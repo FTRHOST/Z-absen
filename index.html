@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal HRIS Karyawan - Tab View</title>
+
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+
+    <style>
+      body {
+        background-color: #f4f6f9;
+      }
+
+      /* Styling Spesifik Kamera & Peta */
+      #kamera-container {
+        position: relative;
+        overflow: hidden;
+        border-radius: 8px;
+        background: #000;
+      }
+      #kamera,
+      #hasil-foto {
+        width: 100%;
+        border-radius: 8px;
+      }
+      #hasil-foto {
+        display: none;
+      }
+      #map {
+        height: 300px;
+        width: 100%;
+        border-radius: 8px;
+        z-index: 1;
+        border: 1px solid #dee2e6;
+      }
+
+      /* Custom Calendar Styling */
+      .calendar-day {
+        height: 80px;
+        vertical-align: top;
+        padding: 5px;
+      }
+      .today {
+        background-color: #e8f4fd;
+        font-weight: bold;
+        color: #0d6efd;
+        border-radius: 5px;
+      }
+
+      /* Styling Tab */
+      .nav-tabs .nav-link {
+        font-weight: bold;
+        color: #495057;
+      }
+      .nav-tabs .nav-link.active {
+        color: #0d6efd;
+        border-bottom: 3px solid #0d6efd;
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+      <div class="container">
+        <a class="navbar-brand fw-bold" href="#">🏢 HRIS Portal</a>
+        <span class="navbar-text text-white">Selamat datang, Karyawan</span>
+      </div>
+    </nav>
+
+    <div class="container py-4">
+      <ul class="nav nav-tabs mb-4" id="hrisTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button
+            class="nav-link active"
+            id="tab-absensi-btn"
+            data-bs-toggle="tab"
+            data-bs-target="#tab-absensi"
+            type="button"
+            role="tab"
+          >
+            📍 Absensi
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button
+            class="nav-link"
+            id="tab-cuti-btn"
+            data-bs-toggle="tab"
+            data-bs-target="#tab-cuti"
+            type="button"
+            role="tab"
+          >
+            📝 Pengajuan Cuti
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button
+            class="nav-link"
+            id="tab-riwayat-btn"
+            data-bs-toggle="tab"
+            data-bs-target="#tab-riwayat"
+            type="button"
+            role="tab"
+          >
+            📅 Riwayat & Kalender
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content" id="hrisTabsContent">
+        <div class="tab-pane fade show active" id="tab-absensi" role="tabpanel">
+          <div class="card shadow-sm">
+            <div class="card-body">
+              <h5 class="card-title fw-bold mb-4">Form Kehadiran Harian</h5>
+              <div class="row g-4">
+                <div class="col-md-12">
+                  <label class="form-label fw-bold small text-muted"
+                    >1. Verifikasi Lokasi</label
+                  >
+                  <div id="map"></div>
+                  <p class="mt-2 text-muted small">
+                    Jarak maksimal: <strong>100 meter</strong> dari kantor.
+                  </p>
+                </div>
+              </div>
+
+              <hr class="my-4" />
+              <button
+                id="btn-cek-lokasi"
+                class="btn btn-primary w-100 py-3 fw-bold fs-5"
+                onclick="prosesCekLokasi()"
+              >
+                📍 Cek Lokasi & Absen
+              </button>
+              <div
+                id="status"
+                class="mt-3 alert alert-secondary text-center"
+                role="alert"
+              >
+                Harap izinkan akses Lokasi di browser Anda.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-cuti" role="tabpanel">
+          <div class="row g-4">
+            <div class="col-md-4">
+              <div class="card shadow-sm border-info h-100">
+                <div
+                  class="card-body text-center d-flex flex-column justify-content-center"
+                >
+                  <h6 class="card-title text-uppercase text-muted fw-bold">
+                    Stok Sisa Cuti Tahunan
+                  </h6>
+                  <h1 class="display-1 text-info fw-bold mb-0">8</h1>
+                  <span class="fs-5 text-dark fw-bold">Hari Tersisa</span>
+                  <small class="text-muted mt-2">Periode Tahun 2026</small>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-8">
+              <div class="card shadow-sm h-100">
+                <div class="card-header bg-white fw-bold">
+                  Formulir Pengajuan Cuti
+                </div>
+                <div class="card-body">
+                  <form onsubmit="ajukanCuti(event)">
+                    <div class="row">
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label small fw-bold"
+                          >Tanggal Mulai</label
+                        >
+                        <input type="date" class="form-control" required />
+                      </div>
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label small fw-bold"
+                          >Tanggal Selesai</label
+                        >
+                        <input type="date" class="form-control" required />
+                      </div>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label small fw-bold">Jenis Cuti</label>
+                      <select class="form-select" required>
+                        <option value="">-- Pilih Jenis Cuti --</option>
+                        <option value="tahunan">Cuti Tahunan</option>
+                        <option value="sakit">
+                          Sakit (Wajib Surat Dokter)
+                        </option>
+                        <option value="melahirkan">Cuti Melahirkan</option>
+                      </select>
+                    </div>
+                    <div class="mb-4">
+                      <label class="form-label small fw-bold"
+                        >Keterangan / Alasan</label
+                      >
+                      <textarea
+                        class="form-control"
+                        rows="3"
+                        placeholder="Tuliskan alasan detail pengajuan cuti..."
+                        required
+                      ></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100 fw-bold">
+                      Kirim Pengajuan Cuti
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-riwayat" role="tabpanel">
+          <div class="row g-4">
+            <div class="col-lg-5">
+              <div class="card shadow-sm h-100">
+                <div class="card-header bg-white fw-bold">
+                  Tabel Riwayat Kehadiran (Bulan Ini)
+                </div>
+                <div class="card-body p-0 overflow-auto">
+                  <table
+                    class="table table-striped table-hover mb-0 text-center small"
+                  >
+                    <thead class="table-light">
+                      <tr>
+                        <th>Tanggal</th>
+                        <th>Masuk</th>
+                        <th>Keluar</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>01 Jul</td>
+                        <td>07:50</td>
+                        <td>17:05</td>
+                        <td><span class="badge bg-success">Hadir</span></td>
+                      </tr>
+                      <tr>
+                        <td>02 Jul</td>
+                        <td>08:15</td>
+                        <td>17:10</td>
+                        <td>
+                          <span class="badge bg-warning text-dark"
+                            >Terlambat</span
+                          >
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>03 Jul</td>
+                        <td>07:55</td>
+                        <td>17:00</td>
+                        <td><span class="badge bg-success">Hadir</span></td>
+                      </tr>
+                      <tr>
+                        <td>04 Jul</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td><span class="badge bg-danger">Alpha</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-lg-7">
+              <div class="card shadow-sm h-100">
+                <div
+                  class="card-header bg-white fw-bold d-flex justify-content-between align-items-center"
+                >
+                  <span>Kalender Kerja</span>
+                  <span id="bulan-tahun" class="badge bg-primary fs-6"></span>
+                </div>
+                <div class="card-body p-0 overflow-auto">
+                  <table class="table table-bordered mb-0 text-center">
+                    <thead class="table-light">
+                      <tr>
+                        <th class="text-danger">Min</th>
+                        <th>Sen</th>
+                        <th>Sel</th>
+                        <th>Rab</th>
+                        <th>Kam</th>
+                        <th>Jum</th>
+                        <th class="text-primary">Sab</th>
+                      </tr>
+                    </thead>
+                    <tbody id="kalender-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Modal Kamera -->
+    <div class="modal fade" id="kameraModal" tabindex="-1" aria-labelledby="kameraModalLabel" aria-hidden="true" data-bs-backdrop="static">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="kameraModalLabel">2. Ambil Foto Wajah</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="stopKamera()"></button>
+          </div>
+          <div class="modal-body text-center">
+            <div id="kamera-container" class="border p-2 bg-dark">
+              <video id="kamera" autoplay playsinline style="width: 100%; border-radius: 8px;"></video>
+              <canvas id="canvas" style="display: none;"></canvas>
+              <img id="hasil-foto" alt="Hasil Tangkapan Kamera" style="width: 100%; border-radius: 8px; display: none;" />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="stopKamera()">Batal</button>
+            <button type="button" class="btn btn-primary" id="btn-ambil-foto" onclick="prosesAbsenFoto()">📸 Ambil Foto & Simpan Absen</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+      // ==========================================
+      // 1. PENGATURAN KAMERA DEPAN
+      // ==========================================
+      const video = document.getElementById("kamera");
+      const canvas = document.getElementById("canvas");
+      const hasilFoto = document.getElementById("hasil-foto");
+      let streamKamera;
+
+      function mulaiKamera() {
+        const video = document.getElementById("kamera");
+        document.getElementById("kamera").style.display = "block";
+        document.getElementById("hasil-foto").style.display = "none";
+        document.getElementById("btn-ambil-foto").style.display = "inline-block";
+        
+        navigator.mediaDevices
+          .getUserMedia({ video: { facingMode: "user" } })
+          .then(function (stream) {
+            streamKamera = stream;
+            video.srcObject = stream;
+          })
+          .catch(function (err) {
+            Swal.fire('Error', 'Gagal mengakses kamera: ' + err.message, 'error');
+          });
+      }
+
+      function stopKamera() {
+        if (streamKamera) {
+          streamKamera.getTracks().forEach((track) => track.stop());
+        }
+      }
+
+      // ==========================================
+      // 2. PENGATURAN LOKASI DAN PETA (Lokasi Baru)
+      // ==========================================
+      const latKantor = -7.028652653309324;
+      const lonKantor = 109.9323264970423;
+      const radiusMaksimal = 100;
+
+      const map = L.map("map").setView([latKantor, lonKantor], 17);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+      }).addTo(map);
+
+      L.marker([latKantor, lonKantor])
+        .addTo(map)
+        .bindPopup("<b>Kantor Baru</b>")
+        .openPopup();
+      L.circle([latKantor, lonKantor], {
+        color: "green",
+        fillColor: "#28a745",
+        fillOpacity: 0.2,
+        radius: radiusMaksimal,
+      }).addTo(map);
+
+      let markerKaryawan;
+
+      // Fix Bug Leaflet: Render ulang peta jika tab "Absensi" diklik
+      document
+        .getElementById("tab-absensi-btn")
+        .addEventListener("shown.bs.tab", function (e) {
+          map.invalidateSize();
+        });
+
+      // ==========================================
+      // 3. PROSES ABSEN
+      // ==========================================
+      function prosesCekLokasi() {
+        const statusDiv = document.getElementById("status");
+        statusDiv.innerHTML = "Memproses lokasi...";
+        statusDiv.className = "mt-3 alert alert-warning text-center";
+        document.getElementById("btn-cek-lokasi").disabled = true;
+
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            berhasilDapatLokasi,
+            gagalDapatLokasi,
+            { enableHighAccuracy: true },
+          );
+        } else {
+          statusDiv.innerHTML = "Geolocation tidak didukung.";
+          statusDiv.className = "mt-3 alert alert-danger text-center";
+          document.getElementById("btn-cek-lokasi").disabled = false;
+        }
+      }
+
+      function berhasilDapatLokasi(position) {
+        document.getElementById("btn-cek-lokasi").disabled = false;
+        const latKaryawan = position.coords.latitude;
+        const lonKaryawan = position.coords.longitude;
+        const titikKantor = L.latLng(latKantor, lonKantor);
+        const titikKaryawan = L.latLng(latKaryawan, lonKaryawan);
+        const jarak = titikKantor.distanceTo(titikKaryawan);
+
+        const statusDiv = document.getElementById("status");
+
+        if (markerKaryawan) map.removeLayer(markerKaryawan);
+        markerKaryawan = L.marker([latKaryawan, lonKaryawan])
+          .addTo(map)
+          .bindPopup("<b>Posisi Anda</b>")
+          .openPopup();
+        map.fitBounds(L.latLngBounds([titikKantor, titikKaryawan]), {
+          padding: [20, 20],
+        });
+
+        if (jarak <= radiusMaksimal) {
+          statusDiv.innerHTML = `✅ <strong>Lokasi Sesuai!</strong><br>Jarak: ${Math.round(jarak)} m dari kantor.`;
+          statusDiv.className = "mt-3 alert alert-success text-center";
+          
+          const kameraModal = new bootstrap.Modal(document.getElementById('kameraModal'));
+          kameraModal.show();
+          mulaiKamera();
+        } else {
+          statusDiv.innerHTML = `❌ <strong>Absen Ditolak.</strong><br>Anda di luar jangkauan (${Math.round(jarak)} m).`;
+          statusDiv.className = "mt-3 alert alert-danger text-center";
+          Swal.fire({
+            title: "Absen Ditolak!",
+            text: `Anda di luar jangkauan (${Math.round(jarak)} m).`,
+            icon: "error",
+          });
+        }
+      }
+
+      function gagalDapatLokasi(error) {
+        document.getElementById("btn-cek-lokasi").disabled = false;
+        document.getElementById("status").innerHTML =
+          "Gagal mengambil lokasi GPS. Pastikan izin lokasi aktif.";
+        document.getElementById("status").className =
+          "mt-3 alert alert-danger text-center";
+      }
+
+      function prosesAbsenFoto() {
+        const video = document.getElementById("kamera");
+        const canvas = document.getElementById("canvas");
+        const hasilFoto = document.getElementById("hasil-foto");
+        
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas
+          .getContext("2d")
+          .drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        video.style.display = "none";
+        hasilFoto.src = canvas.toDataURL("image/png");
+        hasilFoto.style.display = "block";
+        document.getElementById("btn-ambil-foto").style.display = "none";
+
+        stopKamera();
+        
+        setTimeout(() => {
+            const modalEl = document.getElementById('kameraModal');
+            const modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+            modalInstance.hide();
+            
+            Swal.fire({
+              title: "Absen Berhasil!",
+              text: `Foto dan lokasi telah tersimpan.`,
+              icon: "success"
+            });
+        }, 1000);
+      }
+
+      // ==========================================
+      // 4. LOGIKA PENGAJUAN CUTI & KALENDER
+      // ==========================================
+      function ajukanCuti(event) {
+        event.preventDefault();
+        Swal.fire({
+          title: "Berhasil!",
+          text: "Pengajuan cuti berhasil dikirim ke HRD untuk ditinjau!",
+          icon: "success",
+        });
+        event.target.reset(); // Mengosongkan form setelah dikirim
+      }
+
+      function buatKalender() {
+        const tanggalSekarang = new Date();
+        const tahun = tanggalSekarang.getFullYear();
+        const bulan = tanggalSekarang.getMonth();
+        const hariIni = tanggalSekarang.getDate();
+
+        const namaBulan = [
+          "Januari",
+          "Februari",
+          "Maret",
+          "April",
+          "Mei",
+          "Juni",
+          "Juli",
+          "Agustus",
+          "September",
+          "Oktober",
+          "November",
+          "Desember",
+        ];
+        document.getElementById("bulan-tahun").innerText =
+          `${namaBulan[bulan]} ${tahun}`;
+
+        const hariPertama = new Date(tahun, bulan, 1).getDay();
+        const jumlahHari = new Date(tahun, bulan + 1, 0).getDate();
+
+        let tbody = document.getElementById("kalender-body");
+        let tr = document.createElement("tr");
+
+        for (let i = 0; i < hariPertama; i++) {
+          let td = document.createElement("td");
+          tr.appendChild(td);
+        }
+
+        for (let i = 1; i <= jumlahHari; i++) {
+          let td = document.createElement("td");
+          td.innerText = i;
+          td.className = "calendar-day";
+
+          if (i === hariIni) {
+            td.classList.add("today");
+          }
+
+          tr.appendChild(td);
+
+          if ((i + hariPertama) % 7 === 0) {
+            tbody.appendChild(tr);
+            tr = document.createElement("tr");
+          }
+        }
+        if (tr.children.length > 0) {
+          tbody.appendChild(tr);
+        }
+      }
+
+      // Generate kalender saat web dimuat
+      buatKalender();
+    </script>
+  </body>
+</html>
