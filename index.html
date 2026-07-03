@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Portal HRIS Karyawan - Tab View</title>
+    <title>Zie Absen Karyawan - Tab View</title>
 
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
@@ -13,6 +13,14 @@
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     />
+    
+    <script>
+      // Cek apakah pengguna sudah login
+      const userData = localStorage.getItem('userLogin');
+      if (!userData) {
+        window.location.href = 'login.html';
+      }
+    </script>
 
     <style>
       body {
@@ -69,8 +77,11 @@
   <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
       <div class="container">
-        <a class="navbar-brand fw-bold" href="#">🏢 HRIS Portal</a>
-        <span class="navbar-text text-white">Selamat datang, Karyawan</span>
+        <a class="navbar-brand fw-bold" href="#">🏢 Zie Absen</a>
+        <div class="d-flex align-items-center">
+          <span class="navbar-text text-white me-3" id="nama-user-navbar">Selamat datang, Karyawan</span>
+          <button class="btn btn-sm btn-outline-light" onclick="logout()">Logout</button>
+        </div>
       </div>
     </nav>
 
@@ -125,7 +136,7 @@
                     >1. Verifikasi Lokasi</label
                   >
                   <div id="map"></div>
-                  <p class="mt-2 text-muted small">
+                  <p id="info-radius" class="mt-2 text-muted small">
                     Jarak maksimal: <strong>100 meter</strong> dari kantor.
                   </p>
                 </div>
@@ -160,7 +171,7 @@
                   <h6 class="card-title text-uppercase text-muted fw-bold">
                     Stok Sisa Cuti Tahunan
                   </h6>
-                  <h1 class="display-1 text-info fw-bold mb-0">8</h1>
+                  <h1 class="display-1 text-info fw-bold mb-0">-</h1>
                   <span class="fs-5 text-dark fw-bold">Hari Tersisa</span>
                   <small class="text-muted mt-2">Periode Tahun 2026</small>
                 </div>
@@ -238,35 +249,9 @@
                         <th>Status</th>
                       </tr>
                     </thead>
-                    <tbody>
-                      <tr>
-                        <td>01 Jul</td>
-                        <td>07:50</td>
-                        <td>17:05</td>
-                        <td><span class="badge bg-success">Hadir</span></td>
-                      </tr>
-                      <tr>
-                        <td>02 Jul</td>
-                        <td>08:15</td>
-                        <td>17:10</td>
-                        <td>
-                          <span class="badge bg-warning text-dark"
-                            >Terlambat</span
-                          >
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>03 Jul</td>
-                        <td>07:55</td>
-                        <td>17:00</td>
-                        <td><span class="badge bg-success">Hadir</span></td>
-                      </tr>
-                      <tr>
-                        <td>04 Jul</td>
-                        <td>-</td>
-                        <td>-</td>
-                        <td><span class="badge bg-danger">Alpha</span></td>
-                      </tr>
+                    <tbody id="tabel-riwayat-body">
+                      <!-- Data absensi akan dimuat dari database -->
+                      <tr><td colspan="4" class="text-muted">Belum ada riwayat absensi</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -304,23 +289,69 @@
       </div>
     </div>
     <!-- Modal Kamera -->
-    <div class="modal fade" id="kameraModal" tabindex="-1" aria-labelledby="kameraModalLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div
+      class="modal fade"
+      id="kameraModal"
+      tabindex="-1"
+      aria-labelledby="kameraModalLabel"
+      aria-hidden="true"
+      data-bs-backdrop="static"
+    >
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title" id="kameraModalLabel">2. Ambil Foto Wajah</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="stopKamera()"></button>
+            <h5 class="modal-title" id="kameraModalLabel">
+              2. Ambil Foto Wajah
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+              onclick="stopKamera()"
+            ></button>
           </div>
           <div class="modal-body text-center">
-            <div id="kamera-container" class="border p-2 bg-dark">
-              <video id="kamera" autoplay playsinline style="width: 100%; border-radius: 8px;"></video>
-              <canvas id="canvas" style="display: none;"></canvas>
-              <img id="hasil-foto" alt="Hasil Tangkapan Kamera" style="width: 100%; border-radius: 8px; display: none;" />
+            <div
+              id="kamera-container"
+              class="border p-2 bg-dark"
+              style="position: relative"
+            >
+              <video
+                id="kamera"
+                autoplay
+                playsinline
+                style="width: 100%; border-radius: 8px"
+              ></video>
+              <canvas id="canvas" style="display: none"></canvas>
+              <img
+                id="hasil-foto"
+                alt="Hasil Tangkapan Kamera"
+                style="width: 100%; border-radius: 8px; display: none"
+              />
+              <p id="face-status" class="text-warning mt-2 mb-0 fw-bold">
+                Memuat pendeteksi wajah...
+              </p>
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="stopKamera()">Batal</button>
-            <button type="button" class="btn btn-primary" id="btn-ambil-foto" onclick="prosesAbsenFoto()">📸 Ambil Foto & Simpan Absen</button>
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+              onclick="stopKamera()"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              id="btn-ambil-foto"
+              onclick="prosesAbsenFoto()"
+              disabled
+            >
+              📸 Ambil Foto & Simpan Absen
+            </button>
           </div>
         </div>
       </div>
@@ -329,8 +360,114 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
 
     <script>
+      // Variabel Global untuk Lokasi Kantor
+      let latKantor = -7.028652653309324;
+      let lonKantor = 109.9323264970423;
+      let radiusMaksimal = 100;
+      let namaKantor = "Kantor";
+      let map;
+      let markerKaryawan;
+      let jarakAbsen = 0;
+      let absenHariIni = null;
+      let tipeAbsenSekarang = "Masuk";
+
+      async function loadKantorUser() {
+        if (!userData) return;
+        const userObj = JSON.parse(userData);
+        const userCabang = userObj.cabang || '-';
+        document.getElementById("nama-user-navbar").innerText = `Selamat datang, ${userObj.nama} (${userCabang !== '-' ? userCabang : 'Pusat'})`;
+
+        if (userCabang && userCabang !== '-') {
+          const { data, error } = await supabaseClient
+            .from('kantor')
+            .select('*')
+            .eq('nama', userCabang)
+            .single();
+
+          if (data && !error) {
+            latKantor = data.latitude;
+            lonKantor = data.longitude;
+            radiusMaksimal = data.radius;
+            namaKantor = data.nama;
+          }
+        }
+
+        const infoRadius = document.getElementById("info-radius");
+        if (infoRadius) {
+          infoRadius.innerHTML = `Jarak maksimal: <strong>${radiusMaksimal} meter</strong> dari <strong>${namaKantor}</strong>.`;
+        }
+
+        if (!map) {
+          map = L.map("map").setView([latKantor, lonKantor], 17);
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19,
+          }).addTo(map);
+
+          L.marker([latKantor, lonKantor])
+            .addTo(map)
+            .bindPopup(`<b>${namaKantor}</b>`)
+            .openPopup();
+
+          L.circle([latKantor, lonKantor], {
+            color: "green",
+            fillColor: "#28a745",
+            fillOpacity: 0.2,
+            radius: radiusMaksimal,
+          }).addTo(map);
+        }
+      }
+
+      async function cekStatusAbsenHariIni() {
+        if (!userData) return;
+        const userObj = JSON.parse(userData);
+        const tanggalHariIni = new Date().toISOString().split('T')[0];
+        
+        const { data, error } = await supabaseClient
+          .from('absensi')
+          .select('*')
+          .eq('user_id', userObj.id)
+          .eq('tanggal', tanggalHariIni)
+          .maybeSingle();
+          
+        const btnCekLokasi = document.getElementById("btn-cek-lokasi");
+        const btnAmbilFoto = document.getElementById("btn-ambil-foto");
+          
+        if (data) {
+          absenHariIni = data;
+          if (!data.waktu_keluar) {
+            tipeAbsenSekarang = "Pulang";
+            btnCekLokasi.innerHTML = "📍 Cek Lokasi & Absen Pulang";
+            btnCekLokasi.className = "btn btn-warning w-100 py-3 fw-bold fs-5";
+            btnAmbilFoto.innerHTML = "📸 Ambil Foto & Simpan Absen Pulang";
+          } else {
+            tipeAbsenSekarang = "Selesai";
+            btnCekLokasi.innerHTML = "✅ Anda Sudah Absen Lengkap Hari Ini";
+            btnCekLokasi.className = "btn btn-secondary w-100 py-3 fw-bold fs-5";
+            btnCekLokasi.disabled = true;
+          }
+        } else {
+          tipeAbsenSekarang = "Masuk";
+          btnCekLokasi.innerHTML = "📍 Cek Lokasi & Absen Masuk";
+          btnCekLokasi.className = "btn btn-primary w-100 py-3 fw-bold fs-5";
+          btnAmbilFoto.innerHTML = "📸 Ambil Foto & Simpan Absen Masuk";
+        }
+      }
+
+      loadKantorUser();
+      cekStatusAbsenHariIni();
+
+      function logout() {
+        localStorage.removeItem('userLogin');
+        window.location.href = 'login.html';
+      }
+
       // ==========================================
       // 1. PENGATURAN KAMERA DEPAN
       // ==========================================
@@ -339,12 +476,28 @@
       const hasilFoto = document.getElementById("hasil-foto");
       let streamKamera;
 
+      // Initialize face api models
+      let modelsLoaded = false;
+      Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(
+          "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/",
+        ),
+      ]).then(() => {
+        modelsLoaded = true;
+      });
+
       function mulaiKamera() {
         const video = document.getElementById("kamera");
         document.getElementById("kamera").style.display = "block";
         document.getElementById("hasil-foto").style.display = "none";
-        document.getElementById("btn-ambil-foto").style.display = "inline-block";
-        
+        document.getElementById("btn-ambil-foto").style.display =
+          "inline-block";
+        document.getElementById("btn-ambil-foto").disabled = true;
+        document.getElementById("face-status").innerHTML = "Menunggu kamera...";
+        document.getElementById("face-status").className =
+          "text-warning mt-2 mb-0 fw-bold";
+        document.getElementById("face-status").style.display = "block";
+
         navigator.mediaDevices
           .getUserMedia({ video: { facingMode: "user" } })
           .then(function (stream) {
@@ -352,46 +505,64 @@
             video.srcObject = stream;
           })
           .catch(function (err) {
-            Swal.fire('Error', 'Gagal mengakses kamera: ' + err.message, 'error');
+            Swal.fire(
+              "Error",
+              "Gagal mengakses kamera: " + err.message,
+              "error",
+            );
           });
       }
+
+      video.addEventListener("play", () => {
+        const faceStatus = document.getElementById("face-status");
+        const btnAmbilFoto = document.getElementById("btn-ambil-foto");
+
+        const detectInterval = setInterval(async () => {
+          if (video.paused || video.ended || !modelsLoaded) {
+            return;
+          }
+
+          try {
+            const detections = await faceapi.detectAllFaces(
+              video,
+              new faceapi.TinyFaceDetectorOptions(),
+            );
+            if (detections.length > 0) {
+              faceStatus.innerHTML = "✅ Wajah terdeteksi!";
+              faceStatus.className = "text-success mt-2 mb-0 fw-bold";
+              btnAmbilFoto.disabled = false;
+            } else {
+              faceStatus.innerHTML = "❌ Wajah belum terlihat jelas";
+              faceStatus.className = "text-warning mt-2 mb-0 fw-bold";
+              btnAmbilFoto.disabled = true;
+            }
+          } catch (e) {
+            // ignore errors during loading
+          }
+        }, 500);
+
+        video.detectInterval = detectInterval;
+      });
 
       function stopKamera() {
         if (streamKamera) {
           streamKamera.getTracks().forEach((track) => track.stop());
         }
+        if (video.detectInterval) {
+          clearInterval(video.detectInterval);
+        }
       }
 
       // ==========================================
-      // 2. PENGATURAN LOKASI DAN PETA (Lokasi Baru)
+      // 2. PENGATURAN LOKASI DAN PETA (Pindah ke Atas)
       // ==========================================
-      const latKantor = -7.028652653309324;
-      const lonKantor = 109.9323264970423;
-      const radiusMaksimal = 100;
-
-      const map = L.map("map").setView([latKantor, lonKantor], 17);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-      }).addTo(map);
-
-      L.marker([latKantor, lonKantor])
-        .addTo(map)
-        .bindPopup("<b>Kantor Baru</b>")
-        .openPopup();
-      L.circle([latKantor, lonKantor], {
-        color: "green",
-        fillColor: "#28a745",
-        fillOpacity: 0.2,
-        radius: radiusMaksimal,
-      }).addTo(map);
-
-      let markerKaryawan;
+      // Variabel dan inisialisasi peta sekarang dilakukan di fungsi loadKantorUser() di atas.
 
       // Fix Bug Leaflet: Render ulang peta jika tab "Absensi" diklik
       document
         .getElementById("tab-absensi-btn")
         .addEventListener("shown.bs.tab", function (e) {
-          map.invalidateSize();
+          if (map) map.invalidateSize();
         });
 
       // ==========================================
@@ -436,10 +607,13 @@
         });
 
         if (jarak <= radiusMaksimal) {
+          jarakAbsen = Math.round(jarak);
           statusDiv.innerHTML = `✅ <strong>Lokasi Sesuai!</strong><br>Jarak: ${Math.round(jarak)} m dari kantor.`;
           statusDiv.className = "mt-3 alert alert-success text-center";
-          
-          const kameraModal = new bootstrap.Modal(document.getElementById('kameraModal'));
+
+          const kameraModal = new bootstrap.Modal(
+            document.getElementById("kameraModal"),
+          );
           kameraModal.show();
           mulaiKamera();
         } else {
@@ -461,11 +635,12 @@
           "mt-3 alert alert-danger text-center";
       }
 
-      function prosesAbsenFoto() {
+      async function prosesAbsenFoto() {
         const video = document.getElementById("kamera");
         const canvas = document.getElementById("canvas");
         const hasilFoto = document.getElementById("hasil-foto");
-        
+        const faceStatus = document.getElementById("face-status");
+
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         canvas
@@ -473,23 +648,102 @@
           .drawImage(video, 0, 0, canvas.width, canvas.height);
 
         video.style.display = "none";
-        hasilFoto.src = canvas.toDataURL("image/png");
+        const base64Image = canvas.toDataURL("image/png");
+        hasilFoto.src = base64Image;
         hasilFoto.style.display = "block";
-        document.getElementById("btn-ambil-foto").style.display = "none";
+        faceStatus.style.display = "none";
+
+        const btnSubmit = document.getElementById("btn-ambil-foto");
+        btnSubmit.innerHTML = "⏳ Mengunggah foto...";
+        btnSubmit.disabled = true;
 
         stopKamera();
-        
-        setTimeout(() => {
-            const modalEl = document.getElementById('kameraModal');
-            const modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-            modalInstance.hide();
-            
-            Swal.fire({
-              title: "Absen Berhasil!",
-              text: `Foto dan lokasi telah tersimpan.`,
-              icon: "success"
+
+        try {
+          // Konversi Base64 menjadi file Blob untuk Supabase
+          const fetchRes = await fetch(base64Image);
+          const blob = await fetchRes.blob();
+
+          // Generate nama file unik
+          const namaFile = `selfie-${Date.now()}.png`;
+
+          // GANTI 'absensi-bucket' DENGAN NAMA BUCKET YANG ANDA BUAT DI SUPABASE
+          const { data, error } = await supabaseClient
+            .storage
+            .from("absensi-bucket")
+            .upload(namaFile, blob, {
+              contentType: "image/png",
             });
-        }, 1000);
+
+          if (error) throw error;
+
+          // (Opsional) Ambil Public URL untuk disimpan ke database
+          const { data: publicUrlData } = supabaseClient
+            .storage
+            .from("absensi-bucket")
+            .getPublicUrl(namaFile);
+          console.log("Foto tersimpan di URL:", publicUrlData.publicUrl);
+
+          // Simpan data ke tabel absensi
+          const userObj = JSON.parse(userData);
+          const sekarang = new Date();
+          const tanggal = sekarang.toISOString().split('T')[0]; // Format YYYY-MM-DD
+          const waktu_sekarang = sekarang.toTimeString().split(' ')[0]; // Format HH:MM:SS
+
+          let dbError;
+          if (tipeAbsenSekarang === "Masuk") {
+            let statusKehadiran = "Hadir";
+            if (waktu_sekarang > "08:00:00") {
+              statusKehadiran = "Terlambat";
+            }
+            const res = await supabaseClient
+              .from('absensi')
+              .insert([
+                {
+                  user_id: userObj.id,
+                  tanggal: tanggal,
+                  waktu_masuk: waktu_sekarang,
+                  foto_url: publicUrlData.publicUrl,
+                  jarak_meter: jarakAbsen,
+                  status: statusKehadiran
+                }
+              ]);
+            dbError = res.error;
+          } else if (tipeAbsenSekarang === "Pulang") {
+            const res = await supabaseClient
+              .from('absensi')
+              .update({
+                waktu_keluar: waktu_sekarang
+              })
+              .eq('id', absenHariIni.id);
+            dbError = res.error;
+          }
+
+          if (dbError) throw dbError;
+          
+          await cekStatusAbsenHariIni();
+
+          const modalEl = document.getElementById("kameraModal");
+          const modalInstance =
+            bootstrap.Modal.getInstance(modalEl) ||
+            new bootstrap.Modal(modalEl);
+          modalInstance.hide();
+
+          Swal.fire({
+            title: "Absen Berhasil!",
+            text: `Foto dan lokasi telah tersimpan di Supabase.`,
+            icon: "success",
+          });
+        } catch (error) {
+          console.error("Gagal unggah foto:", error.message);
+          Swal.fire({
+            title: "Gagal Mengunggah",
+            text: "Cek konfigurasi URL & Key Supabase Anda.",
+            icon: "error",
+          });
+          btnSubmit.innerHTML = "📸 Ambil Foto & Simpan Absen";
+          btnSubmit.disabled = false;
+        }
       }
 
       // ==========================================
@@ -505,25 +759,15 @@
         event.target.reset(); // Mengosongkan form setelah dikirim
       }
 
-      function buatKalender() {
+      function buatKalender(historyBulanIni = []) {
         const tanggalSekarang = new Date();
         const tahun = tanggalSekarang.getFullYear();
         const bulan = tanggalSekarang.getMonth();
         const hariIni = tanggalSekarang.getDate();
 
         const namaBulan = [
-          "Januari",
-          "Februari",
-          "Maret",
-          "April",
-          "Mei",
-          "Juni",
-          "Juli",
-          "Agustus",
-          "September",
-          "Oktober",
-          "November",
-          "Desember",
+          "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+          "Juli", "Agustus", "September", "Oktober", "November", "Desember"
         ];
         document.getElementById("bulan-tahun").innerText =
           `${namaBulan[bulan]} ${tahun}`;
@@ -532,6 +776,7 @@
         const jumlahHari = new Date(tahun, bulan + 1, 0).getDate();
 
         let tbody = document.getElementById("kalender-body");
+        tbody.innerHTML = '';
         let tr = document.createElement("tr");
 
         for (let i = 0; i < hariPertama; i++) {
@@ -547,6 +792,18 @@
           if (i === hariIni) {
             td.classList.add("today");
           }
+          
+          let tglStr = `${tahun}-${String(bulan + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+          const absenHist = historyBulanIni.find(h => h.tanggal === tglStr);
+          if (absenHist) {
+            if (absenHist.status === 'Hadir') {
+              td.style.backgroundColor = '#d1e7dd';
+              td.title = "Hadir Tepat Waktu";
+            } else if (absenHist.status === 'Terlambat') {
+              td.style.backgroundColor = '#fff3cd';
+              td.title = "Hadir Terlambat";
+            }
+          }
 
           tr.appendChild(td);
 
@@ -560,8 +817,55 @@
         }
       }
 
-      // Generate kalender saat web dimuat
-      buatKalender();
+      async function loadRiwayatAbsensi() {
+        if (!userData) return;
+        const userObj = JSON.parse(userData);
+        
+        const tbody = document.getElementById("tabel-riwayat-body");
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center">Memuat riwayat...</td></tr>';
+
+        const { data, error } = await supabaseClient
+          .from('absensi')
+          .select('*')
+          .eq('user_id', userObj.id)
+          .order('tanggal', { ascending: false });
+
+        if (error) {
+          tbody.innerHTML = '<tr><td colspan="4" class="text-danger">Gagal memuat data</td></tr>';
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" class="text-muted">Belum ada riwayat absensi</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = '';
+        data.forEach(absen => {
+          let badgeClass = absen.status === 'Terlambat' ? 'warning' : 'success';
+          tbody.innerHTML += `
+            <tr>
+              <td>${absen.tanggal}</td>
+              <td>${absen.waktu_masuk || '-'}</td>
+              <td>${absen.waktu_keluar || '-'}</td>
+              <td><span class="badge bg-${badgeClass}">${absen.status}</span></td>
+            </tr>
+          `;
+        });
+        
+        buatKalender(data);
+      }
+
+      // Generate kalender saat web dimuat (default kosong)
+      buatKalender([]);
+      
+      // Load riwayat
+      loadRiwayatAbsensi();
+      
+      // Load ulang riwayat jika tab riwayat diklik
+      document.getElementById('tab-riwayat-btn').addEventListener('shown.bs.tab', function (e) {
+        loadRiwayatAbsensi();
+      });
     </script>
   </body>
 </html>

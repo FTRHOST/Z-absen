@@ -3,7 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Admin Dashboard - HRIS</title>
+    <title>Admin Dashboard - Zie Absen</title>
+    <script>
+      const userData = localStorage.getItem('userLogin');
+      if (!userData) {
+        window.location.href = 'login.html';
+      }
+    </script>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -28,8 +34,11 @@
   <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
       <div class="container-fluid">
-        <a class="navbar-brand fw-bold" href="#">⚙️ Admin Panel HRIS</a>
-        <span class="navbar-text text-white">Login sebagai: Super Admin</span>
+        <a class="navbar-brand fw-bold" href="#">⚙️ Admin Panel Zie Absen</a>
+        <div class="d-flex align-items-center">
+          <span class="navbar-text text-white me-3" id="navbar-role-text">Login sebagai: Super Admin</span>
+          <button class="btn btn-sm btn-outline-light" onclick="logout()">Logout</button>
+        </div>
       </div>
     </nav>
 
@@ -155,43 +164,23 @@
 
             <div class="tab-pane fade" id="tab-kantor">
               <div class="card shadow-sm mb-4">
-                <div class="card-header">➕ Tambah Lokasi Kantor</div>
+                <div class="card-header">➕ Tambah Kantor Baru</div>
                 <div class="card-body">
-                  <form
-                    class="row g-3"
-                    onsubmit="
-                      event.preventDefault();
-                      Swal.fire({title: 'Sukses', text: 'Kantor baru berhasil ditambahkan!', icon: 'success'});
-                    "
-                  >
-                    <div class="col-md-4">
-                      <input
-                        type="text"
-                        class="form-control"
-                        placeholder="Nama Kantor (Misal: Cabang Jakarta)"
-                        required
-                      />
+                  <form class="row g-3" onsubmit="simpanKantor(event)">
+                    <div class="col-md-3">
+                      <input type="text" class="form-control" placeholder="Nama Kantor (Misal: Cabang Tegal)" required />
                     </div>
                     <div class="col-md-3">
-                      <input
-                        type="text"
-                        class="form-control"
-                        placeholder="Latitude (Garis Lintang)"
-                        required
-                      />
+                      <input type="text" class="form-control" placeholder="Latitude (Misal: -6.971817)" required />
                     </div>
                     <div class="col-md-3">
-                      <input
-                        type="text"
-                        class="form-control"
-                        placeholder="Longitude (Garis Bujur)"
-                        required
-                      />
+                      <input type="text" class="form-control" placeholder="Longitude (Misal: 109.931670)" required />
                     </div>
                     <div class="col-md-2">
-                      <button type="submit" class="btn btn-success w-100">
-                        Simpan
-                      </button>
+                      <input type="number" class="form-control" placeholder="Radius (Meter)" value="100" required />
+                    </div>
+                    <div class="col-md-1">
+                      <button type="submit" class="btn btn-success w-100">Simpan</button>
                     </div>
                   </form>
                 </div>
@@ -209,22 +198,8 @@
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td>Pusat Batang</td>
-                        <td>-6.971817, 109.931670</td>
-                        <td>100m</td>
-                        <td>
-                          <button class="btn btn-sm btn-danger">Hapus</button>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>Cabang Tegal</td>
-                        <td>-6.869400, 109.140200</td>
-                        <td>100m</td>
-                        <td>
-                          <button class="btn btn-sm btn-danger">Hapus</button>
-                        </td>
-                      </tr>
+                      <!-- Data akan dimuat dari database -->
+                      <tr><td colspan="4" class="text-muted">Belum ada data kantor</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -233,87 +208,59 @@
 
             <div class="tab-pane fade" id="tab-karyawan">
               <div class="card shadow-sm mb-4">
-                <div class="card-header">➕ Tambah Karyawan Baru</div>
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <span>➕ Tambah Pengguna Baru</span>
+                  <select class="form-select form-select-sm w-auto" id="simulator-role" onchange="gantiRoleSimulator()">
+                    <option value="superadmin">Login Simulator: Super Admin</option>
+                    <option value="hr">Login Simulator: HR</option>
+                  </select>
+                </div>
                 <div class="card-body">
-                  <form
-                    class="row g-3"
-                    onsubmit="
-                      event.preventDefault();
-                      Swal.fire({title: 'Sukses', text: 'Karyawan berhasil ditambahkan!', icon: 'success'});
-                    "
-                  >
-                    <div class="col-md-3">
-                      <input
-                        type="text"
-                        class="form-control"
-                        placeholder="ID Karyawan (Misal: KRY-001)"
-                        required
-                      />
-                    </div>
-                    <div class="col-md-3">
-                      <input
-                        type="text"
-                        class="form-control"
-                        placeholder="Nama Lengkap"
-                        required
-                      />
-                    </div>
+                  <form class="row g-3" onsubmit="simpanKaryawan(event)">
                     <div class="col-md-2">
-                      <input
-                        type="password"
-                        class="form-control"
-                        placeholder="Password"
-                        required
-                      />
-                    </div>
-                    <div class="col-md-2">
-                      <select class="form-select" required>
-                        <option value="">Pilih Kantor...</option>
-                        <option>Pusat Batang</option>
-                        <option>Cabang Tegal</option>
+                      <select class="form-select" id="role-karyawan" required>
+                        <option value="">-- Pilih Role --</option>
+                        <option value="HR" id="opt-hr">HR</option>
+                        <option value="Karyawan">Karyawan</option>
                       </select>
                     </div>
+                    <div class="col-md-3">
+                      <input type="text" class="form-control" placeholder="Nama Lengkap" required />
+                    </div>
+                    <div class="col-md-3">
+                      <input type="tel" class="form-control" placeholder="No HP" required />
+                    </div>
                     <div class="col-md-2">
-                      <button type="submit" class="btn btn-success w-100">
-                        Simpan
-                      </button>
+                      <input type="password" class="form-control" placeholder="Password" required />
+                    </div>
+                    <div class="col-md-2">
+                      <select class="form-select" id="pilih-cabang" required>
+                        <option value="">Pilih Kantor...</option>
+                      </select>
+                    </div>
+                    <div class="col-12 text-end">
+                      <button type="submit" class="btn btn-success">Simpan Data</button>
                     </div>
                   </form>
                 </div>
               </div>
               <div class="card shadow-sm">
-                <div class="card-header">Daftar Karyawan</div>
+                <div class="card-header">Daftar Pengguna / Karyawan</div>
                 <div class="card-body p-0 overflow-auto">
-                  <table class="table table-striped mb-0 text-center">
+                  <table class="table table-striped mb-0 text-center align-middle">
                     <thead>
                       <tr>
-                        <th>ID</th>
                         <th>Nama</th>
+                        <th>Role</th>
+                        <th>No HP</th>
                         <th>Penempatan</th>
+                        <th>Sisa Cuti</th>
                         <th>Aksi</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td>KRY-001</td>
-                        <td>Budi Santoso</td>
-                        <td>Pusat Batang</td>
-                        <td>
-                          <button class="btn btn-sm btn-outline-primary">
-                            Edit
-                          </button>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>KRY-002</td>
-                        <td>Siti Aminah</td>
-                        <td>Cabang Tegal</td>
-                        <td>
-                          <button class="btn btn-sm btn-outline-primary">
-                            Edit
-                          </button>
-                        </td>
-                      </tr>
+                      <!-- Data akan dimuat dari database -->
+                      <tr><td colspan="5" class="text-muted">Belum ada data pengguna</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -345,30 +292,8 @@
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td>Budi Santoso</td>
-                        <td>Pusat Batang</td>
-                        <td>07:45 WIB</td>
-                        <td>
-                          <span class="badge bg-secondary">Lihat Foto</span>
-                        </td>
-                        <td>
-                          <span class="text-success fw-bold">12m (Valid)</span>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>Siti Aminah</td>
-                        <td>Cabang Tegal</td>
-                        <td>08:10 WIB</td>
-                        <td>
-                          <span class="badge bg-secondary">Lihat Foto</span>
-                        </td>
-                        <td>
-                          <span class="text-danger fw-bold"
-                            >150m (Luar Radius)</span
-                          >
-                        </td>
-                      </tr>
+                      <!-- Data akan dimuat dari database -->
+                      <tr><td colspan="5" class="text-muted">Belum ada data absensi hari ini</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -392,26 +317,8 @@
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td>Budi Santoso</td>
-                        <td>10 - 11 Jul 2026</td>
-                        <td>Acara Keluarga</td>
-                        <td>2 Hari (Bulan Ini)</td>
-                        <td>
-                          <button
-                            class="btn btn-sm btn-success"
-                            onclick="Swal.fire({title: 'Berhasil', text: 'Cuti Disetujui', icon: 'success'})"
-                          >
-                            Setujui
-                          </button>
-                          <button
-                            class="btn btn-sm btn-danger"
-                            onclick="Swal.fire({title: 'Ditolak', text: 'Cuti Ditolak', icon: 'error'})"
-                          >
-                            Tolak
-                          </button>
-                        </td>
-                      </tr>
+                      <!-- Data akan dimuat dari database -->
+                      <tr><td colspan="5" class="text-muted">Belum ada pengajuan cuti</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -424,5 +331,38 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <!-- Supabase JS Client & Config -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="admin.js"></script>
+    
+    <script>
+      if (userData) {
+        const userObj = JSON.parse(userData);
+        document.getElementById("navbar-role-text").innerText = `Login sebagai: ${userObj.nama} (${userObj.role})`;
+      }
+
+      function logout() {
+        localStorage.removeItem('userLogin');
+        window.location.href = 'login.html';
+      }
+
+      function gantiRoleSimulator() {
+        const simulatorRole = document.getElementById("simulator-role").value;
+        const optHr = document.getElementById("opt-hr");
+        const navbarText = document.getElementById("navbar-role-text");
+        const roleDropdown = document.getElementById("role-karyawan");
+        
+        if (simulatorRole === 'hr') {
+          optHr.style.display = 'none'; // Sembunyikan opsi tambah HR
+          roleDropdown.value = ""; // Reset pilihan
+          navbarText.innerText = "Login sebagai: HR";
+        } else {
+          optHr.style.display = 'block'; // Tampilkan kembali opsi tambah HR
+          navbarText.innerText = "Login sebagai: Super Admin";
+        }
+      }
+    </script>
   </body>
 </html>
