@@ -151,10 +151,11 @@
             timer: 1500,
             showConfirmButton: false,
           }).then(() => {
-            // Arahkan sesuai peran (role)
-            if (data.role === "HR" || data.role === "Super Admin") {
+            // Super Admin tidak absen, langsung ke Admin Panel
+            if (data.role === "Super Admin") {
               window.location.href = "admin.html";
             } else {
+              // HR dan Karyawan ke halaman absen
               window.location.href = "index.html";
             }
           });

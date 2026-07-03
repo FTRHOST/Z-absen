@@ -14,6 +14,7 @@
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
       rel="stylesheet"
     />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
       body {
         background-color: #f4f6f9;
@@ -36,7 +37,8 @@
       <div class="container-fluid">
         <a class="navbar-brand fw-bold" href="#">⚙️ Admin Panel Zie Absen</a>
         <div class="d-flex align-items-center">
-          <span class="navbar-text text-white me-3" id="navbar-role-text">Login sebagai: Super Admin</span>
+          <a href="index.html" class="btn btn-sm btn-info fw-bold text-dark me-3">📍 Ke Halaman Absen</a>
+          <span class="navbar-text text-white me-3 d-none d-md-inline" id="navbar-role-text">Login sebagai: Super Admin</span>
           <button class="btn btn-sm btn-outline-light" onclick="logout()">Logout</button>
         </div>
       </div>
@@ -93,6 +95,15 @@
                 >
                   📝 Approval Cuti
                 </button>
+                <button
+                  class="nav-link text-start mb-1"
+                  data-bs-toggle="pill"
+                  data-bs-target="#tab-form-builder"
+                  type="button"
+                  id="btn-konfigurasi-cuti"
+                >
+                  ⚙️ Konfigurasi Cuti Terpusat
+                </button>
               </div>
             </div>
           </div>
@@ -106,7 +117,7 @@
                   <div class="card shadow-sm bg-primary text-white">
                     <div class="card-body">
                       <h5>Total Karyawan</h5>
-                      <h2>45</h2>
+                      <h2 id="stat-user">0</h2>
                     </div>
                   </div>
                 </div>
@@ -114,7 +125,7 @@
                   <div class="card shadow-sm bg-success text-white">
                     <div class="card-body">
                       <h5>Hadir Hari Ini</h5>
-                      <h2>42</h2>
+                      <h2 id="stat-hadir">0</h2>
                     </div>
                   </div>
                 </div>
@@ -164,23 +175,48 @@
 
             <div class="tab-pane fade" id="tab-kantor">
               <div class="card shadow-sm mb-4">
-                <div class="card-header">➕ Tambah Kantor Baru</div>
+                <div class="card-header" id="kantor-card-header">➕ Tambah Kantor Baru</div>
                 <div class="card-body">
-                  <form class="row g-3" onsubmit="simpanKantor(event)">
-                    <div class="col-md-3">
-                      <input type="text" class="form-control" placeholder="Nama Kantor (Misal: Cabang Tegal)" required />
+                  <form class="row g-3" id="form-kantor" onsubmit="simpanKantor(event)">
+                    <input type="hidden" id="kantor_id" value="">
+                    <div class="col-md-12">
+                      <div class="d-flex justify-content-between align-items-center mb-1">
+                          <label class="form-label small text-muted mb-0">Pilih Lokasi di Peta (Klik untuk set koordinat)</label>
+                          <button type="button" class="btn btn-sm btn-outline-primary" onclick="gunakanLokasiSaatIni()">📍 Gunakan Lokasi Saat Ini</button>
+                      </div>
+                      <div id="map-kantor" style="height: 250px; width: 100%; border-radius: 8px; border: 1px solid #dee2e6;" class="mb-2"></div>
                     </div>
                     <div class="col-md-3">
-                      <input type="text" class="form-control" placeholder="Latitude (Misal: -6.971817)" required />
-                    </div>
-                    <div class="col-md-3">
-                      <input type="text" class="form-control" placeholder="Longitude (Misal: 109.931670)" required />
+                      <input type="text" class="form-control" id="kantor_nama" placeholder="Nama Kantor (Misal: Cabang Tegal)" required />
                     </div>
                     <div class="col-md-2">
-                      <input type="number" class="form-control" placeholder="Radius (Meter)" value="100" required />
+                      <input type="text" class="form-control" id="kantor_lat" placeholder="Latitude" required readonly />
                     </div>
-                    <div class="col-md-1">
-                      <button type="submit" class="btn btn-success w-100">Simpan</button>
+                    <div class="col-md-2">
+                      <input type="text" class="form-control" id="kantor_lng" placeholder="Longitude" required readonly />
+                    </div>
+                    <div class="col-md-2">
+                      <input type="number" class="form-control" id="kantor_rad" placeholder="Radius (Meter)" value="100" required />
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label small text-muted mb-0">Jam Masuk</label>
+                      <input type="time" class="form-control" id="kantor_jam_masuk" value="08:00" required />
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label small text-muted mb-0">Jam Pulang</label>
+                      <input type="time" class="form-control" id="kantor_jam_keluar" value="17:00" required />
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label small text-muted mb-0">Mulai Istirahat</label>
+                      <input type="time" class="form-control" id="kantor_jam_mulai_istirahat" value="12:00" required />
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label small text-muted mb-0">Selesai Istirahat</label>
+                      <input type="time" class="form-control" id="kantor_jam_selesai_istirahat" value="13:00" required />
+                    </div>
+                    <div class="col-md-12 text-end mt-2">
+                      <button type="button" class="btn btn-secondary d-none" id="kantor_btn_batal" onclick="batalEditKantor()">Batal Edit</button>
+                      <button type="submit" class="btn btn-success" id="kantor_btn">Simpan Data Cabang</button>
                     </div>
                   </form>
                 </div>
@@ -192,8 +228,8 @@
                     <thead>
                       <tr>
                         <th>Nama Kantor</th>
-                        <th>Koordinat</th>
-                        <th>Radius</th>
+                        <th>Koordinat & Radius</th>
+                        <th>Jam Kerja</th>
                         <th>Aksi</th>
                       </tr>
                     </thead>
@@ -208,15 +244,12 @@
 
             <div class="tab-pane fade" id="tab-karyawan">
               <div class="card shadow-sm mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="card-header d-flex justify-content-between align-items-center" id="karyawan-card-header">
                   <span>➕ Tambah Pengguna Baru</span>
-                  <select class="form-select form-select-sm w-auto" id="simulator-role" onchange="gantiRoleSimulator()">
-                    <option value="superadmin">Login Simulator: Super Admin</option>
-                    <option value="hr">Login Simulator: HR</option>
-                  </select>
                 </div>
                 <div class="card-body">
-                  <form class="row g-3" onsubmit="simpanKaryawan(event)">
+                  <form class="row g-3" id="form-karyawan" onsubmit="simpanKaryawan(event)">
+                    <input type="hidden" id="karyawan_id" value="">
                     <div class="col-md-2">
                       <select class="form-select" id="role-karyawan" required>
                         <option value="">-- Pilih Role --</option>
@@ -225,21 +258,34 @@
                       </select>
                     </div>
                     <div class="col-md-3">
-                      <input type="text" class="form-control" placeholder="Nama Lengkap" required />
+                      <input type="text" class="form-control" id="karyawan_nama" placeholder="Nama Lengkap" required />
                     </div>
                     <div class="col-md-3">
-                      <input type="tel" class="form-control" placeholder="No HP" required />
+                      <input type="tel" class="form-control" id="karyawan_hp" placeholder="No HP" required />
                     </div>
                     <div class="col-md-2">
-                      <input type="password" class="form-control" placeholder="Password" required />
+                      <input type="password" class="form-control" id="karyawan_password" placeholder="Password (Kosongi jika tidak diubah)" />
                     </div>
                     <div class="col-md-2">
                       <select class="form-select" id="pilih-cabang" required>
                         <option value="">Pilih Kantor...</option>
                       </select>
                     </div>
+                    <div class="col-md-12">
+                      <label class="form-label mb-1 small text-muted">Jadwal Libur Rutin:</label>
+                      <div class="d-flex flex-wrap gap-3">
+                        <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="1"> <label>Senin</label></div>
+                        <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="2"> <label>Selasa</label></div>
+                        <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="3"> <label>Rabu</label></div>
+                        <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="4"> <label>Kamis</label></div>
+                        <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="5"> <label>Jumat</label></div>
+                        <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="6"> <label>Sabtu</label></div>
+                        <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="0"> <label class="text-danger">Minggu</label></div>
+                      </div>
+                    </div>
                     <div class="col-12 text-end">
-                      <button type="submit" class="btn btn-success">Simpan Data</button>
+                      <button type="button" class="btn btn-secondary d-none" id="karyawan_btn_batal" onclick="batalEditKaryawan()">Batal Edit</button>
+                      <button type="submit" class="btn btn-success" id="karyawan_btn">Simpan Data</button>
                     </div>
                   </form>
                 </div>
@@ -254,7 +300,7 @@
                         <th>Role</th>
                         <th>No HP</th>
                         <th>Penempatan</th>
-                        <th>Sisa Cuti</th>
+                        <th>Jadwal Libur</th>
                         <th>Aksi</th>
                       </tr>
                     </thead>
@@ -286,39 +332,91 @@
                       <tr>
                         <th>Karyawan</th>
                         <th>Kantor</th>
-                        <th>Waktu Masuk</th>
+                        <th>Masuk</th>
+                        <th>Istirahat Keluar</th>
+                        <th>Istirahat Masuk</th>
+                        <th>Pulang</th>
                         <th>Foto Muka</th>
-                        <th>Status Jarak</th>
+                        <th>Status Kehadiran</th>
                       </tr>
                     </thead>
                     <tbody>
                       <!-- Data akan dimuat dari database -->
-                      <tr><td colspan="5" class="text-muted">Belum ada data absensi hari ini</td></tr>
+                      <tr><td colspan="8" class="text-muted">Belum ada data absensi hari ini</td></tr>
                     </tbody>
                   </table>
                 </div>
               </div>
             </div>
 
+            <!-- TAB APPROVAL CUTI -->
             <div class="tab-pane fade" id="tab-cuti">
               <div class="card shadow-sm">
-                <div class="card-header">Daftar Pengajuan Cuti Bulanan</div>
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                  <span>Daftar Pengajuan Cuti</span>
+                </div>
                 <div class="card-body p-0 overflow-auto">
-                  <table
-                    class="table table-striped mb-0 text-center align-middle"
-                  >
-                    <thead>
+                  <table class="table table-hover mb-0" id="tab-cuti">
+                    <thead class="table-light">
                       <tr>
-                        <th>Karyawan</th>
+                        <th>Nama Karyawan</th>
                         <th>Tanggal Cuti</th>
-                        <th>Alasan</th>
-                        <th>Sisa Cuti</th>
+                        <th>Alasan & Form Tambahan</th>
+                        <th>Durasi</th>
+                        <th>Aksi / Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <!-- Data Cuti -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+        <!-- TAB FORM BUILDER CUTI -->
+            <div class="tab-pane fade" id="tab-form-builder">
+              <div class="d-flex justify-content-between align-items-center mb-3 mt-2">
+                <h5 class="fw-bold">Master Jenis Cuti & Kuota</h5>
+                <button class="btn btn-primary" onclick="showModalMasterCuti()">+ Tambah Jenis Cuti</button>
+              </div>
+              <div class="card shadow-sm mb-4">
+                <div class="card-body p-0">
+                  <table class="table table-striped table-hover mb-0 text-center" id="table-master-cuti">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Nama Cuti</th>
+                        <th>Batas Hari</th>
+                        <th>Siklus</th>
                         <th>Aksi</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <!-- Data akan dimuat dari database -->
-                      <tr><td colspan="5" class="text-muted">Belum ada pengajuan cuti</td></tr>
+                      <tr><td colspan="4" class="text-center">Memuat data...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                  <span>Konfigurasi Form Cuti Dinamis</span>
+                  <button class="btn btn-primary btn-sm fw-bold" onclick="showModalFormCuti()">+ Tambah Field</button>
+                </div>
+                <div class="card-body p-0 overflow-auto">
+                  <table class="table table-hover mb-0" id="tabel-form-builder">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Label</th>
+                        <th>Tipe</th>
+                        <th>Opsi Dropdown</th>
+                        <th>Wajib?</th>
+                        <th>Urutan</th>
+                        <th>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <!-- Data Form Builder -->
                     </tbody>
                   </table>
                 </div>
@@ -329,10 +427,108 @@
       </div>
     </div>
 
+    <!-- Modal Form Builder -->
+    <div class="modal fade" id="modalFormBuilder" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form onsubmit="simpanFieldCuti(event)">
+            <div class="modal-header">
+              <h5 class="modal-title" id="modalFormBuilderLabel">Tambah / Edit Field Cuti</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" id="field-id">
+              <div class="mb-3">
+                <label class="form-label">Label Field</label>
+                <input type="text" class="form-control" id="field-label" required placeholder="Contoh: Surat Sakit" />
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Tipe Input</label>
+                <select class="form-select" id="field-tipe" required onchange="toggleOpsiDropdown()">
+                  <option value="keterangan">Teks / Keterangan (Textarea)</option>
+                  <option value="date">Tanggal (Date)</option>
+                  <option value="dropdown">Pilihan Bebas (Dropdown)</option>
+                  <option value="master_cuti">Pilihan Master Cuti Terpusat (Otomatis)</option>
+                  <option value="file">Upload File</option>
+                </select>
+              </div>
+              <div class="mb-3" id="container-opsi" style="display: none;">
+                <label class="form-label" id="label-opsi">Opsi Pilihan (Pisahkan dengan koma)</label>
+                <input type="text" class="form-control" id="field-opsi" placeholder="Opsi A, Opsi B, Opsi C" />
+                <small class="text-muted" id="hint-opsi">Untuk dropdown, pisahkan opsi dengan koma.</small>
+              </div>
+              <div class="row">
+                <div class="col-6 mb-3">
+                  <label class="form-label">Wajib Diisi?</label>
+                  <select class="form-select" id="field-wajib">
+                    <option value="true">Ya (Wajib)</option>
+                    <option value="false">Tidak (Opsional)</option>
+                  </select>
+                </div>
+                <div class="col-6 mb-3">
+                  <label class="form-label">Urutan Tampil</label>
+                  <input type="number" class="form-control" id="field-urutan" value="0" required />
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+              <button type="submit" class="btn btn-primary">Simpan Field</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Master Jenis Cuti -->
+    <div class="modal fade" id="modalMasterCuti" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form id="formMasterCuti" onsubmit="simpanMasterCuti(event)">
+            <div class="modal-header">
+              <h5 class="modal-title" id="modalMasterCutiLabel">Tambah Jenis Cuti</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" id="master-id" />
+              
+              <div class="mb-3">
+                <label class="form-label">Nama Cuti</label>
+                <input type="text" class="form-control" id="master-nama" required placeholder="Contoh: Cuti Tahunan" />
+              </div>
+              
+              <div class="mb-3">
+                <label class="form-label">Batasan Hari</label>
+                <div class="form-check form-switch mb-2">
+                  <input class="form-check-input" type="checkbox" id="master-unlimited" onchange="toggleMasterBatas()">
+                  <label class="form-check-label" for="master-unlimited">Tanpa Batas (Unlimited)</label>
+                </div>
+                <input type="number" class="form-control" id="master-batas" placeholder="Jumlah hari (contoh: 12)" required />
+              </div>
+              
+              <div class="mb-3">
+                <label class="form-label">Siklus</label>
+                <select class="form-select" id="master-siklus" required>
+                  <option value="Tahunan">Tahunan (Reset setiap tahun)</option>
+                  <option value="Bulanan">Bulanan (Reset setiap bulan)</option>
+                  <option value="Sekali">Sekali (Tidak pernah reset)</option>
+                </select>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+              <button type="submit" class="btn btn-primary">Simpan Master</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <!-- Supabase JS Client & Config -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="admin.js"></script>
@@ -348,20 +544,9 @@
         window.location.href = 'login.html';
       }
 
-      function gantiRoleSimulator() {
-        const simulatorRole = document.getElementById("simulator-role").value;
-        const optHr = document.getElementById("opt-hr");
-        const navbarText = document.getElementById("navbar-role-text");
-        const roleDropdown = document.getElementById("role-karyawan");
-        
-        if (simulatorRole === 'hr') {
-          optHr.style.display = 'none'; // Sembunyikan opsi tambah HR
-          roleDropdown.value = ""; // Reset pilihan
-          navbarText.innerText = "Login sebagai: HR";
-        } else {
-          optHr.style.display = 'block'; // Tampilkan kembali opsi tambah HR
-          navbarText.innerText = "Login sebagai: Super Admin";
-        }
+      function logout() {
+        localStorage.removeItem('userLogin');
+        window.location.href = 'login.html';
       }
     </script>
   </body>

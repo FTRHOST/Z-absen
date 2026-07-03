@@ -79,7 +79,8 @@
       <div class="container">
         <a class="navbar-brand fw-bold" href="#">🏢 Zie Absen</a>
         <div class="d-flex align-items-center">
-          <span class="navbar-text text-white me-3" id="nama-user-navbar">Selamat datang, Karyawan</span>
+          <a id="btn-admin-panel" class="btn btn-sm btn-warning text-dark fw-bold me-2 d-none" href="admin.html">⚙️ Panel Admin</a>
+          <span class="navbar-text text-white me-3 d-none d-md-inline" id="nama-user-navbar">Selamat datang, Karyawan</span>
           <button class="btn btn-sm btn-outline-light" onclick="logout()">Logout</button>
         </div>
       </div>
@@ -121,6 +122,18 @@
             role="tab"
           >
             📅 Riwayat & Kalender
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button
+            class="nav-link"
+            id="tab-profil-btn"
+            data-bs-toggle="tab"
+            data-bs-target="#tab-profil"
+            type="button"
+            role="tab"
+          >
+            👤 Profil Pengguna
           </button>
         </li>
       </ul>
@@ -168,12 +181,12 @@
                 <div
                   class="card-body text-center d-flex flex-column justify-content-center"
                 >
-                  <h6 class="card-title text-uppercase text-muted fw-bold">
-                    Stok Sisa Cuti Tahunan
+                  <h6 class="card-title text-uppercase text-muted fw-bold mb-3 border-bottom pb-2">
+                    Jatah & Sisa Cuti Anda
                   </h6>
-                  <h1 class="display-1 text-info fw-bold mb-0">-</h1>
-                  <span class="fs-5 text-dark fw-bold">Hari Tersisa</span>
-                  <small class="text-muted mt-2">Periode Tahun 2026</small>
+                  <div id="container-sisa-cuti" class="text-start overflow-auto" style="max-height: 250px;">
+                    <div class="text-center text-muted small">Memuat data...</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -183,47 +196,43 @@
                   Formulir Pengajuan Cuti
                 </div>
                 <div class="card-body">
-                  <form onsubmit="ajukanCuti(event)">
-                    <div class="row">
-                      <div class="col-md-6 mb-3">
-                        <label class="form-label small fw-bold"
-                          >Tanggal Mulai</label
-                        >
-                        <input type="date" class="form-control" required />
-                      </div>
-                      <div class="col-md-6 mb-3">
-                        <label class="form-label small fw-bold"
-                          >Tanggal Selesai</label
-                        >
-                        <input type="date" class="form-control" required />
-                      </div>
+                  <form id="form-pengajuan-cuti" onsubmit="ajukanCuti(event)">
+                    <div id="dynamic-form-container">
+                      <div class="text-center text-muted">Memuat form...</div>
                     </div>
-                    <div class="mb-3">
-                      <label class="form-label small fw-bold">Jenis Cuti</label>
-                      <select class="form-select" required>
-                        <option value="">-- Pilih Jenis Cuti --</option>
-                        <option value="tahunan">Cuti Tahunan</option>
-                        <option value="sakit">
-                          Sakit (Wajib Surat Dokter)
-                        </option>
-                        <option value="melahirkan">Cuti Melahirkan</option>
-                      </select>
-                    </div>
-                    <div class="mb-4">
-                      <label class="form-label small fw-bold"
-                        >Keterangan / Alasan</label
-                      >
-                      <textarea
-                        class="form-control"
-                        rows="3"
-                        placeholder="Tuliskan alasan detail pengajuan cuti..."
-                        required
-                      ></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-success w-100 fw-bold">
+                    <button type="submit" class="btn btn-success w-100 fw-bold mt-3">
                       Kirim Pengajuan Cuti
                     </button>
                   </form>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIWAYAT PENGAJUAN CUTI -->
+          <div class="row mt-4">
+            <div class="col-12">
+              <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold">
+                  Riwayat Pengajuan Cuti Anda
+                </div>
+                <div class="card-body p-0 overflow-auto">
+                  <table class="table table-striped table-hover mb-0 text-center small">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Tanggal Pengajuan</th>
+                        <th>Tanggal Cuti</th>
+                        <th>Alasan & Form Tambahan</th>
+                        <th>Durasi</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tabel-riwayat-cuti">
+                      <tr>
+                        <td colspan="5" class="text-muted">Memuat data...</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -286,6 +295,43 @@
             </div>
           </div>
         </div>
+
+        <!-- TAB PROFIL -->
+        <div class="tab-pane fade" id="tab-profil" role="tabpanel">
+          <div class="row justify-content-center">
+            <div class="col-md-6">
+              <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white fw-bold">Informasi Profil</div>
+                <div class="card-body">
+                  <table class="table table-borderless mb-0">
+                    <tr><td width="35%" class="text-muted">Nama</td><td><strong id="profil-nama"></strong></td></tr>
+                    <tr><td class="text-muted">Role</td><td><span class="badge bg-primary" id="profil-role"></span></td></tr>
+                    <tr><td class="text-muted">No HP</td><td id="profil-hp"></td></tr>
+                    <tr><td class="text-muted">Penempatan</td><td id="profil-cabang"></td></tr>
+                  </table>
+                </div>
+              </div>
+
+              <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold">Ubah Password</div>
+                <div class="card-body">
+                  <form onsubmit="ubahPassword(event)">
+                    <div class="mb-3">
+                      <label class="form-label small text-muted">Password Baru</label>
+                      <input type="password" class="form-control" id="profil-password-baru" required>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label small text-muted">Konfirmasi Password Baru</label>
+                      <input type="password" class="form-control" id="profil-password-konfirmasi" required>
+                    </div>
+                    <button type="submit" class="btn btn-warning w-100 fw-bold">Update Password</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
     <!-- Modal Kamera -->
@@ -368,10 +414,16 @@
 
     <script>
       // Variabel Global untuk Lokasi Kantor
-      let latKantor = -7.028652653309324;
-      let lonKantor = 109.9323264970423;
+      let currentUser = userData ? JSON.parse(userData) : null;
+      let latKantor = -6.200000;
+      let lonKantor = 106.816666;
       let radiusMaksimal = 100;
-      let namaKantor = "Kantor";
+      let namaKantor = "Kantor Pusat";
+      let jamMasukKantor = "08:00:00";
+      let jamKeluarKantor = "17:00:00";
+      let jamMulaiIstirahat = "12:00:00";
+      let jamSelesaiIstirahat = "13:00:00";
+      
       let map;
       let markerKaryawan;
       let jarakAbsen = 0;
@@ -379,10 +431,16 @@
       let tipeAbsenSekarang = "Masuk";
 
       async function loadKantorUser() {
-        if (!userData) return;
-        const userObj = JSON.parse(userData);
+        if (!currentUser) return;
+        const userObj = currentUser;
         const userCabang = userObj.cabang || '-';
         document.getElementById("nama-user-navbar").innerText = `Selamat datang, ${userObj.nama} (${userCabang !== '-' ? userCabang : 'Pusat'})`;
+        
+        if (userObj.role === "HR" || userObj.role === "Super Admin") {
+            document.getElementById("btn-admin-panel").classList.remove("d-none");
+        }
+        
+        isiDataProfil();
 
         if (userCabang && userCabang !== '-') {
           const { data, error } = await supabaseClient
@@ -396,6 +454,10 @@
             lonKantor = data.longitude;
             radiusMaksimal = data.radius;
             namaKantor = data.nama;
+            jamMasukKantor = data.jam_masuk || "08:00:00";
+            jamKeluarKantor = data.jam_keluar || "17:00:00";
+            if (data.jam_mulai_istirahat) jamMulaiIstirahat = data.jam_mulai_istirahat;
+            if (data.jam_selesai_istirahat) jamSelesaiIstirahat = data.jam_selesai_istirahat;
           }
         }
 
@@ -425,23 +487,84 @@
       }
 
       async function cekStatusAbsenHariIni() {
-        if (!userData) return;
-        const userObj = JSON.parse(userData);
-        const tanggalHariIni = new Date().toISOString().split('T')[0];
+        if (!localStorage.getItem('userLogin')) return;
+        const userObj = JSON.parse(localStorage.getItem('userLogin'));
+        const now = new Date();
+        const offset = now.getTimezoneOffset() * 60000;
+        const localDate = new Date(now - offset);
+        const tanggalHariIni = localDate.toISOString().split('T')[0];
         
-        const { data, error } = await supabaseClient
+        const { data: rows, error } = await supabaseClient
           .from('absensi')
           .select('*')
           .eq('user_id', userObj.id)
           .eq('tanggal', tanggalHariIni)
-          .maybeSingle();
+          .order('id', { ascending: false })
+          .limit(1);
           
+        const data = rows && rows.length > 0 ? rows[0] : null;
+        if (error) console.error("Error fetching absensi:", error);
+        
         const btnCekLokasi = document.getElementById("btn-cek-lokasi");
         const btnAmbilFoto = document.getElementById("btn-ambil-foto");
+        
+        // CEK HARI LIBUR
+        const currentDay = new Date().getDay();
+        let liburArr = [];
+        if (userObj.hari_libur) {
+            liburArr = userObj.hari_libur.split(',').map(Number);
+        }
+        
+        if (liburArr.includes(currentDay)) {
+            tipeAbsenSekarang = "Libur";
+            btnCekLokasi.disabled = true;
+            btnCekLokasi.innerHTML = "Hari Libur Rutin";
+            document.getElementById("status").innerHTML = "⛔ Anda tidak bisa absen di hari libur Anda.";
+            document.getElementById("status").className = "mt-3 alert alert-danger text-center";
+            return;
+        }
+
+        // CEK STATUS CUTI
+        const { data: cutiHariIni, error: errCuti } = await supabaseClient
+          .from('cuti')
+          .select('id, data_tambahan')
+          .eq('user_id', userObj.id)
+          .eq('status_pengajuan', 'Disetujui')
+          .lte('tanggal_mulai', tanggalHariIni)
+          .gte('tanggal_selesai', tanggalHariIni)
+          .maybeSingle();
+
+        if (cutiHariIni) {
+            tipeAbsenSekarang = "Cuti";
+            btnCekLokasi.disabled = true;
+            btnCekLokasi.innerHTML = "Sedang Cuti";
+            
+            // Mencari nama cuti jika ada di form dinamis
+            let namaCuti = "Cuti";
+            if (window.sisaCutiMaster && cutiHariIni.data_tambahan) {
+                const values = Object.values(cutiHariIni.data_tambahan);
+                const foundMaster = values.find(v => window.sisaCutiMaster[v]);
+                if (foundMaster) namaCuti = foundMaster;
+            }
+            
+            document.getElementById("status").innerHTML = `🏖️ Anda sedang dalam masa <strong>${namaCuti}</strong> hari ini.`;
+            document.getElementById("status").className = "mt-3 alert alert-info text-center";
+            return;
+        }
           
         if (data) {
           absenHariIni = data;
-          if (!data.waktu_keluar) {
+          if (!data.waktu_istirahat_keluar) {
+            tipeAbsenSekarang = "Istirahat_Keluar";
+            btnCekLokasi.innerHTML = "📍 Cek Lokasi & Mulai Istirahat";
+            btnCekLokasi.className = "btn btn-info w-100 py-3 fw-bold fs-5 text-white";
+            btnAmbilFoto.innerHTML = "📸 Ambil Foto & Simpan Mulai Istirahat";
+          } else if (!data.waktu_istirahat_masuk) {
+            tipeAbsenSekarang = "Istirahat_Masuk";
+            btnCekLokasi.innerHTML = "📍 Cek Lokasi & Selesai Istirahat";
+            btnCekLokasi.className = "btn btn-success w-100 py-3 fw-bold fs-5";
+            btnAmbilFoto.innerHTML = "📸 Ambil Foto & Simpan Selesai Istirahat";
+          } else if (!data.waktu_keluar) {
             tipeAbsenSekarang = "Pulang";
             btnCekLokasi.innerHTML = "📍 Cek Lokasi & Absen Pulang";
             btnCekLokasi.className = "btn btn-warning w-100 py-3 fw-bold fs-5";
@@ -568,11 +691,33 @@
       // ==========================================
       // 3. PROSES ABSEN
       // ==========================================
-      function prosesCekLokasi() {
+      async function prosesCekLokasi() {
         const statusDiv = document.getElementById("status");
-        statusDiv.innerHTML = "Memproses lokasi...";
+        statusDiv.innerHTML = "Memverifikasi status di server...";
         statusDiv.className = "mt-3 alert alert-warning text-center";
         document.getElementById("btn-cek-lokasi").disabled = true;
+
+        // Cek status terbaru langsung ke database (menghindari bug beda device/tab lama)
+        await cekStatusAbsenHariIni();
+
+        if (tipeAbsenSekarang === "Selesai") {
+           Swal.fire("Peringatan", "Anda sudah menyelesaikan absensi masuk dan pulang hari ini di perangkat lain.", "warning");
+           statusDiv.innerHTML = "✅ Anda Sudah Absen Lengkap Hari Ini";
+           statusDiv.className = "mt-3 alert alert-secondary text-center";
+           return;
+        }
+
+        const sekarang = new Date();
+        const waktu_sekarang = sekarang.toTimeString().split(' ')[0];
+        
+        if (tipeAbsenSekarang === "Istirahat_Keluar" && waktu_sekarang < jamMulaiIstirahat) {
+           Swal.fire("Peringatan", `Belum masuk waktu istirahat! Istirahat baru bisa dimulai jam ${jamMulaiIstirahat}.`, "warning");
+           statusDiv.innerHTML = `Belum masuk waktu istirahat.`;
+           statusDiv.className = "mt-3 alert alert-warning text-center";
+           return;
+        }
+
+        statusDiv.innerHTML = "Memproses lokasi...";
 
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
@@ -636,6 +781,10 @@
       }
 
       async function prosesAbsenFoto() {
+        const btnSubmit = document.getElementById("btn-ambil-foto");
+        if (btnSubmit.disabled) return;
+        btnSubmit.disabled = true;
+
         const video = document.getElementById("kamera");
         const canvas = document.getElementById("canvas");
         const hasilFoto = document.getElementById("hasil-foto");
@@ -653,9 +802,7 @@
         hasilFoto.style.display = "block";
         faceStatus.style.display = "none";
 
-        const btnSubmit = document.getElementById("btn-ambil-foto");
         btnSubmit.innerHTML = "⏳ Mengunggah foto...";
-        btnSubmit.disabled = true;
 
         stopKamera();
 
@@ -687,13 +834,15 @@
           // Simpan data ke tabel absensi
           const userObj = JSON.parse(userData);
           const sekarang = new Date();
-          const tanggal = sekarang.toISOString().split('T')[0]; // Format YYYY-MM-DD
+          const offset = sekarang.getTimezoneOffset() * 60000;
+          const localDate = new Date(sekarang - offset);
+          const tanggal = localDate.toISOString().split('T')[0]; // Format YYYY-MM-DD
           const waktu_sekarang = sekarang.toTimeString().split(' ')[0]; // Format HH:MM:SS
 
           let dbError;
           if (tipeAbsenSekarang === "Masuk") {
             let statusKehadiran = "Hadir";
-            if (waktu_sekarang > "08:00:00") {
+            if (waktu_sekarang > jamMasukKantor) {
               statusKehadiran = "Terlambat";
             }
             const res = await supabaseClient
@@ -709,11 +858,30 @@
                 }
               ]);
             dbError = res.error;
+          } else if (tipeAbsenSekarang === "Istirahat_Keluar") {
+            const res = await supabaseClient
+              .from('absensi')
+              .update({ 
+                waktu_istirahat_keluar: waktu_sekarang,
+                foto_istirahat_keluar: publicUrlData.publicUrl
+              })
+              .eq('id', absenHariIni.id);
+            dbError = res.error;
+          } else if (tipeAbsenSekarang === "Istirahat_Masuk") {
+            const res = await supabaseClient
+              .from('absensi')
+              .update({ 
+                waktu_istirahat_masuk: waktu_sekarang,
+                foto_istirahat_masuk: publicUrlData.publicUrl
+              })
+              .eq('id', absenHariIni.id);
+            dbError = res.error;
           } else if (tipeAbsenSekarang === "Pulang") {
             const res = await supabaseClient
               .from('absensi')
               .update({
-                waktu_keluar: waktu_sekarang
+                waktu_keluar: waktu_sekarang,
+                foto_keluar: publicUrlData.publicUrl
               })
               .eq('id', absenHariIni.id);
             dbError = res.error;
@@ -729,10 +897,20 @@
             new bootstrap.Modal(modalEl);
           modalInstance.hide();
 
+          let swalTitle = "Absen Berhasil!";
+          let swalText = `Foto dan lokasi telah tersimpan di Supabase.`;
+          let swalIcon = "success";
+
+          if (tipeAbsenSekarang === "Istirahat_Masuk" && waktu_sekarang > jamSelesaiIstirahat) {
+            swalTitle = "Peringatan!";
+            swalText = `Anda kembali istirahat melewati jam ${jamSelesaiIstirahat}. Data tetap tersimpan.`;
+            swalIcon = "warning";
+          }
+
           Swal.fire({
-            title: "Absen Berhasil!",
-            text: `Foto dan lokasi telah tersimpan di Supabase.`,
-            icon: "success",
+            title: swalTitle,
+            text: swalText,
+            icon: swalIcon,
           });
         } catch (error) {
           console.error("Gagal unggah foto:", error.message);
@@ -749,17 +927,480 @@
       // ==========================================
       // 4. LOGIKA PENGAJUAN CUTI & KALENDER
       // ==========================================
-      function ajukanCuti(event) {
-        event.preventDefault();
-        Swal.fire({
-          title: "Berhasil!",
-          text: "Pengajuan cuti berhasil dikirim ke HRD untuk ditinjau!",
-          icon: "success",
+      // Global variabel untuk menyimpan sisa cuti masing-masing jenis
+      window.sisaCutiMaster = {};
+      window.masterCutiDb = [];
+
+      async function loadSisaCuti() {
+        if (!localStorage.getItem('userLogin')) return;
+        const userObj = JSON.parse(localStorage.getItem('userLogin'));
+        const container = document.getElementById("container-sisa-cuti");
+        if (!container) return;
+
+        // Ambil Master Cuti
+        const { data: masterData, error: errMaster } = await supabaseClient.from('master_jenis_cuti').select('*');
+        if (errMaster || !masterData) {
+            container.innerHTML = '<div class="text-danger small">Gagal memuat master cuti.</div>';
+            return;
+        }
+        window.masterCutiDb = masterData;
+
+        // Ambil history cuti yang disetujui atau masih menunggu
+        const { data: cutiData, error } = await supabaseClient
+          .from('cuti')
+          .select('durasi_hari, tanggal_mulai, data_tambahan, status_pengajuan')
+          .eq('user_id', userObj.id)
+          .in('status_pengajuan', ['Disetujui', 'Menunggu']);
+
+        const now = new Date();
+        const curYear = String(now.getFullYear());
+        const curMonth = String(now.getMonth() + 1).padStart(2, '0');
+
+        let html = '';
+        window.sisaCutiMaster = {};
+
+        masterData.forEach(master => {
+            let terpakai = 0;
+            // Hitung cuti terpakai untuk jenis ini
+            if (cutiData) {
+                cutiData.forEach(c => {
+                    if (!c.data_tambahan) return;
+                    const isMilikMaster = Object.values(c.data_tambahan).some(v => String(v) === master.nama_cuti);
+                    if (!isMilikMaster) return;
+
+                    const tgl = c.tanggal_mulai || '';
+                    if (master.siklus === 'Tahunan' && tgl.startsWith(curYear)) terpakai += c.durasi_hari;
+                    else if (master.siklus === 'Bulanan' && tgl.startsWith(`${curYear}-${curMonth}`)) terpakai += c.durasi_hari;
+                    else if (master.siklus === 'Sekali') terpakai += c.durasi_hari;
+                });
+            }
+
+            let sisa = 0;
+            let displaySisa = '';
+            if (master.is_unlimited) {
+                displaySisa = '<span class="badge bg-success">Tanpa Batas</span>';
+                sisa = 999999;
+            } else {
+                sisa = master.batas_hari - terpakai;
+                displaySisa = `<span class="badge ${sisa > 0 ? 'bg-primary' : 'bg-danger'}">${sisa} Hari</span>`;
+            }
+
+            window.sisaCutiMaster[master.nama_cuti] = { sisa, is_unlimited: master.is_unlimited };
+
+            html += `
+                <div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-1">
+                    <div>
+                        <span class="d-block fw-bold small text-dark">${master.nama_cuti}</span>
+                        <small class="text-muted" style="font-size: 0.7em;">Siklus: ${master.siklus} | Terpakai: ${terpakai}</small>
+                    </div>
+                    <div>${displaySisa}</div>
+                </div>
+            `;
         });
-        event.target.reset(); // Mengosongkan form setelah dikirim
+
+        if (html === '') html = '<div class="text-muted small">Belum ada master cuti diatur HRD.</div>';
+        container.innerHTML = html;
       }
 
-      function buatKalender(historyBulanIni = []) {
+      let currentFormConfig = [];
+
+      async function loadFormCutiBuilder() {
+        const container = document.getElementById('dynamic-form-container');
+        const { data, error } = await supabaseClient.from('form_cuti_config').select('*').order('urutan', { ascending: true });
+        
+        if (error || !data || data.length === 0) {
+          container.innerHTML = '<div class="alert alert-warning">Form cuti belum dikonfigurasi. Hubungi Admin.</div>';
+          return;
+        }
+
+        currentFormConfig = data;
+        let html = '';
+
+        data.forEach(f => {
+          let dependsAttr = '';
+          let wrapperStyle = '';
+          if (f.tipe !== 'dropdown' && f.opsi && (f.opsi.includes('=') || f.opsi.includes('!='))) {
+             dependsAttr = `data-depends="${f.opsi.trim()}"`;
+             wrapperStyle = 'style="display: none;"'; // hide initially
+          }
+
+          html += `<div class="mb-3 form-group-dynamic" ${dependsAttr} ${wrapperStyle}>`;
+          html += `<label class="form-label small fw-bold">${f.label} ${f.wajib ? '<span class="text-danger">*</span>' : ''}</label>`;
+          
+          if (f.tipe === 'date') {
+            html += `<input type="date" class="form-control" name="${f.id}" ${f.wajib ? 'required' : ''}>`;
+          } else if (f.tipe === 'keterangan') {
+            html += `<textarea class="form-control" rows="3" name="${f.id}" ${f.wajib ? 'required' : ''}></textarea>`;
+          } else if (f.tipe === 'dropdown' || f.tipe === 'master_cuti') {
+            html += `<select class="form-select" name="${f.id}" ${f.wajib ? 'required' : ''} onchange="evalFormConditions()">`;
+            html += `<option value="">-- Pilih --</option>`;
+            
+            if (f.tipe === 'dropdown' && f.opsi) {
+              f.opsi.split(',').forEach(o => {
+                html += `<option value="${o.trim()}">${o.trim()}</option>`;
+              });
+            } else if (f.tipe === 'master_cuti' && window.masterCutiDb) {
+              window.masterCutiDb.forEach(m => {
+                html += `<option value="${m.nama_cuti}">${m.nama_cuti}</option>`;
+              });
+            }
+            html += `</select>`;
+          } else if (f.tipe === 'file') {
+            html += `<input type="file" class="form-control" name="${f.id}" ${f.wajib ? 'required' : ''}>`;
+          }
+          
+          html += `</div>`;
+        });
+        
+        container.innerHTML = html;
+        evalFormConditions(); // evaluate on first load
+      }
+
+      function evalFormConditions() {
+        const container = document.getElementById('dynamic-form-container');
+        const groups = container.querySelectorAll('.form-group-dynamic');
+        
+        groups.forEach(group => {
+           const depends = group.getAttribute('data-depends');
+           if (!depends) return; // tidak ada syarat
+           
+           let operator = '=';
+           let parts = depends.split('!=');
+           if (parts.length === 2) {
+               operator = '!=';
+           } else {
+               parts = depends.split('=');
+           }
+
+           if(parts.length === 2) {
+             const reqLabel = parts[0].trim().toLowerCase();
+             const reqValueStr = parts[1].trim().toLowerCase();
+             const reqValues = reqValueStr.split('|').map(v => v.trim()); // mendukung multi-value dengan pemisah pipa (|)
+             
+             // Cari apakah ada field dengan label tersebut dan nilainya cocok
+             let matched = false;
+             for (const config of currentFormConfig) {
+               if (config.label.toLowerCase() === reqLabel) {
+                 const inputEl = container.querySelector(`[name="${config.id}"]`);
+                 if (inputEl) {
+                   const actualValue = inputEl.value.toLowerCase();
+                   
+                   if (operator === '=') {
+                     // Cocok jika value saat ini ADA di dalam list reqValues
+                     if (reqValues.includes(actualValue)) {
+                       matched = true;
+                     }
+                   } else if (operator === '!=') {
+                     // Cocok jika value saat ini TIDAK ADA di dalam list reqValues (dan tidak kosong)
+                     if (!reqValues.includes(actualValue) && actualValue !== '') {
+                       matched = true;
+                     }
+                   }
+                 }
+               }
+             }
+             
+             if (matched) {
+               group.style.display = 'block';
+               // Aktifkan required jika aslinya wajib
+               const inputEl = group.querySelector('input, select, textarea');
+               const config = currentFormConfig.find(c => c.id === inputEl.name);
+               if (config && config.wajib) inputEl.setAttribute('required', 'true');
+             } else {
+               group.style.display = 'none';
+               // Nonaktifkan required saat disembunyikan
+               const inputEl = group.querySelector('input, select, textarea');
+               if (inputEl) {
+                 inputEl.removeAttribute('required');
+                 inputEl.value = ''; // kosongkan jika sembunyi
+               }
+             }
+           }
+        });
+      }
+
+      async function loadRiwayatCutiUser() {
+        if (!localStorage.getItem('userLogin')) return;
+        const userObj = JSON.parse(localStorage.getItem('userLogin'));
+        const tbody = document.getElementById('tabel-riwayat-cuti');
+        const theadTr = document.querySelector("#tabel-riwayat-cuti").previousElementSibling.querySelector("tr");
+        if(!tbody) return;
+
+        // Ambil konfigurasi form untuk menjadi header kolom dinamis
+        const { data: formConfig } = await supabaseClient.from('form_cuti_config').select('label').order('urutan', { ascending: true });
+        let dynamicHeaders = [];
+        if (formConfig) {
+            dynamicHeaders = formConfig.map(f => f.label);
+        }
+
+        // Bangun ulang Thead
+        let theadHTML = `
+            <th>Tanggal Pengajuan</th>
+            <th>Tanggal Cuti</th>
+        `;
+        dynamicHeaders.forEach(label => {
+            theadHTML += `<th>${label}</th>`;
+        });
+        theadHTML += `
+            <th>Durasi</th>
+            <th>Status</th>
+            <th>Aksi</th>
+        `;
+        if(theadTr) theadTr.innerHTML = theadHTML;
+
+        const { data, error } = await supabaseClient
+          .from('cuti')
+          .select('*')
+          .eq('user_id', userObj.id)
+          .order('id', { ascending: false });
+
+        if (error || !data || data.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="${4 + dynamicHeaders.length}" class="text-muted">Belum ada riwayat pengajuan cuti.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = '';
+        data.forEach(cuti => {
+          let badgeClass = 'bg-secondary';
+          if (cuti.status_pengajuan === 'Disetujui') badgeClass = 'bg-success';
+          else if (cuti.status_pengajuan === 'Ditolak') badgeClass = 'bg-danger';
+          else if (cuti.status_pengajuan === 'Menunggu') badgeClass = 'bg-warning text-dark';
+
+          let tglPengajuan = '-';
+          if(cuti.created_at) {
+             const d = new Date(cuti.created_at);
+             tglPengajuan = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          } else if (cuti.data_tambahan && cuti.data_tambahan['Tanggal_Pengajuan_Sistem']) {
+             tglPengajuan = cuti.data_tambahan['Tanggal_Pengajuan_Sistem'];
+          }
+
+          let trHTML = `<tr>
+              <td>${tglPengajuan}</td>
+              <td>${cuti.tanggal_mulai} <br>s/d<br> ${cuti.tanggal_selesai}</td>
+          `;
+
+          // Loop dynamic headers
+          dynamicHeaders.forEach(label => {
+              let val = (cuti.data_tambahan && cuti.data_tambahan[label]) ? cuti.data_tambahan[label] : '-';
+              if (val.toString().startsWith('http')) {
+                  val = `<a href="${val}" target="_blank" class="btn btn-sm btn-outline-info">File</a>`;
+              }
+              // Khusus alasan, jika kosong di data_tambahan tapi ada di cuti.alasan (backward compatible)
+              if (label.toLowerCase().includes('alasan') && val === '-' && cuti.alasan) {
+                  val = cuti.alasan;
+              }
+              trHTML += `<td class="text-wrap" style="max-width: 250px;">${val}</td>`;
+          });
+
+          let tombolAksi = '-';
+          if (cuti.status_pengajuan === 'Menunggu') {
+              tombolAksi = `<button class="btn btn-sm btn-outline-danger" onclick="batalkanCutiKaryawan('${cuti.id}')">Batalkan</button>`;
+          }
+
+          trHTML += `
+              <td>${cuti.durasi_hari} Hari</td>
+              <td><span class="badge ${badgeClass}">${cuti.status_pengajuan}</span></td>
+              <td>${tombolAksi}</td>
+            </tr>
+          `;
+          tbody.innerHTML += trHTML;
+        });
+      }
+
+      async function batalkanCutiKaryawan(id) {
+          if (!confirm("Yakin ingin membatalkan pengajuan cuti ini?")) return;
+          
+          await supabaseClient.from('cuti').delete().eq('id', id);
+          Swal.fire("Dibatalkan", "Pengajuan cuti Anda telah dibatalkan.", "success");
+          
+          loadRiwayatCutiUser();
+          loadSisaCuti(); // Update jatah cuti di layar
+      }
+
+      async function ajukanCuti(event) {
+        event.preventDefault();
+        if (!localStorage.getItem('userLogin')) return;
+        const userObj = JSON.parse(localStorage.getItem('userLogin'));
+        const form = event.target;
+        
+        const btnSubmit = form.querySelector('button[type="submit"]');
+        btnSubmit.disabled = true;
+        btnSubmit.innerText = "Mengirim...";
+        
+        // 1. Ekstrak data dari field dinamis dan tangani upload file
+        let dataTambahan = {};
+        let tanggal_mulai = null;
+        let tanggal_selesai = null;
+        let jenis_cuti = 'Lainnya';
+        let alasan = '-';
+        
+        for (const config of currentFormConfig) {
+          const inputEl = form.querySelector(`[name="${config.id}"]`);
+          if (!inputEl) continue;
+
+          let val = inputEl.value;
+          
+          // Khusus file upload
+          if (config.tipe === 'file' && inputEl.files.length > 0) {
+            const file = inputEl.files[0];
+            const namaFile = `cuti-${Date.now()}-${file.name}`;
+            const { data, error } = await supabaseClient.storage.from('absensi-bucket').upload(namaFile, file);
+            if (!error) {
+              const { data: publicUrlData } = supabaseClient.storage.from('absensi-bucket').getPublicUrl(namaFile);
+              val = publicUrlData.publicUrl;
+            } else {
+              val = 'Gagal upload file';
+            }
+          }
+
+          dataTambahan[config.label] = val;
+          
+          // Coba tebak kolom-kolom utama untuk durasi dan tabel admin (berdasarkan label umum)
+          const labelLower = config.label.toLowerCase();
+          if (config.tipe === 'date') {
+             if (labelLower.includes('mulai')) tanggal_mulai = val;
+             if (labelLower.includes('selesai') || labelLower.includes('akhir')) tanggal_selesai = val;
+             if (!tanggal_mulai) tanggal_mulai = val; // fallback ke date pertama
+          }
+          if (config.tipe === 'dropdown' && labelLower.includes('jenis')) jenis_cuti = val;
+          if (config.tipe === 'keterangan' && (labelLower.includes('alasan') || labelLower.includes('keterangan'))) alasan = val;
+        }
+
+        // Kalau tanggal selesai tidak diisi/tidak ada formnya, samakan dengan tanggal mulai (cuti 1 hari)
+        if (tanggal_mulai && !tanggal_selesai) tanggal_selesai = tanggal_mulai;
+        
+        // Simpan tanggal pengajuan saat ini agar tampil di riwayat (karena db tidak ada created_at)
+        dataTambahan['Tanggal_Pengajuan_Sistem'] = new Date().toISOString().split('T')[0];
+        
+        let diffDays = 1;
+        if (tanggal_mulai && tanggal_selesai) {
+          const date1 = new Date(tanggal_mulai);
+          const date2 = new Date(tanggal_selesai);
+          if (date2 < date1) {
+            Swal.fire("Gagal", "Tanggal selesai tidak boleh sebelum tanggal mulai.", "error");
+            btnSubmit.disabled = false;
+            btnSubmit.innerText = "Kirim Pengajuan Cuti";
+            return;
+          }
+          
+          // Hitung durasi dengan melewati hari libur karyawan
+          diffDays = 0;
+          let tempDate = new Date(date1);
+          let liburArr = [];
+          if (userObj.hari_libur) {
+              liburArr = userObj.hari_libur.split(',').map(Number);
+          }
+          
+          while (tempDate <= date2) {
+              if (!liburArr.includes(tempDate.getDay())) {
+                  diffDays++;
+              }
+              tempDate.setDate(tempDate.getDate() + 1);
+          }
+          
+          if (diffDays === 0) {
+            Swal.fire("Peringatan", "Durasi cuti 0 hari karena seluruh tanggal yang dipilih adalah hari libur rutin Anda.", "warning");
+            btnSubmit.disabled = false;
+            btnSubmit.innerText = "Kirim Pengajuan Cuti";
+            return;
+          }
+          
+          // CEK OVERLAPPING CUTI (Apakah sudah ada pengajuan di tanggal yang sama)
+          const { data: overlappingLeaves } = await supabaseClient
+            .from('cuti')
+            .select('tanggal_mulai, tanggal_selesai, status_pengajuan')
+            .eq('user_id', userObj.id)
+            .in('status_pengajuan', ['Disetujui', 'Menunggu']);
+
+          if (overlappingLeaves) {
+             const isOverlap = overlappingLeaves.some(leaf => {
+                 const leafStart = new Date(leaf.tanggal_mulai);
+                 const leafEnd = new Date(leaf.tanggal_selesai);
+                 return (date1 <= leafEnd && date2 >= leafStart);
+             });
+             
+             if (isOverlap) {
+                 Swal.fire("Peringatan", "Anda sudah memiliki pengajuan cuti (Disetujui/Menunggu) pada rentang tanggal tersebut. Silakan pilih tanggal lain.", "warning");
+                 btnSubmit.disabled = false;
+                 btnSubmit.innerText = "Kirim Pengajuan Cuti";
+                 return;
+             }
+          }
+        }
+
+        // VALIDASI KUOTA CUTI TERHADAP MASTER CUTI
+        let namaCutiTerpilih = null;
+        let infoMaster = null;
+
+        // Cari tahu apakah user memilih salah satu dari master cuti
+        if (window.sisaCutiMaster) {
+            for (const [key, val] of Object.entries(dataTambahan)) {
+                if (window.sisaCutiMaster[val]) {
+                    namaCutiTerpilih = val;
+                    infoMaster = window.sisaCutiMaster[val];
+                    break;
+                }
+            }
+        }
+        
+        if (infoMaster && !infoMaster.is_unlimited) {
+           if (infoMaster.sisa <= 0) {
+              Swal.fire("Gagal", `Sisa jatah ${namaCutiTerpilih} Anda sudah habis!`, "error");
+              btnSubmit.disabled = false;
+              btnSubmit.innerText = "Kirim Pengajuan Cuti";
+              return;
+           }
+           if (diffDays > infoMaster.sisa) {
+              Swal.fire("Gagal", `Durasi pengajuan (${diffDays} hari) melebihi sisa ${namaCutiTerpilih} Anda (${infoMaster.sisa} hari).`, "error");
+              btnSubmit.disabled = false;
+              btnSubmit.innerText = "Kirim Pengajuan Cuti";
+              return;
+           }
+        }
+
+        const { error } = await supabaseClient
+          .from('cuti')
+          .insert([
+            {
+              user_id: userObj.id,
+              tanggal_mulai: tanggal_mulai || new Date().toISOString().split('T')[0],
+              tanggal_selesai: tanggal_selesai || new Date().toISOString().split('T')[0],
+              alasan: alasan,
+              durasi_hari: diffDays,
+              status_pengajuan: 'Menunggu',
+              data_tambahan: dataTambahan // simpan ke kolom jsonb
+            }
+          ]);
+          
+        btnSubmit.disabled = false;
+        btnSubmit.innerText = "Kirim Pengajuan Cuti";
+
+        if (error) {
+          Swal.fire("Error", "Gagal mengirim pengajuan: " + error.message, "error");
+        } else {
+          Swal.fire({
+            title: "Berhasil!",
+            text: "Pengajuan cuti berhasil dikirim ke HRD untuk ditinjau!",
+            icon: "success",
+          });
+          form.reset();
+          loadRiwayatCutiUser();
+          loadSisaCuti(); // <-- update sisa cuti di layar agar tidak bisa spam!
+        }
+      }
+
+      async function buatKalender(historyBulanIni = []) {
+        const userObj = JSON.parse(localStorage.getItem('userLogin') || '{}');
+        let liburArr = [];
+        if (userObj.hari_libur) liburArr = userObj.hari_libur.split(',').map(Number);
+        
+        // Ambil data cuti untuk ditampilkan di kalender
+        let dataCuti = [];
+        if (userObj.id) {
+            const { data } = await supabaseClient.from('cuti').select('*').eq('user_id', userObj.id).eq('status_pengajuan', 'Disetujui');
+            if (data) dataCuti = data;
+        }
+
         const tanggalSekarang = new Date();
         const tahun = tanggalSekarang.getFullYear();
         const bulan = tanggalSekarang.getMonth();
@@ -788,21 +1429,36 @@
           let td = document.createElement("td");
           td.innerText = i;
           td.className = "calendar-day";
+          
+          let tglStr = `${tahun}-${String(bulan + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+          let currentDayOfWeek = new Date(tahun, bulan, i).getDay();
+          
+          let isLiburMingguan = liburArr.includes(currentDayOfWeek);
+          let isSedangCuti = dataCuti.some(c => tglStr >= c.tanggal_mulai && tglStr <= c.tanggal_selesai);
 
           if (i === hariIni) {
             td.classList.add("today");
           }
           
-          let tglStr = `${tahun}-${String(bulan + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-          const absenHist = historyBulanIni.find(h => h.tanggal === tglStr);
-          if (absenHist) {
-            if (absenHist.status === 'Hadir') {
-              td.style.backgroundColor = '#d1e7dd';
-              td.title = "Hadir Tepat Waktu";
-            } else if (absenHist.status === 'Terlambat') {
-              td.style.backgroundColor = '#fff3cd';
-              td.title = "Hadir Terlambat";
-            }
+          if (isSedangCuti) {
+             td.style.backgroundColor = '#f8d7da';
+             td.style.color = '#842029';
+             td.title = "Dalam Masa Cuti";
+          } else if (isLiburMingguan) {
+             td.style.backgroundColor = '#f8d7da';
+             td.style.color = '#842029';
+             td.title = "Hari Libur Rutin";
+          } else {
+             const absenHist = historyBulanIni.find(h => h.tanggal === tglStr);
+             if (absenHist) {
+               if (absenHist.status === 'Hadir') {
+                 td.style.backgroundColor = '#d1e7dd';
+                 td.title = "Hadir Tepat Waktu";
+               } else if (absenHist.status === 'Terlambat') {
+                 td.style.backgroundColor = '#fff3cd';
+                 td.title = "Hadir Terlambat";
+               }
+             }
           }
 
           tr.appendChild(td);
@@ -859,6 +1515,17 @@
       // Generate kalender saat web dimuat (default kosong)
       buatKalender([]);
       
+      async function syncUserSession() {
+        if (!userData) return;
+        let u = JSON.parse(userData);
+        const { data, error } = await supabaseClient.from('users').select('*').eq('id', u.id).maybeSingle();
+        if (data) {
+           localStorage.setItem('userLogin', JSON.stringify(data));
+           // Update global reference
+           Object.assign(u, data);
+        }
+      }
+
       // Load riwayat
       loadRiwayatAbsensi();
       
@@ -866,6 +1533,61 @@
       document.getElementById('tab-riwayat-btn').addEventListener('shown.bs.tab', function (e) {
         loadRiwayatAbsensi();
       });
+      
+      // Load sisa cuti jika tab cuti diklik
+      document.getElementById('tab-cuti-btn').addEventListener('shown.bs.tab', function (e) {
+        loadSisaCuti();
+        loadFormCutiBuilder();
+        loadRiwayatCutiUser();
+      });
+      
+      // Jalankan sinkronisasi data user terlebih dahulu, baru load fungsi lainnya
+      syncUserSession().then(() => {
+          loadKantorUser(); // ini memanggil cekStatusAbsenHariIni di dalamnya
+          loadSisaCuti(); 
+          loadFormCutiBuilder(); 
+          loadRiwayatCutiUser();
+      });
+      // ==========================================
+      // TAB PROFIL & PASSWORD
+      // ==========================================
+      function isiDataProfil() {
+        if (!currentUser) return;
+        document.getElementById("profil-nama").innerText = currentUser.nama || '-';
+        document.getElementById("profil-role").innerText = currentUser.role || '-';
+        document.getElementById("profil-hp").innerText = currentUser.no_hp || '-';
+        document.getElementById("profil-cabang").innerText = currentUser.cabang || 'Pusat';
+      }
+      
+      async function ubahPassword(e) {
+        e.preventDefault();
+        const pass1 = document.getElementById("profil-password-baru").value;
+        const pass2 = document.getElementById("profil-password-konfirmasi").value;
+        if (pass1 !== pass2) {
+          Swal.fire("Error", "Konfirmasi password tidak cocok!", "error");
+          return;
+        }
+        
+        const btn = e.target.querySelector("button");
+        btn.disabled = true;
+        
+        const { error } = await supabaseClient
+          .from('users')
+          .update({ password: pass1 })
+          .eq('id', currentUser.id);
+          
+        btn.disabled = false;
+        
+        if (error) {
+           Swal.fire("Gagal", error.message, "error");
+        } else {
+           Swal.fire({
+             title: "Sukses", 
+             text: "Password berhasil diubah. Silakan login ulang.", 
+             icon: "success"
+           }).then(() => logout());
+        }
+      }
     </script>
   </body>
 </html>
