@@ -23,8 +23,58 @@
     </script>
 
     <style>
+      :root {
+        --bs-primary: #E5B82A;
+        --bs-warning: #FF7F27;
+        --bs-body-bg: #FDFBF7;
+        --bs-body-color: #3E2723;
+        --bs-link-color: #E5B82A;
+        --bs-info: #E5B82A;
+      }
       body {
-        background-color: #f4f6f9;
+        background-color: var(--bs-body-bg) !important;
+        color: var(--bs-body-color) !important;
+      }
+      .bg-primary {
+        background-color: #E5B82A !important;
+      }
+      .text-primary, .nav-tabs .nav-link.active {
+        color: #E5B82A !important;
+      }
+      .nav-tabs .nav-link.active {
+        border-bottom: 3px solid #E5B82A !important;
+      }
+      .btn-primary {
+        background-color: #E5B82A !important;
+        border-color: #E5B82A !important;
+        color: #3E2723 !important;
+      }
+      .btn-primary:hover, .btn-primary:focus {
+        background-color: #D4AF37 !important;
+        border-color: #D4AF37 !important;
+      }
+      .btn-warning {
+        background-color: #FF7F27 !important;
+        border-color: #FF7F27 !important;
+        color: #FDFBF7 !important;
+      }
+      .btn-warning:hover {
+        background-color: #e66b1a !important;
+        border-color: #e66b1a !important;
+      }
+      .navbar-dark .navbar-brand, .navbar-dark .navbar-text, .navbar-dark .nav-link {
+        color: #3E2723 !important;
+      }
+      .navbar-dark .btn-outline-light {
+        color: #3E2723 !important;
+        border-color: #3E2723 !important;
+      }
+      .navbar-dark .btn-outline-light:hover {
+        background-color: #3E2723 !important;
+        color: #FDFBF7 !important;
+      }
+      h1, h2, h3, h4, h5, h6, .card-title, .fw-bold {
+        color: #3E2723 !important;
       }
 
       /* Styling Spesifik Kamera & Peta */
@@ -63,14 +113,30 @@
         border-radius: 5px;
       }
 
-      /* Styling Tab */
-      .nav-tabs .nav-link {
-        font-weight: bold;
-        color: #495057;
-      }
-      .nav-tabs .nav-link.active {
-        color: #0d6efd;
-        border-bottom: 3px solid #0d6efd;
+      /* Responsif: Navbar bawah untuk Android / Layar Kecil */
+      @media (max-width: 767.98px) {
+        .user-bottom-nav {
+          position: fixed;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          z-index: 1030;
+          margin-bottom: 0 !important;
+          border-radius: 0 !important;
+          border-top: 1px solid #ddd !important;
+          box-shadow: 0 -2px 10px rgba(0,0,0,0.1) !important;
+          background-color: #fff;
+        }
+        .user-bottom-nav .card-body {
+          padding: 0.5rem !important;
+        }
+        .user-bottom-nav .nav-link {
+          font-size: 0.85rem;
+          padding: 0.5rem 0.75rem !important;
+        }
+        body {
+          padding-bottom: 70px;
+        }
       }
     </style>
   </head>
@@ -86,57 +152,26 @@
       </div>
     </nav>
 
-    <div class="container py-4">
-      <ul class="nav nav-tabs mb-4" id="hrisTabs" role="tablist">
-        <li class="nav-item" role="presentation">
-          <button
-            class="nav-link active"
-            id="tab-absensi-btn"
-            data-bs-toggle="tab"
-            data-bs-target="#tab-absensi"
-            type="button"
-            role="tab"
-          >
-            📍 Absensi
-          </button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button
-            class="nav-link"
-            id="tab-cuti-btn"
-            data-bs-toggle="tab"
-            data-bs-target="#tab-cuti"
-            type="button"
-            role="tab"
-          >
-            📝 Pengajuan Cuti
-          </button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button
-            class="nav-link"
-            id="tab-riwayat-btn"
-            data-bs-toggle="tab"
-            data-bs-target="#tab-riwayat"
-            type="button"
-            role="tab"
-          >
-            📅 Riwayat & Kalender
-          </button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button
-            class="nav-link"
-            id="tab-profil-btn"
-            data-bs-toggle="tab"
-            data-bs-target="#tab-profil"
-            type="button"
-            role="tab"
-          >
-            👤 Profil Pengguna
-          </button>
-        </li>
-      </ul>
+    <div class="container-fluid py-4">
+      <!-- MENU NAVBAR KARYAWAN -->
+      <div class="card shadow-sm mb-4 border-0 user-bottom-nav">
+        <div class="card-body p-1">
+          <ul class="nav nav-pills nav-justified gap-1 pb-0" id="hrisTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active fw-bold px-1" id="tab-absensi-btn" data-bs-toggle="pill" data-bs-target="#tab-absensi" type="button" role="tab" style="font-size: 0.8rem;">📍 Absen</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link fw-bold px-1" id="tab-cuti-btn" data-bs-toggle="pill" data-bs-target="#tab-cuti" type="button" role="tab" style="font-size: 0.8rem;">📝 Cuti</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link fw-bold px-1" id="tab-riwayat-btn" data-bs-toggle="pill" data-bs-target="#tab-riwayat" type="button" role="tab" style="font-size: 0.8rem;">📅 Riwayat</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link fw-bold px-1" id="tab-profil-btn" data-bs-toggle="pill" data-bs-target="#tab-profil" type="button" role="tab" style="font-size: 0.8rem;">👤 Profil</button>
+            </li>
+          </ul>
+        </div>
+      </div>
 
       <div class="tab-content" id="hrisTabsContent">
         <div class="tab-pane fade show active" id="tab-absensi" role="tabpanel">
@@ -163,13 +198,6 @@
               >
                 📍 Cek Lokasi & Absen
               </button>
-              <div
-                id="status"
-                class="mt-3 alert alert-secondary text-center"
-                role="alert"
-              >
-                Harap izinkan akses Lokasi di browser Anda.
-              </div>
             </div>
           </div>
         </div>
@@ -519,8 +547,7 @@
             tipeAbsenSekarang = "Libur";
             btnCekLokasi.disabled = true;
             btnCekLokasi.innerHTML = "Hari Libur Rutin";
-            document.getElementById("status").innerHTML = "⛔ Anda tidak bisa absen di hari libur Anda.";
-            document.getElementById("status").className = "mt-3 alert alert-danger text-center";
+            Swal.fire("Hari Libur", "Anda tidak bisa absen di hari libur Anda.", "warning");
             return;
         }
 
@@ -547,8 +574,7 @@
                 if (foundMaster) namaCuti = foundMaster;
             }
             
-            document.getElementById("status").innerHTML = `🏖️ Anda sedang dalam masa <strong>${namaCuti}</strong> hari ini.`;
-            document.getElementById("status").className = "mt-3 alert alert-info text-center";
+            Swal.fire("Informasi", `Anda sedang dalam masa ${namaCuti} hari ini.`, "info");
             return;
         }
           
@@ -692,9 +718,12 @@
       // 3. PROSES ABSEN
       // ==========================================
       async function prosesCekLokasi() {
-        const statusDiv = document.getElementById("status");
-        statusDiv.innerHTML = "Memverifikasi status di server...";
-        statusDiv.className = "mt-3 alert alert-warning text-center";
+        Swal.fire({
+            title: 'Memproses...',
+            text: 'Memverifikasi status absen di server',
+            allowOutsideClick: false,
+            didOpen: () => { Swal.showLoading(); }
+        });
         document.getElementById("btn-cek-lokasi").disabled = true;
 
         // Cek status terbaru langsung ke database (menghindari bug beda device/tab lama)
@@ -702,8 +731,6 @@
 
         if (tipeAbsenSekarang === "Selesai") {
            Swal.fire("Peringatan", "Anda sudah menyelesaikan absensi masuk dan pulang hari ini di perangkat lain.", "warning");
-           statusDiv.innerHTML = "✅ Anda Sudah Absen Lengkap Hari Ini";
-           statusDiv.className = "mt-3 alert alert-secondary text-center";
            return;
         }
 
@@ -712,12 +739,15 @@
         
         if (tipeAbsenSekarang === "Istirahat_Keluar" && waktu_sekarang < jamMulaiIstirahat) {
            Swal.fire("Peringatan", `Belum masuk waktu istirahat! Istirahat baru bisa dimulai jam ${jamMulaiIstirahat}.`, "warning");
-           statusDiv.innerHTML = `Belum masuk waktu istirahat.`;
-           statusDiv.className = "mt-3 alert alert-warning text-center";
            return;
         }
 
-        statusDiv.innerHTML = "Memproses lokasi...";
+        Swal.fire({
+            title: 'Mendeteksi Lokasi...',
+            text: 'Mencari koordinat GPS Anda (Pastikan GPS menyala)',
+            allowOutsideClick: false,
+            didOpen: () => { Swal.showLoading(); }
+        });
 
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
@@ -726,8 +756,7 @@
             { enableHighAccuracy: true },
           );
         } else {
-          statusDiv.innerHTML = "Geolocation tidak didukung.";
-          statusDiv.className = "mt-3 alert alert-danger text-center";
+          Swal.fire("Error", "Geolocation tidak didukung oleh browser Anda.", "error");
           document.getElementById("btn-cek-lokasi").disabled = false;
         }
       }
@@ -740,8 +769,6 @@
         const titikKaryawan = L.latLng(latKaryawan, lonKaryawan);
         const jarak = titikKantor.distanceTo(titikKaryawan);
 
-        const statusDiv = document.getElementById("status");
-
         if (markerKaryawan) map.removeLayer(markerKaryawan);
         markerKaryawan = L.marker([latKaryawan, lonKaryawan])
           .addTo(map)
@@ -753,8 +780,7 @@
 
         if (jarak <= radiusMaksimal) {
           jarakAbsen = Math.round(jarak);
-          statusDiv.innerHTML = `✅ <strong>Lokasi Sesuai!</strong><br>Jarak: ${Math.round(jarak)} m dari kantor.`;
-          statusDiv.className = "mt-3 alert alert-success text-center";
+          Swal.close();
 
           const kameraModal = new bootstrap.Modal(
             document.getElementById("kameraModal"),
@@ -762,11 +788,9 @@
           kameraModal.show();
           mulaiKamera();
         } else {
-          statusDiv.innerHTML = `❌ <strong>Absen Ditolak.</strong><br>Anda di luar jangkauan (${Math.round(jarak)} m).`;
-          statusDiv.className = "mt-3 alert alert-danger text-center";
           Swal.fire({
             title: "Absen Ditolak!",
-            text: `Anda di luar jangkauan (${Math.round(jarak)} m).`,
+            text: `Anda di luar jangkauan (${Math.round(jarak)} m dari kantor).`,
             icon: "error",
           });
         }
@@ -774,10 +798,7 @@
 
       function gagalDapatLokasi(error) {
         document.getElementById("btn-cek-lokasi").disabled = false;
-        document.getElementById("status").innerHTML =
-          "Gagal mengambil lokasi GPS. Pastikan izin lokasi aktif.";
-        document.getElementById("status").className =
-          "mt-3 alert alert-danger text-center";
+        Swal.fire("Gagal", "Gagal mengambil lokasi GPS. Pastikan izin lokasi (GPS) aktif di browser/HP Anda.", "error");
       }
 
       async function prosesAbsenFoto() {

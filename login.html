@@ -13,12 +13,27 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
+      :root {
+        --bs-primary: #E5B82A;
+        --bs-body-bg: #FDFBF7;
+        --bs-body-color: #3E2723;
+      }
       body {
-        background-color: #f4f6f9;
+        background-color: var(--bs-body-bg) !important;
+        color: var(--bs-body-color) !important;
         height: 100vh;
         display: flex;
         align-items: center;
         justify-content: center;
+      }
+      .btn-primary {
+        background-color: #E5B82A !important;
+        border-color: #E5B82A !important;
+        color: #3E2723 !important;
+      }
+      .btn-primary:hover {
+        background-color: #D4AF37 !important;
+        border-color: #D4AF37 !important;
       }
       .login-card {
         border: none;
@@ -27,8 +42,8 @@
         overflow: hidden;
       }
       .login-header {
-        background: linear-gradient(135deg, #0d6efd, #0043a8);
-        color: white;
+        background: linear-gradient(135deg, #E5B82A, #D4AF37) !important;
+        color: #3E2723 !important;
         padding: 30px 20px;
         text-align: center;
       }

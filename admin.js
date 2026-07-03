@@ -438,7 +438,9 @@ async function loadDataAbsensi() {
     const tbody = document.querySelector("#tab-absensi tbody");
     tbody.innerHTML = '<tr><td colspan="8" class="text-center">Memuat data...</td></tr>';
     // Gunakan JOIN di Supabase
-    let queryAbsen = supabaseClient.from('absensi').select('*, users!inner(nama, cabang)').order('created_at', { ascending: false });
+    let queryAbsen = supabaseClient.from('absensi').select('*, users!inner(nama, cabang)')
+        .not('status', 'ilike', '%-TRASH-%')
+        .order('created_at', { ascending: false });
     if (!isSuperAdmin) {
         queryAbsen = queryAbsen.eq('users.cabang', myCabang);
     }
@@ -873,4 +875,329 @@ async function hapusMasterCuti(id) {
     await supabaseClient.from('master_jenis_cuti').delete().eq('id', id);
     Swal.fire("Terhapus", "Data berhasil dihapus.", "success");
     loadMasterCuti();
+}
+
+// =====================================
+// EXPORT DATA
+// =====================================
+async function prosesExport(event) {
+    event.preventDefault();
+    const btn = document.getElementById("btn-export");
+    const tglMulai = document.getElementById("export_mulai").value;
+    const tglSelesai = document.getElementById("export_selesai").value;
+    const isMedia = document.getElementById("export_media").checked;
+
+    btn.disabled = true;
+    btn.innerHTML = "Memproses... Mohon tunggu";
+
+    try {
+        let query = supabaseClient.from('absensi').select('*, users!inner(nama, cabang)')
+            .gte('tanggal', tglMulai)
+            .lte('tanggal', tglSelesai)
+            .not('status', 'ilike', '%-TRASH-%')
+            .order('tanggal', {ascending: true});
+            
+        // Jika bukan super admin, filter cabang
+        if (!isSuperAdmin) {
+            query = query.eq('users.cabang', myCabang);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        // Buat ZIP
+        const zip = new JSZip();
+        // Format root folder: keterangan tanggal contoh 04-07-2026
+        const folderName = `${tglMulai.split('-').reverse().join('-')}_sd_${tglSelesai.split('-').reverse().join('-')}`;
+        const rootFolder = zip.folder(folderName);
+        
+        // 1. Buat CSV
+        let csvContent = "Tanggal,Nama,Cabang,Waktu Masuk,Waktu Mulai Istirahat,Waktu Selesai Istirahat,Waktu Pulang,Status Kehadiran,Jarak (Meter)\n";
+        
+        // 2. Siapkan Folder Media jika dicentang
+        let mediaFolder;
+        if (isMedia) {
+            mediaFolder = rootFolder.folder("media");
+        }
+
+        // Gunakan for...of karena kita butuh await di dalam loop untuk fetch gambar
+        for (const row of data) {
+            const namaUser = row.users ? row.users.nama : 'Unknown';
+            const cabangUser = row.users ? row.users.cabang : '-';
+            
+            // Tambahkan baris ke CSV
+            const safeName = `"${namaUser}"`;
+            const safeCabang = `"${cabangUser}"`;
+            csvContent += `${row.tanggal},${safeName},${safeCabang},${row.waktu_masuk || '-'},${row.waktu_istirahat_keluar || '-'},${row.waktu_istirahat_masuk || '-'},${row.waktu_keluar || '-'},${row.status || '-'},${row.jarak_meter || 0}\n`;
+
+            // Proses Foto jika diceklis
+            if (isMedia) {
+                const userFolder = mediaFolder.folder(namaUser);
+                const tgl = row.tanggal;
+                
+                const simpanFoto = async (url, namaFile) => {
+                    if (url && url.startsWith('http')) {
+                        try {
+                            const response = await fetch(url);
+                            const blob = await response.blob();
+                            userFolder.file(namaFile, blob);
+                        } catch (err) {
+                            console.error("Gagal mendownload foto:", url, err);
+                        }
+                    }
+                };
+
+                await simpanFoto(row.foto_url, `${tgl}_Masuk.png`);
+                await simpanFoto(row.foto_istirahat_keluar, `${tgl}_IstirahatKeluar.png`);
+                await simpanFoto(row.foto_istirahat_masuk, `${tgl}_IstirahatMasuk.png`);
+                await simpanFoto(row.foto_keluar, `${tgl}_Keluar.png`);
+            }
+        }
+
+        // Simpan CSV ke root folder zip
+        rootFolder.file("rekap_absen.csv", csvContent);
+
+        // 3. AMBIL DATA CUTI / IZIN
+        let queryCuti = supabaseClient.from('cuti').select('*, users!inner(nama, cabang)')
+            .lte('tanggal_mulai', tglSelesai)
+            .gte('tanggal_selesai', tglMulai)
+            .order('tanggal_mulai', {ascending: false});
+            
+        if (!isSuperAdmin) {
+            queryCuti = queryCuti.eq('users.cabang', myCabang);
+        }
+
+        const { data: dataCuti, error: errCuti } = await queryCuti;
+        if (!errCuti && dataCuti && dataCuti.length > 0) {
+            let csvCuti = "Nama,Cabang,Tanggal Mulai,Tanggal Selesai,Durasi (Hari),Status Pengajuan,Detail Tambahan\n";
+            dataCuti.forEach(cuti => {
+                const namaUser = cuti.users ? cuti.users.nama : 'Unknown';
+                const cabangUser = cuti.users ? cuti.users.cabang : '-';
+                
+                let tambahan = "";
+                if (cuti.data_tambahan) {
+                    const values = Object.values(cuti.data_tambahan).map(v => typeof v === 'string' ? v.replace(/,/g, ';') : v);
+                    tambahan = values.join(" | ");
+                } else if (cuti.alasan) {
+                    tambahan = cuti.alasan.replace(/,/g, ';');
+                }
+
+                const safeName = `"${namaUser}"`;
+                const safeCabang = `"${cabangUser}"`;
+                const safeTambahan = `"${tambahan}"`;
+                
+                csvCuti += `${safeName},${safeCabang},${cuti.tanggal_mulai},${cuti.tanggal_selesai},${cuti.durasi_hari},${cuti.status_pengajuan},${safeTambahan}\n`;
+            });
+            rootFolder.file("rekap_izin_cuti.csv", csvCuti);
+        }
+
+        // Generate dan download zip
+        const blob = await zip.generateAsync({ type: "blob" });
+        saveAs(blob, `Export_${folderName}.zip`);
+
+        Swal.fire("Sukses", "Data berhasil diexport!", "success");
+    } catch (err) {
+        Swal.fire("Gagal", err.message, "error");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = "📥 Export to ZIP";
+    }
+}
+
+// =====================================
+// DANGER ZONE (TRASH & CLEANUP)
+// =====================================
+async function loadTrash() {
+    const tbody = document.querySelector("#table-trash tbody");
+    tbody.innerHTML = '<tr><td colspan="5" class="text-muted">Memuat data sampah...</td></tr>';
+    
+    let queryTrash = supabaseClient.from('absensi').select('*, users!inner(nama, cabang)')
+        .ilike('status', '%-TRASH-%')
+        .order('tanggal', { ascending: false });
+    
+    if (!isSuperAdmin) {
+        queryTrash = queryTrash.eq('users.cabang', myCabang);
+    }
+
+    const { data, error } = await queryTrash;
+    if (error) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-danger">Gagal memuat: ' + error.message + '</td></tr>';
+        return;
+    }
+
+    // Auto cleanup logic: Hapus permanen jika sudah > 3 hari
+    const tigaHariLalu = Date.now() - (3 * 24 * 60 * 60 * 1000);
+    const dataAman = [];
+    const dataHapus = [];
+
+    data.forEach(row => {
+        const parts = row.status.split('-TRASH-');
+        const ts = parseInt(parts[1]);
+        if (ts < tigaHariLalu) {
+            dataHapus.push(row);
+        } else {
+            dataAman.push({ ...row, ts_dibuang: ts, status_asli: parts[0] });
+        }
+    });
+
+    // Jika ada yang expired, hapus background
+    if (dataHapus.length > 0) {
+        // Run async without blocking UI
+        setTimeout(() => {
+            dataHapus.forEach(r => hapusPermanenInternal(r));
+        }, 1000);
+    }
+
+    if (dataAman.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-muted">Tempat sampah kosong.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = '';
+    dataAman.forEach(row => {
+        const dateStr = new Date(row.ts_dibuang).toLocaleString();
+        tbody.innerHTML += `
+            <tr>
+                <td>${row.users?.nama || 'Unknown'}</td>
+                <td>${row.tanggal}</td>
+                <td><span class="badge bg-secondary">${row.status_asli}</span></td>
+                <td>${dateStr}</td>
+                <td>
+                    <button class="btn btn-sm btn-success mb-1 w-100" onclick="pulihkanData('${row.id}', '${row.status_asli}')">🔄 Pulihkan</button>
+                    <button class="btn btn-sm btn-danger w-100" onclick="hapusPermanenSatu('${row.id}')">🗑️ Hapus Permanen</button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+async function prosesPindahKeSampah(event) {
+    event.preventDefault();
+    const btn = document.getElementById("btn-trash-move");
+    const tglMulai = document.getElementById("trash_mulai").value;
+    const tglSelesai = document.getElementById("trash_selesai").value;
+
+    const res = await Swal.fire({
+        title: "Pindahkan ke Sampah?",
+        text: `Data absen dari ${tglMulai} s/d ${tglSelesai} akan dibuang ke tong sampah dan bisa dihapus otomatis.`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Ya, pindahkan!"
+    });
+    
+    if (!res.isConfirmed) return;
+
+    btn.disabled = true;
+    btn.innerHTML = "Memproses...";
+
+    try {
+        let query = supabaseClient.from('absensi').select('id, status, users!inner(cabang)')
+            .gte('tanggal', tglMulai)
+            .lte('tanggal', tglSelesai)
+            .not('status', 'ilike', '%-TRASH-%');
+        if (!isSuperAdmin) query = query.eq('users.cabang', myCabang);
+
+        const { data, error } = await query;
+        if (error) throw error;
+        if (data.length === 0) throw new Error("Tidak ada data ditemukan untuk diremove.");
+
+        const ts = Date.now();
+        // Update per row (Supabase free tier max bulk limits might apply, but let's do parallel)
+        const updatePromises = data.map(row => 
+            supabaseClient.from('absensi').update({ status: `${row.status}-TRASH-${ts}` }).eq('id', row.id)
+        );
+        await Promise.all(updatePromises);
+        
+        Swal.fire("Berhasil", `${data.length} data dipindahkan ke tempat sampah.`, "success");
+        loadTrash();
+        loadDataAbsensi();
+    } catch (err) {
+        Swal.fire("Gagal", err.message, "error");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = "🗑️ Pindahkan ke Sampah";
+    }
+}
+
+async function pulihkanData(id, statusAsli) {
+    try {
+        await supabaseClient.from('absensi').update({ status: statusAsli }).eq('id', id);
+        Swal.fire("Berhasil", "Data berhasil dipulihkan.", "success");
+        loadTrash();
+        loadDataAbsensi();
+    } catch (err) {
+        Swal.fire("Gagal", err.message, "error");
+    }
+}
+
+async function hapusPermanenSatu(id) {
+    const res = await Swal.fire({
+        title: "Hapus Permanen?",
+        text: "Data beserta foto-fotonya akan hilang selamanya!",
+        icon: "error",
+        showCancelButton: true,
+        confirmButtonText: "Hapus Permanen"
+    });
+    if (!res.isConfirmed) return;
+
+    try {
+        const { data: row } = await supabaseClient.from('absensi').select('*').eq('id', id).single();
+        if (row) await hapusPermanenInternal(row);
+        Swal.fire("Dihapus", "Data terhapus permanen.", "success");
+        loadTrash();
+    } catch (err) {
+        Swal.fire("Gagal", err.message, "error");
+    }
+}
+
+async function kosongkanSampah() {
+    const res = await Swal.fire({
+        title: "Kosongkan Tempat Sampah?",
+        text: "Seluruh data sampah (termasuk foto) akan dihapus permanen saat ini juga!",
+        icon: "error",
+        showCancelButton: true,
+        confirmButtonText: "Kosongkan"
+    });
+    if (!res.isConfirmed) return;
+
+    try {
+        let queryTrash = supabaseClient.from('absensi').select('*, users!inner(cabang)').ilike('status', '%-TRASH-%');
+        if (!isSuperAdmin) queryTrash = queryTrash.eq('users.cabang', myCabang);
+        
+        const { data } = await queryTrash;
+        if (data && data.length > 0) {
+            Swal.fire("Proses", "Sedang menghapus data, jangan tutup jendela...", "info");
+            for (let r of data) {
+                await hapusPermanenInternal(r);
+            }
+            Swal.fire("Berhasil", "Semua data di tempat sampah telah dihapus.", "success");
+            loadTrash();
+        } else {
+            Swal.fire("Info", "Tempat sampah sudah kosong.", "info");
+        }
+    } catch (err) {
+        Swal.fire("Gagal", err.message, "error");
+    }
+}
+
+async function hapusPermanenInternal(row) {
+    try {
+        // Hapus file storage
+        const files = [];
+        const extractFilename = (url) => url ? url.split('/').pop() : null;
+        if (row.foto_url) files.push(extractFilename(row.foto_url));
+        if (row.foto_istirahat_keluar) files.push(extractFilename(row.foto_istirahat_keluar));
+        if (row.foto_istirahat_masuk) files.push(extractFilename(row.foto_istirahat_masuk));
+        if (row.foto_keluar) files.push(extractFilename(row.foto_keluar));
+        
+        const validFiles = files.filter(f => f);
+        if (validFiles.length > 0) {
+            await supabaseClient.storage.from('absensi-bucket').remove(validFiles);
+        }
+        
+        // Hapus row DB
+        await supabaseClient.from('absensi').delete().eq('id', row.id);
+    } catch (err) {
+        console.error("Gagal menghapus internal:", row.id, err);
+    }
 }
