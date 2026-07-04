@@ -2039,7 +2039,42 @@
         loadSisaCuti();
         loadFormCutiBuilder();
         loadRiwayatCutiUser();
+        checkDefaultPassword();
       });
+
+      function checkDefaultPassword() {
+        if (!currentUser) return;
+        const pass = currentUser.password;
+        if (pass === "1234" || pass === "123456") {
+          if (sessionStorage.getItem('passwordPromptShown')) return;
+          sessionStorage.setItem('passwordPromptShown', 'true');
+
+          Swal.fire({
+            title: 'Keamanan Akun',
+            text: 'Password Anda masih menggunakan bawaan (default). Sangat disarankan untuk segera menggantinya demi keamanan.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Ganti Sekarang',
+            cancelButtonText: 'Nanti Saja',
+            reverseButtons: true,
+            allowOutsideClick: false
+          }).then((result) => {
+            if (result.isConfirmed) {
+              const profilTab = document.querySelector('[data-bs-target="#tab-profil"]');
+              if (profilTab) {
+                // Untuk BS5
+                const tab = new bootstrap.Tab(profilTab);
+                tab.show();
+                setTimeout(() => {
+                  const newPassInput = document.getElementById('profil-password-baru');
+                  if (newPassInput) newPassInput.focus();
+                }, 500);
+              }
+            }
+          });
+        }
+      }
+      
       // ==========================================
       // TAB PROFIL & PASSWORD
       // ==========================================
