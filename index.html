@@ -357,10 +357,13 @@
             <div class="col-lg-7">
               <div class="card shadow-sm h-100">
                 <div
-                  class="card-header bg-white fw-bold d-flex justify-content-between align-items-center"
+                  class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center"
                 >
-                  <span>Kalender Kerja</span>
-                  <span id="bulan-tahun" class="badge bg-primary fs-6"></span>
+                  <h6 class="mb-0 fw-bold">Statistik Kehadiran</h6>
+                  <span
+                    id="bulan-tahun"
+                    class="badge bg-primary text-white fs-6"
+                  ></span>
                 </div>
                 <div class="card-body p-0 overflow-auto">
                   <table class="table table-bordered mb-0 text-center">
@@ -393,12 +396,12 @@
                   <table class="table table-borderless mb-0">
                     <tr>
                       <td width="35%" class="text-muted">Nama</td>
-                      <td><strong id="profil-nama"></strong></td>
-                    </tr>
-                    <tr>
-                      <td class="text-muted">Role</td>
                       <td>
-                        <span class="badge bg-primary" id="profil-role"></span>
+                        <h5 class="fw-bold mb-1" id="profil-nama"></h5>
+                        <span
+                          class="badge bg-primary text-white"
+                          id="profil-role"
+                        ></span>
                       </td>
                     </tr>
                     <tr>
@@ -580,17 +583,27 @@
                 id="kamera"
                 autoplay
                 playsinline
-                style="width: 100%; border-radius: 8px"
+                style="width: 100%; border-radius: 8px; transform: scaleX(-1)"
               ></video>
               <canvas id="canvas" style="display: none"></canvas>
               <img
                 id="hasil-foto"
                 alt="Hasil Tangkapan Kamera"
-                style="width: 100%; border-radius: 8px; display: none"
+                style="
+                  width: 100%;
+                  border-radius: 8px;
+                  display: none;
+                  transform: scaleX(-1);
+                "
               />
-              <p id="face-status" class="text-warning mt-2 mb-0 fw-bold">
-                Memuat pendeteksi wajah...
-              </p>
+              <div class="mt-2">
+                <span
+                  id="face-status"
+                  class="badge bg-warning-subtle text-warning-emphasis fs-6 border border-warning-subtle rounded-pill px-3 py-2"
+                >
+                  Memuat pendeteksi wajah...
+                </span>
+              </div>
             </div>
           </div>
           <div class="modal-footer">
@@ -616,6 +629,76 @@
       </div>
     </div>
 
+    <!-- Modal Register Face -->
+    <div
+      class="modal fade"
+      id="modalRegisterFace"
+      tabindex="-1"
+      aria-hidden="true"
+      data-bs-backdrop="static"
+      data-bs-keyboard="false"
+    >
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+          <div class="modal-header bg-danger text-white">
+            <h5 class="modal-title fw-bold">
+              📷 Wajib Pendaftaran Wajah (Face Recognition)
+            </h5>
+          </div>
+          <div class="modal-body text-center p-4">
+            <p class="mb-3 text-muted small">
+              Aplikasi ini dilengkapi sistem anti-kecurangan. Anda wajib
+              mendaftarkan wajah Anda sebelum dapat melakukan absensi.
+            </p>
+            <div class="position-relative d-inline-block">
+              <video
+                id="video-register-face"
+                autoplay
+                playsinline
+                style="
+                  width: 100%;
+                  border-radius: 8px;
+                  max-width: 400px;
+                  transform: scaleX(-1);
+                "
+              ></video>
+              <canvas
+                id="canvas-register-face"
+                style="
+                  position: absolute;
+                  top: 0;
+                  left: 0;
+                  width: 100%;
+                  height: 100%;
+                  pointer-events: none;
+                  transform: scaleX(-1);
+                "
+              ></canvas>
+            </div>
+            <div class="mt-3">
+              <span
+                id="register-face-status"
+                class="badge bg-warning-subtle text-warning-emphasis fs-6 border border-warning-subtle rounded-pill px-3 py-2"
+              >
+                Memuat model kecerdasan buatan... (Harap tunggu)
+              </span>
+            </div>
+          </div>
+          <div class="modal-footer justify-content-center">
+            <button
+              type="button"
+              class="btn btn-primary btn-lg fw-bold w-100"
+              id="btn-simpan-wajah"
+              onclick="simpanWajahUser()"
+              disabled
+            >
+              Simpan Data Wajah
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -625,6 +708,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="config.js"></script>
+    <script src="face.js?v=5"></script>
 
     <script>
       // Variabel Global untuk Lokasi Kantor
@@ -891,7 +975,7 @@
         document.getElementById("btn-ambil-foto").disabled = true;
         document.getElementById("face-status").innerHTML = "Menunggu kamera...";
         document.getElementById("face-status").className =
-          "text-warning mt-2 mb-0 fw-bold";
+          "badge bg-warning-subtle text-warning-emphasis fs-6 border border-warning-subtle rounded-pill px-3 py-2 mt-2 mb-0 fw-bold";
         document.getElementById("face-status").style.display = "block";
 
         navigator.mediaDevices
@@ -925,11 +1009,13 @@
             );
             if (detections.length > 0) {
               faceStatus.innerHTML = "✅ Wajah terdeteksi!";
-              faceStatus.className = "text-success mt-2 mb-0 fw-bold";
+              faceStatus.className =
+                "badge bg-success-subtle text-success-emphasis fs-6 border border-success-subtle rounded-pill px-3 py-2 mt-2 mb-0 fw-bold";
               btnAmbilFoto.disabled = false;
             } else {
               faceStatus.innerHTML = "❌ Wajah belum terlihat jelas";
-              faceStatus.className = "text-warning mt-2 mb-0 fw-bold";
+              faceStatus.className =
+                "badge bg-warning-subtle text-warning-emphasis fs-6 border border-warning-subtle rounded-pill px-3 py-2 mt-2 mb-0 fw-bold";
               btnAmbilFoto.disabled = true;
             }
           } catch (e) {
@@ -1157,6 +1243,34 @@
         const hasilFoto = document.getElementById("hasil-foto");
         const faceStatus = document.getElementById("face-status");
 
+        let faceAbsenStatus = "Belum dicek";
+        if (currentUser && currentUser.face_descriptor) {
+          btnSubmit.innerHTML = "⏳ Memindai wajah...";
+          try {
+            const registeredDesc = new Float32Array(
+              JSON.parse(currentUser.face_descriptor),
+            );
+            const detection = await faceapi
+              .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+              .withFaceLandmarks()
+              .withFaceDescriptor();
+
+            if (detection) {
+              const distance = faceapi.euclideanDistance(
+                registeredDesc,
+                detection.descriptor,
+              );
+              faceAbsenStatus =
+                distance > 0.55 ? "Dicurigai (Tidak Sama)" : "Sesuai (Sama)";
+            } else {
+              faceAbsenStatus = "Wajah Tidak Terdeteksi";
+            }
+          } catch (e) {
+            console.error("Gagal mendeteksi wajah:", e);
+            faceAbsenStatus = "Error Cek Wajah";
+          }
+        }
+
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         canvas
@@ -1218,6 +1332,7 @@
                 foto_url: publicUrlData.publicUrl,
                 jarak_meter: jarakAbsen,
                 status: statusKehadiran,
+                status_wajah: faceAbsenStatus,
               },
             ]);
             dbError = res.error;
@@ -1227,6 +1342,7 @@
               .update({
                 waktu_istirahat_keluar: waktu_sekarang,
                 foto_istirahat_keluar: publicUrlData.publicUrl,
+                status_wajah: faceAbsenStatus,
               })
               .eq("id", absenHariIni.id);
             dbError = res.error;
@@ -1236,6 +1352,7 @@
               .update({
                 waktu_istirahat_masuk: waktu_sekarang,
                 foto_istirahat_masuk: publicUrlData.publicUrl,
+                status_wajah: faceAbsenStatus,
               })
               .eq("id", absenHariIni.id);
             dbError = res.error;
@@ -1245,6 +1362,7 @@
               .update({
                 waktu_keluar: waktu_sekarang,
                 foto_keluar: publicUrlData.publicUrl,
+                status_wajah: faceAbsenStatus,
               })
               .eq("id", absenHariIni.id);
             dbError = res.error;
@@ -1363,11 +1481,12 @@
           let sisa = 0;
           let displaySisa = "";
           if (master.is_unlimited) {
-            displaySisa = '<span class="badge bg-success">Tanpa Batas</span>';
+            displaySisa =
+              '<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">Tanpa Batas</span>';
             sisa = 999999;
           } else {
             sisa = master.batas_hari - terpakai;
-            displaySisa = `<span class="badge ${sisa > 0 ? "bg-primary" : "bg-danger"}">${sisa} Hari</span>`;
+            displaySisa = `<span class="badge ${sisa > 0 ? "bg-primary-subtle text-primary-emphasis border border-primary-subtle" : "bg-danger-subtle text-danger-emphasis border border-danger-subtle"}">${sisa} Hari</span>`;
           }
 
           window.sisaCutiMaster[master.nama_cuti] = {
@@ -1574,10 +1693,11 @@
 
         tbody.innerHTML = "";
         data.forEach((cuti) => {
-          let badgeClass = "bg-secondary";
-          if (cuti.status_pengajuan === "Disetujui") badgeClass = "bg-success";
+          let badgeClass = "bg-secondary text-white";
+          if (cuti.status_pengajuan === "Disetujui")
+            badgeClass = "bg-success text-white";
           else if (cuti.status_pengajuan === "Ditolak")
-            badgeClass = "bg-danger";
+            badgeClass = "bg-danger text-white";
           else if (cuti.status_pengajuan === "Menunggu")
             badgeClass = "bg-warning text-dark";
 
@@ -1982,7 +2102,11 @@
 
         tbody.innerHTML = "";
         data.forEach((absen) => {
-          let badgeClass = absen.status === "Terlambat" ? "warning" : "success";
+          let badgeClass =
+            absen.status === "Terlambat"
+              ? "warning text-dark"
+              : "success text-white";
+          if (absen.status === "Alpha") badgeClass = "danger text-white";
           tbody.innerHTML += `
             <tr>
               <td>${absen.tanggal}</td>
@@ -2040,33 +2164,38 @@
         loadFormCutiBuilder();
         loadRiwayatCutiUser();
         checkDefaultPassword();
+        checkAndRegisterFace();
       });
 
       function checkDefaultPassword() {
         if (!currentUser) return;
         const pass = currentUser.password;
         if (pass === "1234" || pass === "123456") {
-          if (sessionStorage.getItem('passwordPromptShown')) return;
-          sessionStorage.setItem('passwordPromptShown', 'true');
+          if (sessionStorage.getItem("passwordPromptShown")) return;
+          sessionStorage.setItem("passwordPromptShown", "true");
 
           Swal.fire({
-            title: 'Keamanan Akun',
-            text: 'Password Anda masih menggunakan bawaan (default). Sangat disarankan untuk segera menggantinya demi keamanan.',
-            icon: 'warning',
+            title: "Keamanan Akun",
+            text: "Password Anda masih menggunakan bawaan (default). Sangat disarankan untuk segera menggantinya demi keamanan.",
+            icon: "warning",
             showCancelButton: true,
-            confirmButtonText: 'Ganti Sekarang',
-            cancelButtonText: 'Nanti Saja',
+            confirmButtonText: "Ganti Sekarang",
+            cancelButtonText: "Nanti Saja",
             reverseButtons: true,
-            allowOutsideClick: false
+            allowOutsideClick: false,
           }).then((result) => {
             if (result.isConfirmed) {
-              const profilTab = document.querySelector('[data-bs-target="#tab-profil"]');
+              const profilTab = document.querySelector(
+                '[data-bs-target="#tab-profil"]',
+              );
               if (profilTab) {
                 // Untuk BS5
                 const tab = new bootstrap.Tab(profilTab);
                 tab.show();
                 setTimeout(() => {
-                  const newPassInput = document.getElementById('profil-password-baru');
+                  const newPassInput = document.getElementById(
+                    "profil-password-baru",
+                  );
                   if (newPassInput) newPassInput.focus();
                 }, 500);
               }
@@ -2074,7 +2203,7 @@
           });
         }
       }
-      
+
       // ==========================================
       // TAB PROFIL & PASSWORD
       // ==========================================

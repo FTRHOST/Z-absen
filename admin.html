@@ -430,6 +430,15 @@
                           <input type="tel" class="form-control" id="karyawan_hp" placeholder="No HP" required />
                         </div>
                         <div class="col-md-4">
+                          <label class="form-label small text-muted mb-0">Foto Wajah Terdaftar</label>
+                          <div id="foto-wajah-container" class="border rounded text-center p-2 bg-light mb-2">
+                            <span class="text-muted small">Belum terdaftar</span>
+                          </div>
+                          <button type="button" id="btn-reset-wajah" class="btn btn-sm btn-outline-danger w-100 d-none" onclick="resetWajahKaryawan()">
+                            <i class="fas fa-trash-alt me-1"></i> Reset Data Wajah
+                          </button>
+                        </div>
+                        <div class="col-md-4">
                           <label class="form-label small text-muted mb-0">Password</label>
                           <input type="password" class="form-control" id="karyawan_password" placeholder="(Kosongkan jika tdk diubah)" />
                         </div>
@@ -511,6 +520,7 @@
                       <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body text-center">
+                       <div id="detail_foto_wajah" class="mb-3 d-none"></div>
                        <h4 id="detail_nama" class="fw-bold mb-1"></h4>
                        <span id="detail_role" class="badge bg-secondary mb-3"></span>
                        <table class="table table-bordered text-start small">
@@ -569,6 +579,7 @@
                               <th>Pulang</th>
                               <th>Foto Muka</th>
                               <th>Status Kehadiran</th>
+                              <th>Aksi</th>
                             </tr>
                           </thead>
                           <tbody id="modalDetailAbsensiBody">
@@ -950,7 +961,7 @@ Besok **17 Agustus** kita libur ya!"></textarea>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="config.js"></script>
-    <script src="admin.js?v=29"></script>
+    <script src="admin.js?v=35"></script>
     
     <script>
       if (userData) {

@@ -704,7 +704,7 @@ function renderKaryawan() {
                     <div class="card h-100 shadow-sm border-0 user-card-hover" style="transition: transform 0.2s;">
                         <div class="card-body" style="cursor: pointer;" onclick="showDetailKaryawan('${user.id}')">
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <span class="badge bg-${badgeColor}">${user.role}</span>
+                                <span class="badge bg-${badgeColor} text-white">${user.role}</span>
                                 <small class="text-muted text-end">
                                     <i class="fas fa-building text-secondary"></i> ${user.cabang || '-'}
                                 </small>
@@ -730,7 +730,7 @@ function renderKaryawan() {
             tbody.innerHTML += `
                 <tr>
                     <td>${user.nama}</td>
-                    <td><span class="badge bg-${badgeColor}">${user.role}</span></td>
+                    <td><span class="badge bg-${badgeColor} text-white">${user.role}</span></td>
                     <td>${user.no_hp || '-'}</td>
                     <td>${user.cabang || '-'}</td>
                     <td>
@@ -749,7 +749,7 @@ function showDetailKaryawan(id) {
     document.getElementById("detail_nama").innerText = user.nama;
     
     const badgeColor = user.role === 'HR' ? 'primary' : (user.role === 'Super Admin' ? 'danger' : 'secondary');
-    document.getElementById("detail_role").className = `badge bg-${badgeColor} mb-3`;
+    document.getElementById("detail_role").className = `badge bg-${badgeColor} text-white mb-3`;
     document.getElementById("detail_role").innerText = user.role;
     
     document.getElementById("detail_cabang").innerText = user.cabang || '-';
@@ -763,6 +763,15 @@ function showDetailKaryawan(id) {
         if (strLibur) liburTeks = strLibur;
     }
     document.getElementById("detail_libur").innerText = liburTeks;
+    
+    // Tampilkan foto wajah di detail
+    const detailFoto = document.getElementById("detail_foto_wajah");
+    if (user.foto_wajah) {
+        detailFoto.innerHTML = `<img src="${user.foto_wajah}" class="img-fluid rounded-circle shadow-sm" style="width: 120px; height: 120px; object-fit: cover; border: 3px solid #dee2e6;" alt="Wajah">`;
+        detailFoto.classList.remove('d-none');
+    } else {
+        detailFoto.classList.add('d-none');
+    }
     
     // Set button click handlers
     document.getElementById("btn-detail-edit").onclick = () => {
@@ -854,6 +863,17 @@ function editKaryawan(id, nama, role, no_hp, cabang) {
         cb.checked = arrLibur.includes(cb.value);
     });
     
+    // Tampilkan foto wajah jika ada
+    const containerWajah = document.getElementById("foto-wajah-container");
+    const btnResetWajah = document.getElementById("btn-reset-wajah");
+    if (user && user.foto_wajah) {
+        containerWajah.innerHTML = `<img src="${user.foto_wajah}" class="img-fluid rounded shadow-sm" style="max-height: 120px;" alt="Wajah Karyawan">`;
+        btnResetWajah.classList.remove('d-none');
+    } else {
+        containerWajah.innerHTML = `<span class="text-muted small">Belum terdaftar</span>`;
+        btnResetWajah.classList.add('d-none');
+    }
+    
     document.getElementById("karyawan-card-header").innerText = "✏️ Edit Data Pengguna";
     document.getElementById("karyawan_btn").innerText = "Update Data";
     
@@ -872,9 +892,18 @@ function batalEditKaryawan() {
     document.getElementById("karyawan_password").placeholder = "Password (Wajib)";
     
     document.querySelectorAll('.form-libur-baru').forEach(cb => cb.checked = false);
-    
+    document.getElementById("role-karyawan").value = "";
     document.getElementById("karyawan-card-header").innerText = "➕ Tambah Pengguna Baru";
     document.getElementById("karyawan_btn").innerText = "Simpan Data";
+    
+    const containerWajah = document.getElementById("foto-wajah-container");
+    const btnResetWajah = document.getElementById("btn-reset-wajah");
+    if (containerWajah) {
+        containerWajah.innerHTML = `<span class="text-muted small">Belum terdaftar</span>`;
+    }
+    if (btnResetWajah) {
+        btnResetWajah.classList.add('d-none');
+    }
     
     if (!isSuperAdmin) {
         document.getElementById("role-karyawan").disabled = false;
@@ -898,7 +927,7 @@ async function hapusKaryawan(id) {
     if (!result.isConfirmed) return;
 
     await supabaseClient.from('users').delete().eq('id', id);
-    Swal.fire("Terhapus", "Karyawan berhasil dihapus.", "success");
+    Swal.fire("Terhapus", "Data pengguna berhasil dihapus.", "success");
     loadDataKaryawan();
 }
 
@@ -1087,14 +1116,21 @@ function showDetailAbsensi(tanggal, dateStr) {
             ? `<button class="btn btn-sm btn-info text-white shadow-sm" onclick="lihatFotoAbsen('${absen.foto_url || ''}', '${absen.foto_istirahat_keluar || ''}', '${absen.foto_istirahat_masuk || ''}', '${absen.foto_keluar || ''}')">📸 Lihat Foto</button>` 
             : `<span class="text-muted small fst-italic">Tidak tersedia</span>`;
             
-        let badgeClass = "bg-secondary";
-        if (absen.status === "Hadir") badgeClass = "bg-success";
+        let badgeClass = "bg-secondary text-white";
+        if (absen.status === "Hadir") badgeClass = "bg-success text-white";
         else if (absen.status === "Terlambat") badgeClass = "bg-warning text-dark";
-        else if (absen.status === "Alpha") badgeClass = "bg-danger";
+        else if (absen.status === "Alpha") badgeClass = "bg-danger text-white";
         else if (absen.status === "Cuti") badgeClass = "bg-info text-dark";
+        
+        let faceBadgeClass = "bg-secondary text-white";
+        const faceStatus = absen.status_wajah || "Sesuai";
+        if (faceStatus.includes("Dicurigai") || faceStatus.includes("Tidak Sama")) faceBadgeClass = "bg-danger text-white";
+        else if (faceStatus.includes("Sesuai") || faceStatus.includes("Sama")) faceBadgeClass = "bg-success text-white";
+        else if (faceStatus.includes("Error")) faceBadgeClass = "bg-warning text-dark";
 
         const statusHTML = `
-            <span class="badge ${badgeClass} fs-6">${absen.status}</span>
+            <span class="badge ${badgeClass} fs-6 mb-1">${absen.status}</span><br>
+            <span class="badge ${faceBadgeClass} mb-1" title="Status Pengenalan Wajah"><i class="fas fa-user-check"></i> ${faceStatus}</span>
             <div class="small text-muted mt-1">Jarak: ${absen.jarak_meter || 0}m</div>
         `;
             
@@ -1113,6 +1149,11 @@ function showDetailAbsensi(tanggal, dateStr) {
                 <td>${absen.waktu_keluar || '-'}</td>
                 <td>${fotoHTML}</td>
                 <td>${statusHTML}</td>
+                <td>
+                    <button class="btn btn-sm btn-danger shadow-sm text-white" onclick="hapusDataAbsen('${absen.id}', '${tanggal}')">
+                        <i class="fas fa-trash-alt me-1"></i>Hapus
+                    </button>
+                </td>
             </tr>
         `;
     });
@@ -2649,4 +2690,80 @@ async function restoreDatabase(event) {
         }
     };
     reader.readAsText(file);
+}
+
+async function resetWajahKaryawan() {
+    const id = document.getElementById("karyawan_id").value;
+    if (!id) return;
+    
+    const result = await Swal.fire({
+        title: "Konfirmasi Reset Wajah",
+        text: "Wajah karyawan ini akan dihapus dan mereka wajib mendaftar ulang saat login. Lanjutkan?",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Ya, Reset Wajah!"
+    });
+
+    if (!result.isConfirmed) return;
+
+    const { error } = await supabaseClient.from('users').update({ 
+        face_descriptor: null, 
+        foto_wajah: null 
+    }).eq('id', id);
+
+    if (error) {
+        Swal.fire("Gagal", error.message, "error");
+        return;
+    }
+    
+    Swal.fire("Berhasil", "Data wajah karyawan telah dihapus.", "success");
+    document.getElementById("foto-wajah-container").innerHTML = `<span class="text-muted small">Belum terdaftar</span>`;
+    document.getElementById("btn-reset-wajah").classList.add('d-none');
+    loadDataKaryawan();
+}
+
+async function hapusDataAbsen(absenId, tanggal) {
+    const result = await Swal.fire({
+        title: "Hapus Data Absen?",
+        text: "Seluruh foto dan rekaman absensi akan dihapus permanen. Karyawan akan dianggap belum absen.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Ya, Hapus!"
+    });
+
+    if (!result.isConfirmed) return;
+    
+    // Ambil data absen
+    const { data: absenData } = await supabaseClient.from('absensi').select('*').eq('id', absenId).maybeSingle();
+    if (absenData) {
+        const fotoFiles = [
+            absenData.foto_url,
+            absenData.foto_istirahat_keluar,
+            absenData.foto_istirahat_masuk,
+            absenData.foto_keluar
+        ];
+        
+        const filesToDelete = fotoFiles.filter(f => f).map(url => {
+            const parts = url.split('/');
+            return parts[parts.length - 1];
+        });
+        
+        if (filesToDelete.length > 0) {
+            await supabaseClient.storage.from('absensi-bucket').remove(filesToDelete);
+        }
+    }
+
+    const { error } = await supabaseClient.from('absensi').delete().eq('id', absenId);
+    if (error) {
+        Swal.fire("Gagal", error.message, "error");
+        return;
+    }
+    
+    Swal.fire("Berhasil", "Data absen beserta foto berhasil dihapus.", "success");
+    bootstrap.Modal.getInstance(document.getElementById('modalDetailAbsensi')).hide();
+    loadDataAbsensi();
 }
