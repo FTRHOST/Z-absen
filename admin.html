@@ -59,6 +59,10 @@
         background-color: #e66b1a !important;
         border-color: #e66b1a !important;
       }
+      .user-card-hover:hover, .dashboard-card-hover:hover {
+        transform: translateY(-5px) !important;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.15) !important;
+      }
       .navbar-dark .navbar-brand, .navbar-dark .navbar-text, .navbar-dark .nav-link {
         color: #3E2723 !important;
       }
@@ -87,64 +91,71 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
       <div class="container-fluid">
         <a class="navbar-brand fw-bold" href="#">⚙️ Admin Panel Zie Absen</a>
-        <div class="d-flex align-items-center">
-          <a href="index.html" class="btn btn-sm btn-info fw-bold text-dark me-3">📍 Ke Halaman Absen</a>
+        <div class="d-flex align-items-center ms-auto">
+          <a href="index.html" class="btn btn-sm btn-info fw-bold text-dark me-2">📍 Ke Halaman Absen</a>
           <span class="navbar-text text-white me-3 d-none d-md-inline" id="navbar-role-text">Login sebagai: Super Admin</span>
           <button class="btn btn-sm btn-outline-light" onclick="logout()">Logout</button>
+          
+          <button class="navbar-toggler border-0 ms-2 d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#adminMenuTabs" aria-controls="adminMenuTabs" style="box-shadow: none;">
+            <span class="navbar-toggler-icon"></span>
+          </button>
         </div>
       </div>
     </nav>
 
     <div class="container-fluid py-4">
       
-      <!-- MENU NAVBAR SEDERHANA DENGAN HAMBURGER -->
-      <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4 rounded">
-        <div class="container-fluid">
-          <span class="navbar-brand d-lg-none fw-bold fs-6 text-muted">☰ Menu Navigasi</span>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminMenuTabs">
-            <span class="navbar-toggler-icon"></span>
-          </button>
-          <div class="collapse navbar-collapse" id="adminMenuTabs">
-            <ul class="nav nav-pills flex-column flex-lg-row gap-2 py-2 py-lg-0 w-100" id="adminTabs" role="tablist">
-              <li class="nav-item">
-                <button class="nav-link active fw-bold text-start text-lg-center px-3" data-bs-toggle="pill" data-bs-target="#tab-dashboard" type="button" role="tab" onclick="closeMenu()">📊 Dashboard & Info</button>
-              </li>
-              <li class="nav-item">
-                <button class="nav-link fw-bold text-start text-lg-center px-3" data-bs-toggle="pill" data-bs-target="#tab-kantor" type="button" role="tab" onclick="closeMenu()">🏢 Kelola Kantor</button>
-              </li>
-              <li class="nav-item">
-                <button class="nav-link fw-bold text-start text-lg-center px-3" data-bs-toggle="pill" data-bs-target="#tab-karyawan" type="button" role="tab" onclick="closeMenu()">👥 Data Karyawan</button>
-              </li>
-              <li class="nav-item">
-                <button class="nav-link fw-bold text-start text-lg-center px-3" data-bs-toggle="pill" data-bs-target="#tab-absensi" type="button" role="tab" onclick="closeMenu()">📍 Rekap Absensi</button>
-              </li>
-              <li class="nav-item">
-                <button class="nav-link fw-bold text-start text-lg-center px-3" data-bs-toggle="pill" data-bs-target="#tab-cuti" type="button" role="tab" onclick="closeMenu()">📝 Pengajuan Cuti</button>
-              </li>
-              <li class="nav-item">
-                <button class="nav-link fw-bold text-start text-lg-center px-3" data-bs-toggle="pill" data-bs-target="#tab-export" type="button" role="tab" onclick="closeMenu()">📥 Export Data</button>
-              </li>
-              <li class="nav-item">
-                <button class="nav-link fw-bold text-start text-lg-center px-3" data-bs-toggle="pill" data-bs-target="#tab-form-builder" type="button" id="btn-konfigurasi-cuti" role="tab" onclick="closeMenu()">⚙️ Konfigurasi Cuti</button>
-              </li>
-              <li class="nav-item">
-                <button class="nav-link fw-bold text-start text-lg-center px-3 text-danger border border-danger" data-bs-toggle="pill" data-bs-target="#tab-danger" type="button" role="tab" onclick="loadTrash(); closeMenu()">⚠️ Zone Bahaya</button>
-              </li>
-            </ul>
+      <!-- MENU NAVBAR -->
+      <div class="bg-white shadow-sm mb-4 rounded p-0 p-lg-2 border-0">
+          <div class="offcanvas-lg offcanvas-end" tabindex="-1" id="adminMenuTabs" aria-labelledby="adminMenuTabsLabel">
+            <div class="offcanvas-header border-bottom">
+              <h5 class="offcanvas-title fw-bold" id="adminMenuTabsLabel">☰ Menu Navigasi</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#adminMenuTabs" aria-label="Close"></button>
+            </div>
+            <div class="offcanvas-body p-3 p-lg-0">
+              <ul class="nav nav-pills flex-column flex-lg-row gap-2 w-100" id="adminTabs" role="tablist">
+                <li class="nav-item">
+                  <button class="nav-link fw-bold text-start text-lg-center px-3 w-100" data-bs-toggle="pill" data-bs-target="#tab-dashboard" type="button" role="tab" onclick="closeMenu()">📊 Dashboard & Info</button>
+                </li>
+                <li class="nav-item">
+                  <button class="nav-link fw-bold text-start text-lg-center px-3 w-100" data-bs-toggle="pill" data-bs-target="#tab-kantor" type="button" role="tab" onclick="closeMenu()">🏢 Kelola Kantor</button>
+                </li>
+                <li class="nav-item">
+                  <button class="nav-link fw-bold text-start text-lg-center px-3 w-100" data-bs-toggle="pill" data-bs-target="#tab-karyawan" type="button" role="tab" onclick="closeMenu()">👥 Data Karyawan</button>
+                </li>
+                <li class="nav-item">
+                  <button class="nav-link fw-bold text-start text-lg-center px-3 w-100" data-bs-toggle="pill" data-bs-target="#tab-absensi" type="button" role="tab" onclick="closeMenu()">📍 Rekap Absensi</button>
+                </li>
+                <li class="nav-item">
+                  <button class="nav-link fw-bold text-start text-lg-center px-3 w-100" data-bs-toggle="pill" data-bs-target="#tab-cuti" type="button" role="tab" onclick="closeMenu()">
+                    📝 Pengajuan Cuti 
+                    <span id="badge-cuti" class="badge bg-danger rounded-pill ms-1 d-none">0</span>
+                  </button>
+                </li>
+                <li class="nav-item">
+                  <button class="nav-link fw-bold text-start text-lg-center px-3 w-100" data-bs-toggle="pill" data-bs-target="#tab-export" type="button" role="tab" onclick="closeMenu()">📥 Export Data</button>
+                </li>
+                <li class="nav-item">
+                  <button class="nav-link fw-bold text-start text-lg-center px-3 w-100" data-bs-toggle="pill" data-bs-target="#tab-form-builder" type="button" id="btn-konfigurasi-cuti" role="tab" onclick="closeMenu()">⚙️ Konfigurasi Cuti</button>
+                </li>
+                <li class="nav-item">
+                  <button class="nav-link fw-bold text-start text-lg-center px-3 w-100" data-bs-toggle="pill" data-bs-target="#tab-pengaturan" type="button" role="tab" onclick="loadSettings(); closeMenu()">🛠️ Pengaturan Aplikasi</button>
+                </li>
+                <li class="nav-item">
+                  <button class="nav-link fw-bold text-start text-lg-center px-3 text-danger border border-danger w-100" data-bs-toggle="pill" data-bs-target="#tab-danger" type="button" role="tab" onclick="loadTrash(); closeMenu()">⚠️ Zone Bahaya</button>
+                </li>
+              </ul>
+            </div>
           </div>
-        </div>
-      </nav>
+      </div>
 
       <script>
         function closeMenu() {
             const menu = document.getElementById('adminMenuTabs');
-            if (menu.classList.contains('show')) {
-                // Ensure bootstrap is loaded before calling
-                if (typeof bootstrap !== 'undefined') {
-                    const bsCollapse = bootstrap.Collapse.getInstance(menu) || new bootstrap.Collapse(menu, {toggle: false});
-                    bsCollapse.hide();
-                } else {
-                    menu.classList.remove('show');
+            if (typeof bootstrap !== 'undefined') {
+                const bsOffcanvas = bootstrap.Offcanvas.getInstance(menu);
+                if (bsOffcanvas) {
+                    bsOffcanvas.hide();
                 }
             }
         }
@@ -153,271 +164,476 @@
       <div class="row">
         <div class="col-12">
           <div class="tab-content w-100" id="adminTabsContent">
-            <div class="tab-pane fade show active" id="tab-dashboard">
+            <div class="tab-pane" id="tab-dashboard">
               <div class="row g-3 mb-4">
-                <div class="col-md-4">
-                  <div class="card shadow-sm bg-primary text-white">
-                    <div class="card-body">
-                      <h5>Total Karyawan</h5>
-                      <h2 id="stat-user">0</h2>
+                <div class="col-6 col-md-3">
+                  <div class="card shadow-sm bg-success text-white h-100 border-0 dashboard-card-hover" onclick="showDashboardDetail('hadir')" style="cursor:pointer; transition: transform 0.2s;">
+                    <div class="card-body text-center">
+                      <h6 class="fw-bold mb-1"><i class="fas fa-check-circle"></i> Hadir Hari Ini</h6>
+                      <h2 id="stat-hadir" class="fw-bold mb-0">0</h2>
                     </div>
                   </div>
                 </div>
-                <div class="col-md-4">
-                  <div class="card shadow-sm bg-success text-white">
-                    <div class="card-body">
-                      <h5>Hadir Hari Ini</h5>
-                      <h2 id="stat-hadir">0</h2>
+                <div class="col-6 col-md-3">
+                  <div class="card shadow-sm bg-warning text-dark h-100 border-0 dashboard-card-hover" onclick="showDashboardDetail('terlambat')" style="cursor:pointer; transition: transform 0.2s;">
+                    <div class="card-body text-center">
+                      <h6 class="fw-bold mb-1"><i class="fas fa-clock"></i> Terlambat</h6>
+                      <h2 id="stat-terlambat" class="fw-bold mb-0">0</h2>
                     </div>
                   </div>
                 </div>
-                <div class="col-md-4">
-                  <div class="card shadow-sm bg-warning text-dark">
-                    <div class="card-body">
-                      <h5>Cuti Pending</h5>
-                      <h2>3</h2>
+                <div class="col-6 col-md-3">
+                  <div class="card shadow-sm bg-info text-white h-100 border-0 dashboard-card-hover" onclick="showDashboardDetail('cuti')" style="cursor:pointer; transition: transform 0.2s;">
+                    <div class="card-body text-center">
+                      <h6 class="fw-bold mb-1"><i class="fas fa-suitcase-rolling"></i> Sedang Cuti</h6>
+                      <h2 id="stat-cuti" class="fw-bold mb-0">0</h2>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-6 col-md-3">
+                  <div class="card shadow-sm bg-secondary text-white h-100 border-0 dashboard-card-hover" onclick="showDashboardDetail('belum')" style="cursor:pointer; transition: transform 0.2s;">
+                    <div class="card-body text-center">
+                      <h6 class="fw-bold mb-1"><i class="fas fa-question-circle"></i> Belum Absen</h6>
+                      <h2 id="stat-belum" class="fw-bold mb-0">0</h2>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div class="card shadow-sm">
-                <div class="card-header">📢 Buat Pengumuman / Info Libur</div>
-                <div class="card-body">
-                  <form
-                    onsubmit="
-                      event.preventDefault();
-                      Swal.fire({title: 'Sukses', text: 'Pengumuman berhasil disebarkan ke semua karyawan!', icon: 'success'});
-                    "
-                  >
-                    <div class="mb-3">
-                      <label class="form-label">Judul Pengumuman</label>
-                      <input
-                        type="text"
-                        class="form-control"
-                        placeholder="Contoh: Libur Nasional Idul Adha"
-                        required
-                      />
+              <!-- Cuti Pending Alert -->
+              <div class="alert alert-danger d-none align-items-center mb-4 shadow-sm" id="alert-cuti-pending" role="alert">
+                <i class="fas fa-exclamation-triangle fs-4 me-3"></i>
+                <div>
+                  <h6 class="fw-bold mb-0">Perhatian! Ada <span id="stat-cuti-pending">0</span> pengajuan cuti menunggu konfirmasi.</h6>
+                  <small>Harap segera cek tab "Pengajuan Cuti" untuk menindaklanjuti.</small>
+                </div>
+                <button type="button" class="btn btn-sm btn-danger ms-auto fw-bold px-3" onclick="document.querySelector('[data-bs-target=\'#tab-cuti\']').click();">Cek Sekarang</button>
+              </div>
+
+              <div class="row g-4">
+                <div class="col-lg-8">
+                  <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white fw-bold border-0 pt-3">
+                      <i class="fas fa-chart-bar text-primary me-2"></i> Tren Kehadiran 7 Hari Terakhir
                     </div>
-                    <div class="mb-3">
-                      <label class="form-label">Isi Pengumuman</label>
-                      <textarea
-                        class="form-control"
-                        rows="3"
-                        required
-                      ></textarea>
+                    <div class="card-body">
+                      <canvas id="attendanceChart" height="100"></canvas>
                     </div>
-                    <button type="submit" class="btn btn-primary">
-                      Kirim Pengumuman
+                  </div>
+                </div>
+                <div class="col-lg-4">
+                  <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white fw-bold border-0 pt-3">
+                      <i class="fas fa-bullhorn text-warning me-2"></i> Papan Informasi
+                    </div>
+                    <div class="card-body">
+                      <div id="dashboard-pengumuman-container">
+                        <!-- Konten Pengumuman Markdown -->
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Modal Detail Dashboard -->
+            <div class="modal fade" id="modalDetailDashboard" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content border-0 shadow">
+                  <div class="modal-header text-white" id="modalDetailDashboardHeader">
+                    <h5 class="modal-title fw-bold" id="modalDetailDashboardTitle">Daftar Karyawan</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <div class="modal-body p-0">
+                    <div class="table-responsive">
+                      <table class="table table-hover mb-0 text-center align-middle">
+                        <thead class="table-light">
+                          <tr>
+                            <th class="text-start ps-4">Nama Karyawan</th>
+                            <th>Cabang</th>
+                            <th id="modalDetailDashboardExtraCol">Info</th>
+                          </tr>
+                        </thead>
+                        <tbody id="modalDetailDashboardBody">
+                          <!-- Data baris detail -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="tab-pane" id="tab-kantor">
+              <div class="row align-items-center mb-3 g-2">
+                <div class="col-md-6 col-lg-4">
+                  <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                    <input type="text" id="search-kantor" class="form-control" placeholder="Cari Nama Cabang..." onkeyup="renderKantor()" />
+                  </div>
+                </div>
+                <div class="col-md-6 col-lg-8 text-end">
+                  <div class="btn-group me-2" role="group">
+                    <button type="button" id="btn-kantor-grid" class="btn btn-outline-primary active" onclick="toggleKantorView('grid')">
+                      <i class="fas fa-th-large"></i> Card
                     </button>
-                  </form>
+                    <button type="button" id="btn-kantor-table" class="btn btn-outline-primary" onclick="toggleKantorView('table')">
+                      <i class="fas fa-list"></i> Tabel
+                    </button>
+                  </div>
+                  <button id="btn-tambah-kantor" class="btn btn-primary fw-bold" onclick="batalEditKantor(); new bootstrap.Modal(document.getElementById('modalKantor')).show();">
+                    <i class="fas fa-plus-circle"></i> Tambah Kantor Baru
+                  </button>
                 </div>
               </div>
-            </div>
 
-            <div class="tab-pane fade" id="tab-kantor">
-              <div class="card shadow-sm mb-4">
-                <div class="card-header" id="kantor-card-header">➕ Tambah Kantor Baru</div>
-                <div class="card-body">
-                  <form class="row g-3" id="form-kantor" onsubmit="simpanKantor(event)">
-                    <input type="hidden" id="kantor_id" value="">
-                    <div class="col-md-12">
-                      <div class="d-flex justify-content-between align-items-center mb-1">
-                          <label class="form-label small text-muted mb-0">Pilih Lokasi di Peta (Klik untuk set koordinat)</label>
-                          <button type="button" class="btn btn-sm btn-outline-primary" onclick="gunakanLokasiSaatIni()">📍 Gunakan Lokasi Saat Ini</button>
-                      </div>
-                      <div id="map-kantor" style="height: 250px; width: 100%; border-radius: 8px; border: 1px solid #dee2e6;" class="mb-2"></div>
+              <!-- Modal Kantor -->
+              <div class="modal fade" id="modalKantor" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                  <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                      <h5 class="modal-title fw-bold" id="kantor-card-header">➕ Tambah Kantor Baru</h5>
+                      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="col-md-3">
-                      <input type="text" class="form-control" id="kantor_nama" placeholder="Nama Kantor (Misal: Cabang Tegal)" required />
+                    <div class="modal-body">
+                      <form class="row g-3" id="form-kantor" onsubmit="simpanKantor(event)">
+                        <input type="hidden" id="kantor_id" value="">
+                        <div class="col-md-12">
+                          <div class="d-flex justify-content-between align-items-center mb-1">
+                              <label class="form-label small text-muted mb-0">Pilih Lokasi di Peta (Klik untuk set koordinat)</label>
+                              <button type="button" class="btn btn-sm btn-outline-primary" onclick="gunakanLokasiSaatIni()">📍 Gunakan Lokasi Saat Ini</button>
+                          </div>
+                          <div id="map-kantor" style="height: 250px; width: 100%; border-radius: 8px; border: 1px solid #dee2e6;" class="mb-2"></div>
+                        </div>
+                        <div class="col-md-4">
+                          <label class="form-label small text-muted mb-0">Nama Kantor</label>
+                          <input type="text" class="form-control" id="kantor_nama" placeholder="Misal: Cabang Tegal" required />
+                        </div>
+                        <div class="col-md-4">
+                          <label class="form-label small text-muted mb-0">Latitude</label>
+                          <input type="text" class="form-control" id="kantor_lat" placeholder="Latitude" required readonly />
+                        </div>
+                        <div class="col-md-4">
+                          <label class="form-label small text-muted mb-0">Longitude</label>
+                          <input type="text" class="form-control" id="kantor_lng" placeholder="Longitude" required readonly />
+                        </div>
+                        <div class="col-md-4">
+                          <label class="form-label small text-muted mb-0">Radius (Meter)</label>
+                          <input type="number" class="form-control" id="kantor_rad" placeholder="Radius (Meter)" value="100" required />
+                        </div>
+                        <div class="col-md-2">
+                          <label class="form-label small text-muted mb-0">Jam Masuk</label>
+                          <input type="time" class="form-control" id="kantor_jam_masuk" value="08:00" required />
+                        </div>
+                        <div class="col-md-2">
+                          <label class="form-label small text-muted mb-0">Jam Pulang</label>
+                          <input type="time" class="form-control" id="kantor_jam_keluar" value="17:00" required />
+                        </div>
+                        <div class="col-md-2">
+                          <label class="form-label small text-muted mb-0">Mulai Istirahat</label>
+                          <input type="time" class="form-control" id="kantor_jam_mulai_istirahat" value="12:00" required />
+                        </div>
+                        <div class="col-md-2">
+                          <label class="form-label small text-muted mb-0">Selesai Istirahat</label>
+                          <input type="time" class="form-control" id="kantor_jam_selesai_istirahat" value="13:00" required />
+                        </div>
+                        <div class="col-md-12 text-end mt-4">
+                          <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Batal</button>
+                          <button type="submit" class="btn btn-success" id="kantor_btn">Simpan Data Cabang</button>
+                        </div>
+                      </form>
                     </div>
-                    <div class="col-md-2">
-                      <input type="text" class="form-control" id="kantor_lat" placeholder="Latitude" required readonly />
-                    </div>
-                    <div class="col-md-2">
-                      <input type="text" class="form-control" id="kantor_lng" placeholder="Longitude" required readonly />
-                    </div>
-                    <div class="col-md-2">
-                      <input type="number" class="form-control" id="kantor_rad" placeholder="Radius (Meter)" value="100" required />
-                    </div>
-                    <div class="col-md-2">
-                      <label class="form-label small text-muted mb-0">Jam Masuk</label>
-                      <input type="time" class="form-control" id="kantor_jam_masuk" value="08:00" required />
-                    </div>
-                    <div class="col-md-2">
-                      <label class="form-label small text-muted mb-0">Jam Pulang</label>
-                      <input type="time" class="form-control" id="kantor_jam_keluar" value="17:00" required />
-                    </div>
-                    <div class="col-md-2">
-                      <label class="form-label small text-muted mb-0">Mulai Istirahat</label>
-                      <input type="time" class="form-control" id="kantor_jam_mulai_istirahat" value="12:00" required />
-                    </div>
-                    <div class="col-md-2">
-                      <label class="form-label small text-muted mb-0">Selesai Istirahat</label>
-                      <input type="time" class="form-control" id="kantor_jam_selesai_istirahat" value="13:00" required />
-                    </div>
-                    <div class="col-md-12 text-end mt-2">
-                      <button type="button" class="btn btn-secondary d-none" id="kantor_btn_batal" onclick="batalEditKantor()">Batal Edit</button>
-                      <button type="submit" class="btn btn-success" id="kantor_btn">Simpan Data Cabang</button>
-                    </div>
-                  </form>
+                  </div>
                 </div>
               </div>
-              <div class="card shadow-sm">
-                <div class="card-header">Daftar Kantor Aktif</div>
+
+              <!-- Kontainer Mode Grid (Card) -->
+              <div id="kantor-grid-container" class="row g-3">
+                <!-- Data kantor akan di-render di sini oleh JavaScript -->
+              </div>
+
+              <!-- Kontainer Mode Tabel -->
+              <div id="kantor-table-container" class="card shadow-sm d-none">
+                <div class="card-header bg-white fw-bold">Daftar Kantor Aktif</div>
                 <div class="card-body p-0">
-                  <table class="table table-striped mb-0 text-center">
-                    <thead>
-                      <tr>
-                        <th>Nama Kantor</th>
-                        <th>Koordinat & Radius</th>
-                        <th>Jam Kerja</th>
-                        <th>Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <!-- Data akan dimuat dari database -->
-                      <tr><td colspan="4" class="text-muted">Belum ada data kantor</td></tr>
-                    </tbody>
-                  </table>
+                  <div class="table-responsive">
+                    <table class="table table-striped table-hover mb-0 text-center align-middle">
+                      <thead class="table-light">
+                        <tr>
+                          <th>Nama Kantor</th>
+                          <th>Koordinat & Radius</th>
+                          <th>Jam Kerja</th>
+                          <th>Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody id="kantor-table-body">
+                        <!-- Data baris akan di-render di sini oleh JavaScript -->
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div class="tab-pane fade" id="tab-karyawan">
-              <div class="card shadow-sm mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center" id="karyawan-card-header">
-                  <span>➕ Tambah Pengguna Baru</span>
+            <div class="tab-pane" id="tab-karyawan">
+              <div class="mb-3 text-end d-flex justify-content-end gap-2">
+                <button class="btn btn-primary fw-bold" onclick="batalEditKaryawan(); new bootstrap.Modal(document.getElementById('modalKaryawan')).show();">
+                  <i class="fas fa-user-plus"></i> Tambah Pengguna
+                </button>
+                <button class="btn btn-outline-success fw-bold" onclick="exportKaryawan()">
+                  <i class="fas fa-file-export"></i> Export
+                </button>
+                <div class="dropdown">
+                  <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-file-import"></i> Import
+                  </button>
+                  <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" onclick="downloadTemplateKaryawan()"><i class="fas fa-download me-2"></i>Download Template CSV</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="#" onclick="document.getElementById('file-import-karyawan').click()"><i class="fas fa-upload me-2"></i>Upload File CSV</a></li>
+                  </ul>
+                  <input type="file" id="file-import-karyawan" accept=".csv" class="d-none" onchange="importKaryawan(event)">
                 </div>
-                <div class="card-body">
-                  <form class="row g-3" id="form-karyawan" onsubmit="simpanKaryawan(event)">
-                    <input type="hidden" id="karyawan_id" value="">
-                    <div class="col-md-2">
-                      <select class="form-select" id="role-karyawan" required>
-                        <option value="">-- Pilih Role --</option>
-                        <option value="HR" id="opt-hr">HR</option>
-                        <option value="Karyawan">Karyawan</option>
-                      </select>
+              </div>
+
+              <!-- Modal Karyawan -->
+              <div class="modal fade" id="modalKaryawan" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                  <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                      <h5 class="modal-title fw-bold" id="karyawan-card-header">➕ Tambah Pengguna Baru</h5>
+                      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="col-md-3">
-                      <input type="text" class="form-control" id="karyawan_nama" placeholder="Nama Lengkap" required />
+                    <div class="modal-body">
+                      <form class="row g-3" id="form-karyawan" onsubmit="simpanKaryawan(event)">
+                        <input type="hidden" id="karyawan_id" value="">
+                        <div class="col-md-6">
+                          <label class="form-label small text-muted mb-0">Role</label>
+                          <select class="form-select" id="role-karyawan" required>
+                            <option value="">-- Pilih Role --</option>
+                            <option value="HR" id="opt-hr">HR</option>
+                            <option value="Karyawan">Karyawan</option>
+                          </select>
+                        </div>
+                        <div class="col-md-6">
+                          <label class="form-label small text-muted mb-0">Cabang</label>
+                          <select class="form-select" id="pilih-cabang" required>
+                            <option value="">Pilih Kantor...</option>
+                          </select>
+                        </div>
+                        <div class="col-md-4">
+                          <label class="form-label small text-muted mb-0">Nama Lengkap</label>
+                          <input type="text" class="form-control" id="karyawan_nama" placeholder="Nama Lengkap" required />
+                        </div>
+                        <div class="col-md-4">
+                          <label class="form-label small text-muted mb-0">Nomor HP / WA</label>
+                          <input type="tel" class="form-control" id="karyawan_hp" placeholder="No HP" required />
+                        </div>
+                        <div class="col-md-4">
+                          <label class="form-label small text-muted mb-0">Password</label>
+                          <input type="password" class="form-control" id="karyawan_password" placeholder="(Kosongkan jika tdk diubah)" />
+                        </div>
+                        <div class="col-md-12">
+                          <label class="form-label mb-1 small text-muted">Jadwal Libur Rutin:</label>
+                          <div class="d-flex flex-wrap gap-3">
+                            <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="1"> <label>Senin</label></div>
+                            <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="2"> <label>Selasa</label></div>
+                            <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="3"> <label>Rabu</label></div>
+                            <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="4"> <label>Kamis</label></div>
+                            <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="5"> <label>Jumat</label></div>
+                            <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="6"> <label>Sabtu</label></div>
+                            <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="0"> <label class="text-danger">Minggu</label></div>
+                          </div>
+                        </div>
+                        <div class="col-12 text-end mt-4">
+                          <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Batal</button>
+                          <button type="submit" class="btn btn-success" id="karyawan_btn">Simpan Data</button>
+                        </div>
+                      </form>
                     </div>
-                    <div class="col-md-3">
-                      <input type="tel" class="form-control" id="karyawan_hp" placeholder="No HP" required />
+                  </div>
+                </div>
+              </div>
+              <div class="card shadow-sm border-0 bg-transparent">
+                <div class="card-header bg-transparent border-0 px-0 pb-3">
+                   <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                     <h6 class="mb-0 fw-bold">Daftar Pengguna / Karyawan</h6>
+                     <div class="d-flex gap-2">
+                       <input type="text" id="karyawan-search" class="form-control form-control-sm" placeholder="Cari nama..." onkeyup="renderKaryawan()">
+                       <select id="karyawan-filter-role" class="form-select form-select-sm" onchange="renderKaryawan()">
+                         <option value="">Semua Role</option>
+                         <option value="Karyawan">Karyawan</option>
+                         <option value="HR">HR</option>
+                         <option value="Super Admin">Super Admin</option>
+                       </select>
+                       <select id="karyawan-filter-cabang" class="form-select form-select-sm" onchange="renderKaryawan()">
+                         <option value="">Semua Cabang</option>
+                       </select>
+                       <div class="btn-group btn-group-sm text-nowrap" role="group">
+                         <button type="button" class="btn btn-outline-secondary active" id="btn-view-grid" onclick="setKaryawanView('grid')"><i class="fas fa-th-large"></i> Card</button>
+                         <button type="button" class="btn btn-outline-secondary" id="btn-view-table" onclick="setKaryawanView('table')"><i class="fas fa-list"></i> Tabel</button>
+                       </div>
+                     </div>
+                   </div>
+                </div>
+                <div class="card-body p-0">
+                  <!-- Mode Grid -->
+                  <div class="row g-3" id="karyawan-grid-container">
+                    <div class="col-12 text-center text-muted">Memuat data pengguna...</div>
+                  </div>
+                  
+                  <!-- Mode Table -->
+                  <div class="table-responsive d-none bg-white rounded shadow-sm border" id="karyawan-table-container">
+                    <table class="table table-hover mb-0 text-center align-middle">
+                      <thead class="table-light">
+                        <tr>
+                          <th>Nama</th>
+                          <th>Role</th>
+                          <th>No HP</th>
+                          <th>Penempatan</th>
+                          <th>Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody id="karyawan-tbody">
+                        <!-- Data Tabel -->
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Modal Detail Karyawan -->
+              <div class="modal fade" id="modalDetailKaryawan" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                  <div class="modal-content">
+                    <div class="modal-header bg-info text-white">
+                      <h5 class="modal-title fw-bold">ℹ️ Informasi Karyawan</h5>
+                      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="col-md-2">
-                      <input type="password" class="form-control" id="karyawan_password" placeholder="Password (Kosongi jika tidak diubah)" />
+                    <div class="modal-body text-center">
+                       <h4 id="detail_nama" class="fw-bold mb-1"></h4>
+                       <span id="detail_role" class="badge bg-secondary mb-3"></span>
+                       <table class="table table-bordered text-start small">
+                         <tbody>
+                           <tr><th class="bg-light w-50">Cabang / Penempatan</th><td id="detail_cabang"></td></tr>
+                           <tr><th class="bg-light">Nomor HP / WA</th><td id="detail_hp"></td></tr>
+                           <tr><th class="bg-light">Jadwal Libur Rutin</th><td id="detail_libur"></td></tr>
+                         </tbody>
+                       </table>
                     </div>
-                    <div class="col-md-2">
-                      <select class="form-select" id="pilih-cabang" required>
-                        <option value="">Pilih Kantor...</option>
-                      </select>
+                    <div class="modal-footer justify-content-end">
+                       <div>
+                         <button type="button" class="btn btn-warning" id="btn-detail-edit">✏️ Edit Data</button>
+                         <button type="button" class="btn btn-danger" id="btn-detail-hapus">🗑️ Hapus</button>
+                       </div>
                     </div>
-                    <div class="col-md-12">
-                      <label class="form-label mb-1 small text-muted">Jadwal Libur Rutin:</label>
-                      <div class="d-flex flex-wrap gap-3">
-                        <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="1"> <label>Senin</label></div>
-                        <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="2"> <label>Selasa</label></div>
-                        <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="3"> <label>Rabu</label></div>
-                        <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="4"> <label>Kamis</label></div>
-                        <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="5"> <label>Jumat</label></div>
-                        <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="6"> <label>Sabtu</label></div>
-                        <div class="form-check"><input class="form-check-input form-libur-baru" type="checkbox" value="0"> <label class="text-danger">Minggu</label></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="tab-pane" id="tab-absensi">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0 text-primary"><i class="fas fa-calendar-alt me-2"></i>Rekap Absensi Harian</h5>
+                <input
+                  type="month"
+                  id="filter-bulan-absensi"
+                  class="form-control form-control-sm w-auto shadow-sm"
+                  onchange="loadDataAbsensi()"
+                />
+              </div>
+
+              <!-- Kontainer Grid Card Absensi -->
+              <div id="absensi-grid-container" class="row g-3">
+                <!-- Card harian dimuat via JS -->
+              </div>
+
+              <!-- Modal Detail Absensi Harian -->
+              <div class="modal fade" id="modalDetailAbsensi" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                  <div class="modal-content border-0 shadow">
+                    <div class="modal-header bg-primary text-white">
+                      <h5 class="modal-title fw-bold" id="modalDetailAbsensiTitle">Detail Absensi</h5>
+                      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-0">
+                      <div class="table-responsive">
+                        <table class="table table-hover table-striped mb-0 text-center align-middle">
+                          <thead class="table-light">
+                            <tr>
+                              <th class="text-start ps-3">Karyawan</th>
+                              <th>Kantor</th>
+                              <th>Masuk</th>
+                              <th>Istirahat Keluar</th>
+                              <th>Istirahat Masuk</th>
+                              <th>Pulang</th>
+                              <th>Foto Muka</th>
+                              <th>Status Kehadiran</th>
+                            </tr>
+                          </thead>
+                          <tbody id="modalDetailAbsensiBody">
+                            <!-- Data akan dimuat via JS -->
+                          </tbody>
+                        </table>
                       </div>
                     </div>
-                    <div class="col-12 text-end">
-                      <button type="button" class="btn btn-secondary d-none" id="karyawan_btn_batal" onclick="batalEditKaryawan()">Batal Edit</button>
-                      <button type="submit" class="btn btn-success" id="karyawan_btn">Simpan Data</button>
+                    <div class="modal-footer bg-light">
+                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
                     </div>
-                  </form>
-                </div>
-              </div>
-              <div class="card shadow-sm">
-                <div class="card-header">Daftar Pengguna / Karyawan</div>
-                <div class="card-body p-0 overflow-auto">
-                  <table class="table table-striped mb-0 text-center align-middle">
-                    <thead>
-                      <tr>
-                        <th>Nama</th>
-                        <th>Role</th>
-                        <th>No HP</th>
-                        <th>Penempatan</th>
-                        <th>Jadwal Libur</th>
-                        <th>Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <!-- Data akan dimuat dari database -->
-                      <tr><td colspan="5" class="text-muted">Belum ada data pengguna</td></tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <div class="tab-pane fade" id="tab-absensi">
-              <div class="card shadow-sm">
-                <div
-                  class="card-header d-flex justify-content-between align-items-center"
-                >
-                  <span>Rekap Absensi Harian</span>
-                  <input
-                    type="date"
-                    class="form-control form-control-sm w-auto"
-                  />
-                </div>
-                <div class="card-body p-0 overflow-auto">
-                  <table
-                    class="table table-striped mb-0 text-center align-middle"
-                  >
-                    <thead>
-                      <tr>
-                        <th>Karyawan</th>
-                        <th>Kantor</th>
-                        <th>Masuk</th>
-                        <th>Istirahat Keluar</th>
-                        <th>Istirahat Masuk</th>
-                        <th>Pulang</th>
-                        <th>Foto Muka</th>
-                        <th>Status Kehadiran</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <!-- Data akan dimuat dari database -->
-                      <tr><td colspan="8" class="text-muted">Belum ada data absensi hari ini</td></tr>
-                    </tbody>
-                  </table>
+                  </div>
                 </div>
               </div>
             </div>
 
             <!-- TAB APPROVAL CUTI -->
-            <div class="tab-pane fade" id="tab-cuti">
-              <div class="card shadow-sm">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                  <span>Daftar Pengajuan Cuti</span>
-                </div>
-                <div class="card-body p-0 overflow-auto">
-                  <table class="table table-hover mb-0" id="tab-cuti">
-                    <thead class="table-light">
-                      <tr>
-                        <th>Nama Karyawan</th>
-                        <th>Tanggal Cuti</th>
-                        <th>Alasan & Form Tambahan</th>
-                        <th>Durasi</th>
-                        <th>Aksi / Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <!-- Data Cuti -->
-                    </tbody>
-                  </table>
+            <div class="tab-pane" id="tab-cuti">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h5 class="fw-bold m-0"><i class="fas fa-calendar-alt text-primary me-2"></i>Rekap Pengajuan Cuti</h5>
+              </div>
+              
+              <div class="row g-3" id="cuti-grid">
+                  <!-- Card Cuti Bulanan akan dirender di sini via JS -->
+              </div>
+              
+              <!-- MODAL DETAIL CUTI -->
+              <div class="modal fade" id="modalDetailCuti" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
+                  <div class="modal-content border-0 shadow-lg">
+                    <div class="modal-header bg-primary text-white border-0">
+                      <h5 class="modal-title fw-bold" id="modalDetailCutiTitle"></h5>
+                      <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-0 bg-light">
+                      <div class="bg-white p-3 border-bottom d-flex justify-content-between align-items-center">
+                          <input type="text" id="inputSearchCuti" class="form-control form-control-sm rounded-pill px-3" placeholder="🔍 Cari nama karyawan..." onkeyup="renderTableDetailCuti(true)" style="max-width:300px;">
+                      </div>
+                      <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" id="table-detail-cuti">
+                          <thead class="table-light text-nowrap">
+                            <tr id="thead-cuti-tr">
+                              <!-- Header dinamis diisi via JS -->
+                            </tr>
+                          </thead>
+                          <tbody id="modalDetailCutiBody" class="bg-white">
+                            <!-- Data akan dimuat via JS -->
+                          </tbody>
+                        </table>
+                        <!-- Sentinel untuk Infinite Scroll -->
+                        <div id="sentinel-cuti" class="text-center py-3 text-muted" style="display:none;">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status"></div> Memuat data selanjutnya...
+                        </div>
+                      </div>
+                    </div>
+                    <div class="modal-footer bg-light">
+                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
         <!-- TAB FORM BUILDER CUTI -->
-            <div class="tab-pane fade" id="tab-form-builder">
+            <div class="tab-pane" id="tab-form-builder">
               <div class="d-flex justify-content-between align-items-center mb-3 mt-2">
                 <h5 class="fw-bold">Master Jenis Cuti & Kuota</h5>
                 <button class="btn btn-primary" onclick="showModalMasterCuti()">+ Tambah Jenis Cuti</button>
@@ -464,10 +680,9 @@
                 </div>
               </div>
             </div>
-          </div>
 
             <!-- TAB EXPORT DATA -->
-            <div class="tab-pane fade" id="tab-export" role="tabpanel">
+            <div class="tab-pane" id="tab-export" role="tabpanel">
               <div class="card shadow-sm border-0">
                 <div class="card-header bg-white fw-bold">Export Data Absensi</div>
                 <div class="card-body">
@@ -488,16 +703,90 @@
                         </div>
                       </div>
                       <div class="col-md-12 text-end">
-                        <button type="submit" class="btn btn-primary fw-bold" id="btn-export">📥 Export to ZIP</button>
+                        <button type="submit" class="btn btn-success w-100 fw-bold shadow-sm" id="btn-export"><i class="fas fa-download me-2"></i>Mulai Export CSV/ZIP</button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              </div>
+              
+              <div class="card shadow-sm border-0 mt-4 border-danger">
+                <div class="card-header bg-danger text-white fw-bold"><i class="fas fa-database me-2"></i>Backup & Restore Database</div>
+                <div class="card-body">
+                  <p class="text-muted small mb-2">Backup seluruh tabel database ke dalam format JSON. Sangat berguna untuk migrasi atau pencadangan.</p>
+                  <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="backup_media">
+                    <label class="form-check-label text-muted small" for="backup_media">Sertakan media (foto absensi & dokumen cuti). Backup akan berupa file ZIP berukuran besar.</label>
+                  </div>
+                  <div class="d-flex gap-2">
+                    <button class="btn btn-outline-danger fw-bold flex-grow-1" onclick="backupDatabase()"><i class="fas fa-cloud-download-alt me-2"></i>Backup Semua Data (Export)</button>
+                    <button class="btn btn-danger fw-bold flex-grow-1" onclick="document.getElementById('file-restore-db').click()"><i class="fas fa-cloud-upload-alt me-2"></i>Restore Data (Import)</button>
+                    <input type="file" id="file-restore-db" accept=".json" class="d-none" onchange="restoreDatabase(event)">
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- TAB DANGER ZONE -->
+            <!-- TAB PENGATURAN -->
+            <div class="tab-pane" id="tab-pengaturan" role="tabpanel">
+              <div class="card shadow-sm border-0 ">
+                <div class="card-header bg-dark text-white rounded-top d-flex justify-content-between align-items-center">
+                  <h4 class="mb-0 text-white"><i class="fas fa-cogs"></i> Pengaturan Aplikasi</h4>
+                  <button class="btn btn-sm btn-light" onclick="saveSettings()">
+                    <i class="fas fa-save"></i> Simpan
+                  </button>
+                </div>
+                <div class="card-body">
+                  <form id="form-pengaturan">
+                    <div class="mb-3">
+                      <label class="form-label fw-bold">Nama Aplikasi (Tampil di Navbar)</label>
+                      <input type="text" id="setting_nama_aplikasi" class="form-control" placeholder="Contoh: Zie Absen">
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label fw-bold">Judul Form Absensi (Halaman Depan)</label>
+                      <input type="text" id="setting_form_judul" class="form-control" placeholder="Contoh: Sistem Absensi Karyawan">
+                    </div>
+
+                    <div class="mb-3">
+                      <label class="form-label fw-bold">Warna Box Pengumuman</label>
+                      <select id="setting_pengumuman_warna" class="form-select">
+                        <option value="alert-info">Biru (Info)</option>
+                        <option value="alert-warning">Kuning (Peringatan)</option>
+                        <option value="alert-danger">Merah (Bahaya / Urgent)</option>
+                        <option value="alert-success">Hijau (Sukses / Positif)</option>
+                        <option value="alert-secondary">Abu-abu (Netral)</option>
+                      </select>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label fw-bold">Konten Pengumuman (Mendukung Markdown)</label>
+                      <textarea id="setting_pengumuman" class="form-control" rows="5" placeholder="Gunakan Markdown. Contoh:
+### 📣 Info Libur Nasional
+Besok **17 Agustus** kita libur ya!"></textarea>
+                      <small class="text-muted">Gunakan syntax Markdown seperti `# Judul`, `**Tebal**`, atau `[Link](URL)` untuk memformat pengumuman.</small>
+                    </div>
+                    <div class="row">
+                      <div class="col-md-6 mb-3">
+                        <div class="form-check form-switch fs-5">
+                          <input class="form-check-input" type="checkbox" role="switch" id="setting_enable_lokasi">
+                          <label class="form-check-label ms-2 text-dark" for="setting_enable_lokasi">Wajib Lokasi (GPS)</label>
+                        </div>
+                        <small class="text-muted">Jika dinonaktifkan, absen tidak akan memvalidasi jarak.</small>
+                      </div>
+                      <div class="col-md-6 mb-3">
+                        <div class="form-check form-switch fs-5">
+                          <input class="form-check-input" type="checkbox" role="switch" id="setting_enable_kamera">
+                          <label class="form-check-label ms-2 text-dark" for="setting_enable_kamera">Verifikasi Wajah (Kamera)</label>
+                        </div>
+                        <small class="text-muted">Jika dinonaktifkan, fitur kamera & face capture akan disembunyikan.</small>
                       </div>
                     </div>
                   </form>
                 </div>
               </div>
             </div>
-            
-            <!-- TAB DANGER ZONE -->
-            <div class="tab-pane fade" id="tab-danger" role="tabpanel">
+
+            <div class="tab-pane" id="tab-danger" role="tabpanel">
               <div class="alert alert-danger shadow-sm border-danger">
                 <h5 class="fw-bold"><i class="bi bi-exclamation-triangle-fill"></i> Zone Bahaya (Data Cleanup)</h5>
                 <p class="mb-0 text-dark">Di sini Anda bisa membersihkan data absensi beserta fotonya untuk menghemat penyimpanan. Data yang dibersihkan akan dipindahkan ke <strong>Tempat Sampah</strong> selama 3 hari sebelum dihapus permanen secara otomatis.</p>
@@ -650,16 +939,18 @@
       </div>
     </div>
 
+    <!-- External Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    
-    <!-- Supabase JS Client & Config -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="config.js"></script>
-    <script src="admin.js"></script>
+    <script src="admin.js?v=29"></script>
     
     <script>
       if (userData) {

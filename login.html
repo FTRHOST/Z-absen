@@ -131,6 +131,16 @@
     <script src="config.js"></script>
 
     <script>
+      document.addEventListener("DOMContentLoaded", async () => {
+          try {
+              const { data } = await supabaseClient.from('app_settings').select('nama_aplikasi').eq('id', 1).single();
+              if (data && data.nama_aplikasi) {
+                  document.title = `Login - ${data.nama_aplikasi}`;
+                  document.querySelector('h3').innerHTML = `🏢 ${data.nama_aplikasi}`;
+              }
+          } catch (e) { console.error(e); }
+      });
+
       // ==========================================
       // ==========================================
       // FUNGSI LOGIN

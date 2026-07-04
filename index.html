@@ -13,68 +13,79 @@
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     />
-    
+
     <script>
       // Cek apakah pengguna sudah login
-      const userData = localStorage.getItem('userLogin');
+      const userData = localStorage.getItem("userLogin");
       if (!userData) {
-        window.location.href = 'login.html';
+        window.location.href = "login.html";
       }
     </script>
 
     <style>
       :root {
-        --bs-primary: #E5B82A;
-        --bs-warning: #FF7F27;
-        --bs-body-bg: #FDFBF7;
-        --bs-body-color: #3E2723;
-        --bs-link-color: #E5B82A;
-        --bs-info: #E5B82A;
+        --bs-primary: #e5b82a;
+        --bs-warning: #ff7f27;
+        --bs-body-bg: #fdfbf7;
+        --bs-body-color: #3e2723;
+        --bs-link-color: #e5b82a;
+        --bs-info: #e5b82a;
       }
       body {
         background-color: var(--bs-body-bg) !important;
         color: var(--bs-body-color) !important;
       }
       .bg-primary {
-        background-color: #E5B82A !important;
+        background-color: #e5b82a !important;
       }
-      .text-primary, .nav-tabs .nav-link.active {
-        color: #E5B82A !important;
+      .text-primary,
+      .nav-tabs .nav-link.active {
+        color: #e5b82a !important;
       }
       .nav-tabs .nav-link.active {
-        border-bottom: 3px solid #E5B82A !important;
+        border-bottom: 3px solid #e5b82a !important;
       }
       .btn-primary {
-        background-color: #E5B82A !important;
-        border-color: #E5B82A !important;
-        color: #3E2723 !important;
+        background-color: #e5b82a !important;
+        border-color: #e5b82a !important;
+        color: #3e2723 !important;
       }
-      .btn-primary:hover, .btn-primary:focus {
-        background-color: #D4AF37 !important;
-        border-color: #D4AF37 !important;
+      .btn-primary:hover,
+      .btn-primary:focus {
+        background-color: #d4af37 !important;
+        border-color: #d4af37 !important;
       }
       .btn-warning {
-        background-color: #FF7F27 !important;
-        border-color: #FF7F27 !important;
-        color: #FDFBF7 !important;
+        background-color: #ff7f27 !important;
+        border-color: #ff7f27 !important;
+        color: #fdfbf7 !important;
       }
       .btn-warning:hover {
         background-color: #e66b1a !important;
         border-color: #e66b1a !important;
       }
-      .navbar-dark .navbar-brand, .navbar-dark .navbar-text, .navbar-dark .nav-link {
-        color: #3E2723 !important;
+      .navbar-dark .navbar-brand,
+      .navbar-dark .navbar-text,
+      .navbar-dark .nav-link {
+        color: #3e2723 !important;
       }
       .navbar-dark .btn-outline-light {
-        color: #3E2723 !important;
-        border-color: #3E2723 !important;
+        color: #3e2723 !important;
+        border-color: #3e2723 !important;
       }
       .navbar-dark .btn-outline-light:hover {
-        background-color: #3E2723 !important;
-        color: #FDFBF7 !important;
+        background-color: #3e2723 !important;
+        color: #fdfbf7 !important;
       }
-      h1, h2, h3, h4, h5, h6, .card-title, .fw-bold {
-        color: #3E2723 !important;
+      h1,
+      h2,
+      h3,
+      h4,
+      h5,
+      h6,
+      .card-title,
+      .fw-bold {
+        color: #3e2723 !important;
       }
 
       /* Styling Spesifik Kamera & Peta */
@@ -88,6 +99,7 @@
       #hasil-foto {
         width: 100%;
         border-radius: 8px;
+        transform: scaleX(-1);
       }
       #hasil-foto {
         display: none;
@@ -124,7 +136,7 @@
           margin-bottom: 0 !important;
           border-radius: 0 !important;
           border-top: 1px solid #ddd !important;
-          box-shadow: 0 -2px 10px rgba(0,0,0,0.1) !important;
+          box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1) !important;
           background-color: #fff;
         }
         .user-bottom-nav .card-body {
@@ -143,31 +155,95 @@
   <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
       <div class="container">
-        <a class="navbar-brand fw-bold" href="#">🏢 Zie Absen</a>
+        <a class="navbar-brand fw-bold" href="#"></a>
         <div class="d-flex align-items-center">
-          <a id="btn-admin-panel" class="btn btn-sm btn-warning text-dark fw-bold me-2 d-none" href="admin.html">⚙️ Panel Admin</a>
-          <span class="navbar-text text-white me-3 d-none d-md-inline" id="nama-user-navbar">Selamat datang, Karyawan</span>
-          <button class="btn btn-sm btn-outline-light" onclick="logout()">Logout</button>
+          <a
+            id="btn-admin-panel"
+            class="btn btn-sm btn-warning text-dark fw-bold me-2 d-none"
+            href="admin.html"
+            >⚙️ Panel Admin</a
+          >
+          <span
+            class="navbar-text text-white me-3 d-none d-md-inline"
+            id="nama-user-navbar"
+            >Selamat datang, Karyawan</span
+          >
+          <button class="btn btn-sm btn-outline-light" onclick="logout()">
+            Logout
+          </button>
         </div>
       </div>
     </nav>
 
     <div class="container-fluid py-4">
+      <!-- PENGUMUMAN APLIKASI -->
+      <div
+        id="pengumuman-container"
+        class="alert d-none shadow-sm mb-4"
+        role="alert"
+      >
+        <div id="pengumuman-content"></div>
+      </div>
+
       <!-- MENU NAVBAR KARYAWAN -->
       <div class="card shadow-sm mb-4 border-0 user-bottom-nav">
         <div class="card-body p-1">
-          <ul class="nav nav-pills nav-justified gap-1 pb-0" id="hrisTabs" role="tablist">
+          <ul
+            class="nav nav-pills nav-justified gap-1 pb-0"
+            id="hrisTabs"
+            role="tablist"
+          >
             <li class="nav-item" role="presentation">
-              <button class="nav-link active fw-bold px-1" id="tab-absensi-btn" data-bs-toggle="pill" data-bs-target="#tab-absensi" type="button" role="tab" style="font-size: 0.8rem;">📍 Absen</button>
+              <button
+                class="nav-link active fw-bold px-1"
+                id="tab-absensi-btn"
+                data-bs-toggle="pill"
+                data-bs-target="#tab-absensi"
+                type="button"
+                role="tab"
+                style="font-size: 0.8rem"
+              >
+                📍 Absen
+              </button>
             </li>
             <li class="nav-item" role="presentation">
-              <button class="nav-link fw-bold px-1" id="tab-cuti-btn" data-bs-toggle="pill" data-bs-target="#tab-cuti" type="button" role="tab" style="font-size: 0.8rem;">📝 Cuti</button>
+              <button
+                class="nav-link fw-bold px-1"
+                id="tab-cuti-btn"
+                data-bs-toggle="pill"
+                data-bs-target="#tab-cuti"
+                type="button"
+                role="tab"
+                style="font-size: 0.8rem"
+              >
+                📝 Cuti
+              </button>
             </li>
             <li class="nav-item" role="presentation">
-              <button class="nav-link fw-bold px-1" id="tab-riwayat-btn" data-bs-toggle="pill" data-bs-target="#tab-riwayat" type="button" role="tab" style="font-size: 0.8rem;">📅 Riwayat</button>
+              <button
+                class="nav-link fw-bold px-1"
+                id="tab-riwayat-btn"
+                data-bs-toggle="pill"
+                data-bs-target="#tab-riwayat"
+                type="button"
+                role="tab"
+                style="font-size: 0.8rem"
+              >
+                📅 Riwayat
+              </button>
             </li>
             <li class="nav-item" role="presentation">
-              <button class="nav-link fw-bold px-1" id="tab-profil-btn" data-bs-toggle="pill" data-bs-target="#tab-profil" type="button" role="tab" style="font-size: 0.8rem;">👤 Profil</button>
+              <button
+                class="nav-link fw-bold px-1"
+                id="tab-profil-btn"
+                data-bs-toggle="pill"
+                data-bs-target="#tab-profil"
+                type="button"
+                role="tab"
+                style="font-size: 0.8rem"
+              >
+                👤 Profil
+              </button>
             </li>
           </ul>
         </div>
@@ -177,9 +253,11 @@
         <div class="tab-pane fade show active" id="tab-absensi" role="tabpanel">
           <div class="card shadow-sm">
             <div class="card-body">
-              <h5 class="card-title fw-bold mb-4">Form Kehadiran Harian</h5>
+              <h5 id="form-judul-absen" class="card-title fw-bold mb-4">
+                Form Kehadiran Harian
+              </h5>
               <div class="row g-4">
-                <div class="col-md-12">
+                <div class="col-md-12" id="lokasi-section">
                   <label class="form-label fw-bold small text-muted"
                     >1. Verifikasi Lokasi</label
                   >
@@ -203,22 +281,25 @@
         </div>
 
         <div class="tab-pane fade" id="tab-cuti" role="tabpanel">
+          <div class="d-flex gap-2 mb-3">
+            <button
+              class="btn btn-info text-white fw-bold w-50"
+              data-bs-toggle="modal"
+              data-bs-target="#modalSisaCuti"
+            >
+              <i class="fas fa-ticket-alt"></i> Cek Sisa Cuti
+            </button>
+            <button
+              class="btn btn-secondary fw-bold w-50"
+              data-bs-toggle="modal"
+              data-bs-target="#modalRiwayatCuti"
+            >
+              <i class="fas fa-history"></i> Riwayat Cuti
+            </button>
+          </div>
+
           <div class="row g-4">
-            <div class="col-md-4">
-              <div class="card shadow-sm border-info h-100">
-                <div
-                  class="card-body text-center d-flex flex-column justify-content-center"
-                >
-                  <h6 class="card-title text-uppercase text-muted fw-bold mb-3 border-bottom pb-2">
-                    Jatah & Sisa Cuti Anda
-                  </h6>
-                  <div id="container-sisa-cuti" class="text-start overflow-auto" style="max-height: 250px;">
-                    <div class="text-center text-muted small">Memuat data...</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-8">
+            <div class="col-12">
               <div class="card shadow-sm h-100">
                 <div class="card-header bg-white fw-bold">
                   Formulir Pengajuan Cuti
@@ -228,39 +309,13 @@
                     <div id="dynamic-form-container">
                       <div class="text-center text-muted">Memuat form...</div>
                     </div>
-                    <button type="submit" class="btn btn-success w-100 fw-bold mt-3">
+                    <button
+                      type="submit"
+                      class="btn btn-success w-100 fw-bold mt-3"
+                    >
                       Kirim Pengajuan Cuti
                     </button>
                   </form>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- RIWAYAT PENGAJUAN CUTI -->
-          <div class="row mt-4">
-            <div class="col-12">
-              <div class="card shadow-sm">
-                <div class="card-header bg-white fw-bold">
-                  Riwayat Pengajuan Cuti Anda
-                </div>
-                <div class="card-body p-0 overflow-auto">
-                  <table class="table table-striped table-hover mb-0 text-center small">
-                    <thead class="table-light">
-                      <tr>
-                        <th>Tanggal Pengajuan</th>
-                        <th>Tanggal Cuti</th>
-                        <th>Alasan & Form Tambahan</th>
-                        <th>Durasi</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody id="tabel-riwayat-cuti">
-                      <tr>
-                        <td colspan="5" class="text-muted">Memuat data...</td>
-                      </tr>
-                    </tbody>
-                  </table>
                 </div>
               </div>
             </div>
@@ -288,7 +343,11 @@
                     </thead>
                     <tbody id="tabel-riwayat-body">
                       <!-- Data absensi akan dimuat dari database -->
-                      <tr><td colspan="4" class="text-muted">Belum ada riwayat absensi</td></tr>
+                      <tr>
+                        <td colspan="4" class="text-muted">
+                          Belum ada riwayat absensi
+                        </td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
@@ -332,10 +391,24 @@
                 <div class="card-header bg-white fw-bold">Informasi Profil</div>
                 <div class="card-body">
                   <table class="table table-borderless mb-0">
-                    <tr><td width="35%" class="text-muted">Nama</td><td><strong id="profil-nama"></strong></td></tr>
-                    <tr><td class="text-muted">Role</td><td><span class="badge bg-primary" id="profil-role"></span></td></tr>
-                    <tr><td class="text-muted">No HP</td><td id="profil-hp"></td></tr>
-                    <tr><td class="text-muted">Penempatan</td><td id="profil-cabang"></td></tr>
+                    <tr>
+                      <td width="35%" class="text-muted">Nama</td>
+                      <td><strong id="profil-nama"></strong></td>
+                    </tr>
+                    <tr>
+                      <td class="text-muted">Role</td>
+                      <td>
+                        <span class="badge bg-primary" id="profil-role"></span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="text-muted">No HP</td>
+                      <td id="profil-hp"></td>
+                    </tr>
+                    <tr>
+                      <td class="text-muted">Penempatan</td>
+                      <td id="profil-cabang"></td>
+                    </tr>
                   </table>
                 </div>
               </div>
@@ -345,23 +418,135 @@
                 <div class="card-body">
                   <form onsubmit="ubahPassword(event)">
                     <div class="mb-3">
-                      <label class="form-label small text-muted">Password Baru</label>
-                      <input type="password" class="form-control" id="profil-password-baru" required>
+                      <label class="form-label small text-muted"
+                        >Password Baru</label
+                      >
+                      <input
+                        type="password"
+                        class="form-control"
+                        id="profil-password-baru"
+                        required
+                      />
                     </div>
                     <div class="mb-3">
-                      <label class="form-label small text-muted">Konfirmasi Password Baru</label>
-                      <input type="password" class="form-control" id="profil-password-konfirmasi" required>
+                      <label class="form-label small text-muted"
+                        >Konfirmasi Password Baru</label
+                      >
+                      <input
+                        type="password"
+                        class="form-control"
+                        id="profil-password-konfirmasi"
+                        required
+                      />
                     </div>
-                    <button type="submit" class="btn btn-warning w-100 fw-bold">Update Password</button>
+                    <button type="submit" class="btn btn-warning w-100 fw-bold">
+                      Update Password
+                    </button>
                   </form>
                 </div>
               </div>
             </div>
           </div>
         </div>
-
       </div>
     </div>
+    <!-- Modal Sisa Cuti -->
+    <div
+      class="modal fade"
+      id="modalSisaCuti"
+      tabindex="-1"
+      aria-labelledby="modalSisaCutiLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-info text-white">
+            <h5 class="modal-title fw-bold" id="modalSisaCutiLabel">
+              📊 Jatah & Sisa Cuti Anda
+            </h5>
+            <button
+              type="button"
+              class="btn-close btn-close-white"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body p-4 text-center">
+            <div
+              id="container-sisa-cuti"
+              class="text-start overflow-auto"
+              style="max-height: 350px"
+            >
+              <div class="text-center text-muted small">Memuat data...</div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Riwayat Cuti -->
+    <div
+      class="modal fade"
+      id="modalRiwayatCuti"
+      tabindex="-1"
+      aria-labelledby="modalRiwayatCutiLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+          <div class="modal-header bg-secondary text-white">
+            <h5 class="modal-title fw-bold" id="modalRiwayatCutiLabel">
+              🕒 Riwayat Pengajuan Cuti Anda
+            </h5>
+            <button
+              type="button"
+              class="btn-close btn-close-white"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body p-0 overflow-auto">
+            <table
+              class="table table-striped table-hover mb-0 text-center small"
+            >
+              <thead class="table-light">
+                <tr>
+                  <th>Tanggal Pengajuan</th>
+                  <th>Tanggal Cuti</th>
+                  <th>Alasan & Form Tambahan</th>
+                  <th>Durasi</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="tabel-riwayat-cuti">
+                <tr>
+                  <td colspan="5" class="text-muted">Memuat data...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal Kamera -->
     <div
       class="modal fade"
@@ -438,12 +623,13 @@
 
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="config.js"></script>
 
     <script>
       // Variabel Global untuk Lokasi Kantor
       let currentUser = userData ? JSON.parse(userData) : null;
-      let latKantor = -6.200000;
+      let latKantor = -6.2;
       let lonKantor = 106.816666;
       let radiusMaksimal = 100;
       let namaKantor = "Kantor Pusat";
@@ -451,7 +637,7 @@
       let jamKeluarKantor = "17:00:00";
       let jamMulaiIstirahat = "12:00:00";
       let jamSelesaiIstirahat = "13:00:00";
-      
+
       let map;
       let markerKaryawan;
       let jarakAbsen = 0;
@@ -461,20 +647,21 @@
       async function loadKantorUser() {
         if (!currentUser) return;
         const userObj = currentUser;
-        const userCabang = userObj.cabang || '-';
-        document.getElementById("nama-user-navbar").innerText = `Selamat datang, ${userObj.nama} (${userCabang !== '-' ? userCabang : 'Pusat'})`;
-        
+        const userCabang = userObj.cabang || "-";
+        document.getElementById("nama-user-navbar").innerText =
+          `Selamat datang, ${userObj.nama} (${userCabang !== "-" ? userCabang : "Pusat"})`;
+
         if (userObj.role === "HR" || userObj.role === "Super Admin") {
-            document.getElementById("btn-admin-panel").classList.remove("d-none");
+          document.getElementById("btn-admin-panel").classList.remove("d-none");
         }
-        
+
         isiDataProfil();
 
-        if (userCabang && userCabang !== '-') {
+        if (userCabang && userCabang !== "-") {
           const { data, error } = await supabaseClient
-            .from('kantor')
-            .select('*')
-            .eq('nama', userCabang)
+            .from("kantor")
+            .select("*")
+            .eq("nama", userCabang)
             .single();
 
           if (data && !error) {
@@ -484,8 +671,10 @@
             namaKantor = data.nama;
             jamMasukKantor = data.jam_masuk || "08:00:00";
             jamKeluarKantor = data.jam_keluar || "17:00:00";
-            if (data.jam_mulai_istirahat) jamMulaiIstirahat = data.jam_mulai_istirahat;
-            if (data.jam_selesai_istirahat) jamSelesaiIstirahat = data.jam_selesai_istirahat;
+            if (data.jam_mulai_istirahat)
+              jamMulaiIstirahat = data.jam_mulai_istirahat;
+            if (data.jam_selesai_istirahat)
+              jamSelesaiIstirahat = data.jam_selesai_istirahat;
           }
         }
 
@@ -515,75 +704,84 @@
       }
 
       async function cekStatusAbsenHariIni() {
-        if (!localStorage.getItem('userLogin')) return;
-        const userObj = JSON.parse(localStorage.getItem('userLogin'));
+        if (!localStorage.getItem("userLogin")) return;
+        const userObj = JSON.parse(localStorage.getItem("userLogin"));
         const now = new Date();
         const offset = now.getTimezoneOffset() * 60000;
         const localDate = new Date(now - offset);
-        const tanggalHariIni = localDate.toISOString().split('T')[0];
-        
+        const tanggalHariIni = localDate.toISOString().split("T")[0];
+
         const { data: rows, error } = await supabaseClient
-          .from('absensi')
-          .select('*')
-          .eq('user_id', userObj.id)
-          .eq('tanggal', tanggalHariIni)
-          .order('id', { ascending: false })
+          .from("absensi")
+          .select("*")
+          .eq("user_id", userObj.id)
+          .eq("tanggal", tanggalHariIni)
+          .order("id", { ascending: false })
           .limit(1);
-          
+
         const data = rows && rows.length > 0 ? rows[0] : null;
         if (error) console.error("Error fetching absensi:", error);
-        
+
         const btnCekLokasi = document.getElementById("btn-cek-lokasi");
         const btnAmbilFoto = document.getElementById("btn-ambil-foto");
-        
+
         // CEK HARI LIBUR
         const currentDay = new Date().getDay();
         let liburArr = [];
         if (userObj.hari_libur) {
-            liburArr = userObj.hari_libur.split(',').map(Number);
+          liburArr = userObj.hari_libur.split(",").map(Number);
         }
-        
+
         if (liburArr.includes(currentDay)) {
-            tipeAbsenSekarang = "Libur";
-            btnCekLokasi.disabled = true;
-            btnCekLokasi.innerHTML = "Hari Libur Rutin";
-            Swal.fire("Hari Libur", "Anda tidak bisa absen di hari libur Anda.", "warning");
-            return;
+          tipeAbsenSekarang = "Libur";
+          btnCekLokasi.disabled = true;
+          btnCekLokasi.innerHTML = "Hari Libur Rutin";
+          Swal.fire(
+            "Hari Libur",
+            "Anda tidak bisa absen di hari libur Anda.",
+            "warning",
+          );
+          return;
         }
 
         // CEK STATUS CUTI
         const { data: cutiHariIni, error: errCuti } = await supabaseClient
-          .from('cuti')
-          .select('id, data_tambahan')
-          .eq('user_id', userObj.id)
-          .eq('status_pengajuan', 'Disetujui')
-          .lte('tanggal_mulai', tanggalHariIni)
-          .gte('tanggal_selesai', tanggalHariIni)
+          .from("cuti")
+          .select("id, data_tambahan")
+          .eq("user_id", userObj.id)
+          .eq("status_pengajuan", "Disetujui")
+          .lte("tanggal_mulai", tanggalHariIni)
+          .gte("tanggal_selesai", tanggalHariIni)
           .maybeSingle();
 
         if (cutiHariIni) {
-            tipeAbsenSekarang = "Cuti";
-            btnCekLokasi.disabled = true;
-            btnCekLokasi.innerHTML = "Sedang Cuti";
-            
-            // Mencari nama cuti jika ada di form dinamis
-            let namaCuti = "Cuti";
-            if (window.sisaCutiMaster && cutiHariIni.data_tambahan) {
-                const values = Object.values(cutiHariIni.data_tambahan);
-                const foundMaster = values.find(v => window.sisaCutiMaster[v]);
-                if (foundMaster) namaCuti = foundMaster;
-            }
-            
-            Swal.fire("Informasi", `Anda sedang dalam masa ${namaCuti} hari ini.`, "info");
-            return;
+          tipeAbsenSekarang = "Cuti";
+          btnCekLokasi.disabled = true;
+          btnCekLokasi.innerHTML = "Sedang Cuti";
+
+          // Mencari nama cuti jika ada di form dinamis
+          let namaCuti = "Cuti";
+          if (window.sisaCutiMaster && cutiHariIni.data_tambahan) {
+            const values = Object.values(cutiHariIni.data_tambahan);
+            const foundMaster = values.find((v) => window.sisaCutiMaster[v]);
+            if (foundMaster) namaCuti = foundMaster;
+          }
+
+          Swal.fire(
+            "Informasi",
+            `Anda sedang dalam masa ${namaCuti} hari ini.`,
+            "info",
+          );
+          return;
         }
-          
+
         if (data) {
           absenHariIni = data;
           if (!data.waktu_istirahat_keluar) {
             tipeAbsenSekarang = "Istirahat_Keluar";
             btnCekLokasi.innerHTML = "📍 Cek Lokasi & Mulai Istirahat";
-            btnCekLokasi.className = "btn btn-info w-100 py-3 fw-bold fs-5 text-white";
+            btnCekLokasi.className =
+              "btn btn-info w-100 py-3 fw-bold fs-5 text-white";
             btnAmbilFoto.innerHTML = "📸 Ambil Foto & Simpan Mulai Istirahat";
           } else if (!data.waktu_istirahat_masuk) {
             tipeAbsenSekarang = "Istirahat_Masuk";
@@ -598,7 +796,8 @@
           } else {
             tipeAbsenSekarang = "Selesai";
             btnCekLokasi.innerHTML = "✅ Anda Sudah Absen Lengkap Hari Ini";
-            btnCekLokasi.className = "btn btn-secondary w-100 py-3 fw-bold fs-5";
+            btnCekLokasi.className =
+              "btn btn-secondary w-100 py-3 fw-bold fs-5";
             btnCekLokasi.disabled = true;
           }
         } else {
@@ -609,12 +808,60 @@
         }
       }
 
-      loadKantorUser();
-      cekStatusAbsenHariIni();
+      let isLokasiEnabled = true;
+      let isKameraEnabled = true;
+
+      async function loadAppSettings() {
+        try {
+          const { data, error } = await supabaseClient
+            .from("app_settings")
+            .select("*")
+            .eq("id", 1)
+            .single();
+          if (data) {
+            if (data.nama_aplikasi) {
+              const brand = document.querySelector(".navbar-brand");
+              if (brand) brand.innerHTML = `${data.nama_aplikasi}`;
+              document.title = data.nama_aplikasi;
+            }
+            if (data.form_judul) {
+              document.getElementById("form-judul-absen").innerText =
+                data.form_judul;
+              // If form_judul exists, maybe append it to title or override
+              document.title = data.nama_aplikasi
+                ? `${data.nama_aplikasi} - ${data.form_judul}`
+                : data.form_judul;
+            }
+            if (data.pengumuman) {
+              const container = document.getElementById("pengumuman-container");
+              container.classList.remove("d-none");
+              container.classList.add(data.pengumuman_warna || "alert-info");
+              document.getElementById("pengumuman-content").innerHTML =
+                marked.parse(data.pengumuman);
+            }
+            isLokasiEnabled = data.enable_lokasi !== false;
+            isKameraEnabled = data.enable_kamera !== false;
+
+            if (!isLokasiEnabled) {
+              document.getElementById("lokasi-section").style.display = "none";
+            }
+            if (!isKameraEnabled) {
+              // Sembunyikan bagian modal yang mungkin gak diperlukan atau ubah text buttonnya
+            }
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      loadAppSettings().then(() => {
+        loadKantorUser();
+        cekStatusAbsenHariIni();
+      });
 
       function logout() {
-        localStorage.removeItem('userLogin');
-        window.location.href = 'login.html';
+        localStorage.removeItem("userLogin");
+        window.location.href = "login.html";
       }
 
       // ==========================================
@@ -719,10 +966,12 @@
       // ==========================================
       async function prosesCekLokasi() {
         Swal.fire({
-            title: 'Memproses...',
-            text: 'Memverifikasi status absen di server',
-            allowOutsideClick: false,
-            didOpen: () => { Swal.showLoading(); }
+          title: "Memproses...",
+          text: "Memverifikasi status absen di server",
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          },
         });
         document.getElementById("btn-cek-lokasi").disabled = true;
 
@@ -730,23 +979,42 @@
         await cekStatusAbsenHariIni();
 
         if (tipeAbsenSekarang === "Selesai") {
-           Swal.fire("Peringatan", "Anda sudah menyelesaikan absensi masuk dan pulang hari ini di perangkat lain.", "warning");
-           return;
+          Swal.fire(
+            "Peringatan",
+            "Anda sudah menyelesaikan absensi masuk dan pulang hari ini di perangkat lain.",
+            "warning",
+          );
+          return;
         }
 
         const sekarang = new Date();
-        const waktu_sekarang = sekarang.toTimeString().split(' ')[0];
-        
-        if (tipeAbsenSekarang === "Istirahat_Keluar" && waktu_sekarang < jamMulaiIstirahat) {
-           Swal.fire("Peringatan", `Belum masuk waktu istirahat! Istirahat baru bisa dimulai jam ${jamMulaiIstirahat}.`, "warning");
-           return;
+        const waktu_sekarang = sekarang.toTimeString().split(" ")[0];
+
+        if (
+          tipeAbsenSekarang === "Istirahat_Keluar" &&
+          waktu_sekarang < jamMulaiIstirahat
+        ) {
+          Swal.fire(
+            "Peringatan",
+            `Belum masuk waktu istirahat! Istirahat baru bisa dimulai jam ${jamMulaiIstirahat}.`,
+            "warning",
+          );
+          return;
+        }
+
+        if (!isLokasiEnabled) {
+          Swal.close();
+          lanjutKeKameraAtauSubmit();
+          return;
         }
 
         Swal.fire({
-            title: 'Mendeteksi Lokasi...',
-            text: 'Mencari koordinat GPS Anda (Pastikan GPS menyala)',
-            allowOutsideClick: false,
-            didOpen: () => { Swal.showLoading(); }
+          title: "Mendeteksi Lokasi...",
+          text: "Mencari koordinat GPS Anda (Pastikan GPS menyala)",
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          },
         });
 
         if (navigator.geolocation) {
@@ -756,7 +1024,11 @@
             { enableHighAccuracy: true },
           );
         } else {
-          Swal.fire("Error", "Geolocation tidak didukung oleh browser Anda.", "error");
+          Swal.fire(
+            "Error",
+            "Geolocation tidak didukung oleh browser Anda.",
+            "error",
+          );
           document.getElementById("btn-cek-lokasi").disabled = false;
         }
       }
@@ -781,12 +1053,7 @@
         if (jarak <= radiusMaksimal) {
           jarakAbsen = Math.round(jarak);
           Swal.close();
-
-          const kameraModal = new bootstrap.Modal(
-            document.getElementById("kameraModal"),
-          );
-          kameraModal.show();
-          mulaiKamera();
+          lanjutKeKameraAtauSubmit();
         } else {
           Swal.fire({
             title: "Absen Ditolak!",
@@ -796,9 +1063,88 @@
         }
       }
 
+      function lanjutKeKameraAtauSubmit() {
+        if (!isKameraEnabled) {
+          prosesAbsenTanpaFoto();
+        } else {
+          const kameraModal = new bootstrap.Modal(
+            document.getElementById("kameraModal"),
+          );
+          kameraModal.show();
+          mulaiKamera();
+        }
+      }
+
+      async function prosesAbsenTanpaFoto() {
+        Swal.fire({
+          title: "Menyimpan...",
+          text: "Memproses data absensi Anda",
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          },
+        });
+
+        const now = new Date();
+        const offset = now.getTimezoneOffset() * 60000;
+        const localDate = new Date(now - offset);
+        const localTime = localDate.toISOString().split("T")[1].substring(0, 8);
+        const tanggalHariIni = localDate.toISOString().split("T")[0];
+
+        let payload = {};
+        if (tipeAbsenSekarang === "Masuk") {
+          payload = {
+            user_id: currentUser.id,
+            tanggal: tanggalHariIni,
+            waktu_masuk: localTime,
+            lokasi_masuk: `Jarak: ${Math.round(jarakAbsen)}m`,
+            status: localTime > jamMasukKantor ? "Terlambat" : "Tepat Waktu",
+          };
+        } else if (tipeAbsenSekarang === "Istirahat_Keluar") {
+          payload = {
+            waktu_istirahat_keluar: localTime,
+            lokasi_istirahat_keluar: `Jarak: ${Math.round(jarakAbsen)}m`,
+          };
+        } else if (tipeAbsenSekarang === "Istirahat_Masuk") {
+          payload = {
+            waktu_istirahat_masuk: localTime,
+            lokasi_istirahat_masuk: `Jarak: ${Math.round(jarakAbsen)}m`,
+          };
+        } else if (tipeAbsenSekarang === "Pulang") {
+          payload = {
+            waktu_keluar: localTime,
+            lokasi_keluar: `Jarak: ${Math.round(jarakAbsen)}m`,
+          };
+        }
+
+        let response;
+        if (tipeAbsenSekarang === "Masuk") {
+          response = await supabaseClient.from("absensi").insert([payload]);
+        } else {
+          response = await supabaseClient
+            .from("absensi")
+            .update(payload)
+            .eq("id", absenHariIni.id);
+        }
+
+        if (response.error) {
+          Swal.fire("Gagal", response.error.message, "error");
+        } else {
+          Swal.fire("Berhasil!", "Absensi berhasil disimpan.", "success").then(
+            () => {
+              window.location.reload();
+            },
+          );
+        }
+      }
+
       function gagalDapatLokasi(error) {
         document.getElementById("btn-cek-lokasi").disabled = false;
-        Swal.fire("Gagal", "Gagal mengambil lokasi GPS. Pastikan izin lokasi (GPS) aktif di browser/HP Anda.", "error");
+        Swal.fire(
+          "Gagal",
+          "Gagal mengambil lokasi GPS. Pastikan izin lokasi (GPS) aktif di browser/HP Anda.",
+          "error",
+        );
       }
 
       async function prosesAbsenFoto() {
@@ -836,8 +1182,7 @@
           const namaFile = `selfie-${Date.now()}.png`;
 
           // GANTI 'absensi-bucket' DENGAN NAMA BUCKET YANG ANDA BUAT DI SUPABASE
-          const { data, error } = await supabaseClient
-            .storage
+          const { data, error } = await supabaseClient.storage
             .from("absensi-bucket")
             .upload(namaFile, blob, {
               contentType: "image/png",
@@ -846,8 +1191,7 @@
           if (error) throw error;
 
           // (Opsional) Ambil Public URL untuk disimpan ke database
-          const { data: publicUrlData } = supabaseClient
-            .storage
+          const { data: publicUrlData } = supabaseClient.storage
             .from("absensi-bucket")
             .getPublicUrl(namaFile);
           console.log("Foto tersimpan di URL:", publicUrlData.publicUrl);
@@ -857,8 +1201,8 @@
           const sekarang = new Date();
           const offset = sekarang.getTimezoneOffset() * 60000;
           const localDate = new Date(sekarang - offset);
-          const tanggal = localDate.toISOString().split('T')[0]; // Format YYYY-MM-DD
-          const waktu_sekarang = sekarang.toTimeString().split(' ')[0]; // Format HH:MM:SS
+          const tanggal = localDate.toISOString().split("T")[0]; // Format YYYY-MM-DD
+          const waktu_sekarang = sekarang.toTimeString().split(" ")[0]; // Format HH:MM:SS
 
           let dbError;
           if (tipeAbsenSekarang === "Masuk") {
@@ -866,50 +1210,48 @@
             if (waktu_sekarang > jamMasukKantor) {
               statusKehadiran = "Terlambat";
             }
-            const res = await supabaseClient
-              .from('absensi')
-              .insert([
-                {
-                  user_id: userObj.id,
-                  tanggal: tanggal,
-                  waktu_masuk: waktu_sekarang,
-                  foto_url: publicUrlData.publicUrl,
-                  jarak_meter: jarakAbsen,
-                  status: statusKehadiran
-                }
-              ]);
+            const res = await supabaseClient.from("absensi").insert([
+              {
+                user_id: userObj.id,
+                tanggal: tanggal,
+                waktu_masuk: waktu_sekarang,
+                foto_url: publicUrlData.publicUrl,
+                jarak_meter: jarakAbsen,
+                status: statusKehadiran,
+              },
+            ]);
             dbError = res.error;
           } else if (tipeAbsenSekarang === "Istirahat_Keluar") {
             const res = await supabaseClient
-              .from('absensi')
-              .update({ 
+              .from("absensi")
+              .update({
                 waktu_istirahat_keluar: waktu_sekarang,
-                foto_istirahat_keluar: publicUrlData.publicUrl
+                foto_istirahat_keluar: publicUrlData.publicUrl,
               })
-              .eq('id', absenHariIni.id);
+              .eq("id", absenHariIni.id);
             dbError = res.error;
           } else if (tipeAbsenSekarang === "Istirahat_Masuk") {
             const res = await supabaseClient
-              .from('absensi')
-              .update({ 
+              .from("absensi")
+              .update({
                 waktu_istirahat_masuk: waktu_sekarang,
-                foto_istirahat_masuk: publicUrlData.publicUrl
+                foto_istirahat_masuk: publicUrlData.publicUrl,
               })
-              .eq('id', absenHariIni.id);
+              .eq("id", absenHariIni.id);
             dbError = res.error;
           } else if (tipeAbsenSekarang === "Pulang") {
             const res = await supabaseClient
-              .from('absensi')
+              .from("absensi")
               .update({
                 waktu_keluar: waktu_sekarang,
-                foto_keluar: publicUrlData.publicUrl
+                foto_keluar: publicUrlData.publicUrl,
               })
-              .eq('id', absenHariIni.id);
+              .eq("id", absenHariIni.id);
             dbError = res.error;
           }
 
           if (dbError) throw dbError;
-          
+
           await cekStatusAbsenHariIni();
 
           const modalEl = document.getElementById("kameraModal");
@@ -922,7 +1264,10 @@
           let swalText = `Foto dan lokasi telah tersimpan di Supabase.`;
           let swalIcon = "success";
 
-          if (tipeAbsenSekarang === "Istirahat_Masuk" && waktu_sekarang > jamSelesaiIstirahat) {
+          if (
+            tipeAbsenSekarang === "Istirahat_Masuk" &&
+            waktu_sekarang > jamSelesaiIstirahat
+          ) {
             swalTitle = "Peringatan!";
             swalText = `Anda kembali istirahat melewati jam ${jamSelesaiIstirahat}. Data tetap tersimpan.`;
             swalIcon = "warning";
@@ -953,62 +1298,84 @@
       window.masterCutiDb = [];
 
       async function loadSisaCuti() {
-        if (!localStorage.getItem('userLogin')) return;
-        const userObj = JSON.parse(localStorage.getItem('userLogin'));
+        if (!localStorage.getItem("userLogin")) return;
+        const userObj = JSON.parse(localStorage.getItem("userLogin"));
         const container = document.getElementById("container-sisa-cuti");
         if (!container) return;
 
+        container.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-2 placeholder-glow">
+                <span class="placeholder col-4"></span><span class="placeholder col-2"></span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-2 placeholder-glow">
+                <span class="placeholder col-5"></span><span class="placeholder col-2"></span>
+            </div>
+        `;
+
         // Ambil Master Cuti
-        const { data: masterData, error: errMaster } = await supabaseClient.from('master_jenis_cuti').select('*');
+        const { data: masterData, error: errMaster } = await supabaseClient
+          .from("master_jenis_cuti")
+          .select("*");
         if (errMaster || !masterData) {
-            container.innerHTML = '<div class="text-danger small">Gagal memuat master cuti.</div>';
-            return;
+          container.innerHTML =
+            '<div class="text-danger small">Gagal memuat master cuti.</div>';
+          return;
         }
         window.masterCutiDb = masterData;
 
         // Ambil history cuti yang disetujui atau masih menunggu
         const { data: cutiData, error } = await supabaseClient
-          .from('cuti')
-          .select('durasi_hari, tanggal_mulai, data_tambahan, status_pengajuan')
-          .eq('user_id', userObj.id)
-          .in('status_pengajuan', ['Disetujui', 'Menunggu']);
+          .from("cuti")
+          .select("durasi_hari, tanggal_mulai, data_tambahan, status_pengajuan")
+          .eq("user_id", userObj.id)
+          .in("status_pengajuan", ["Disetujui", "Menunggu"]);
 
         const now = new Date();
         const curYear = String(now.getFullYear());
-        const curMonth = String(now.getMonth() + 1).padStart(2, '0');
+        const curMonth = String(now.getMonth() + 1).padStart(2, "0");
 
-        let html = '';
+        let html = "";
         window.sisaCutiMaster = {};
 
-        masterData.forEach(master => {
-            let terpakai = 0;
-            // Hitung cuti terpakai untuk jenis ini
-            if (cutiData) {
-                cutiData.forEach(c => {
-                    if (!c.data_tambahan) return;
-                    const isMilikMaster = Object.values(c.data_tambahan).some(v => String(v) === master.nama_cuti);
-                    if (!isMilikMaster) return;
+        masterData.forEach((master) => {
+          let terpakai = 0;
+          // Hitung cuti terpakai untuk jenis ini
+          if (cutiData) {
+            cutiData.forEach((c) => {
+              if (!c.data_tambahan) return;
+              const isMilikMaster = Object.values(c.data_tambahan).some(
+                (v) => String(v) === master.nama_cuti,
+              );
+              if (!isMilikMaster) return;
 
-                    const tgl = c.tanggal_mulai || '';
-                    if (master.siklus === 'Tahunan' && tgl.startsWith(curYear)) terpakai += c.durasi_hari;
-                    else if (master.siklus === 'Bulanan' && tgl.startsWith(`${curYear}-${curMonth}`)) terpakai += c.durasi_hari;
-                    else if (master.siklus === 'Sekali') terpakai += c.durasi_hari;
-                });
-            }
+              const tgl = c.tanggal_mulai || "";
+              if (master.siklus === "Tahunan" && tgl.startsWith(curYear))
+                terpakai += c.durasi_hari;
+              else if (
+                master.siklus === "Bulanan" &&
+                tgl.startsWith(`${curYear}-${curMonth}`)
+              )
+                terpakai += c.durasi_hari;
+              else if (master.siklus === "Sekali") terpakai += c.durasi_hari;
+            });
+          }
 
-            let sisa = 0;
-            let displaySisa = '';
-            if (master.is_unlimited) {
-                displaySisa = '<span class="badge bg-success">Tanpa Batas</span>';
-                sisa = 999999;
-            } else {
-                sisa = master.batas_hari - terpakai;
-                displaySisa = `<span class="badge ${sisa > 0 ? 'bg-primary' : 'bg-danger'}">${sisa} Hari</span>`;
-            }
+          let sisa = 0;
+          let displaySisa = "";
+          if (master.is_unlimited) {
+            displaySisa = '<span class="badge bg-success">Tanpa Batas</span>';
+            sisa = 999999;
+          } else {
+            sisa = master.batas_hari - terpakai;
+            displaySisa = `<span class="badge ${sisa > 0 ? "bg-primary" : "bg-danger"}">${sisa} Hari</span>`;
+          }
 
-            window.sisaCutiMaster[master.nama_cuti] = { sisa, is_unlimited: master.is_unlimited };
+          window.sisaCutiMaster[master.nama_cuti] = {
+            sisa,
+            is_unlimited: master.is_unlimited,
+          };
 
-            html += `
+          html += `
                 <div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-1">
                     <div>
                         <span class="d-block fw-bold small text-dark">${master.nama_cuti}</span>
@@ -1019,139 +1386,164 @@
             `;
         });
 
-        if (html === '') html = '<div class="text-muted small">Belum ada master cuti diatur HRD.</div>';
+        if (html === "")
+          html =
+            '<div class="text-muted small">Belum ada master cuti diatur HRD.</div>';
         container.innerHTML = html;
       }
 
       let currentFormConfig = [];
 
       async function loadFormCutiBuilder() {
-        const container = document.getElementById('dynamic-form-container');
-        const { data, error } = await supabaseClient.from('form_cuti_config').select('*').order('urutan', { ascending: true });
-        
+        const container = document.getElementById("dynamic-form-container");
+        const { data, error } = await supabaseClient
+          .from("form_cuti_config")
+          .select("*")
+          .order("urutan", { ascending: true });
+
         if (error || !data || data.length === 0) {
-          container.innerHTML = '<div class="alert alert-warning">Form cuti belum dikonfigurasi. Hubungi Admin.</div>';
+          container.innerHTML =
+            '<div class="alert alert-warning">Form cuti belum dikonfigurasi. Hubungi Admin.</div>';
           return;
         }
 
         currentFormConfig = data;
-        let html = '';
+        let html = "";
 
-        data.forEach(f => {
-          let dependsAttr = '';
-          let wrapperStyle = '';
-          if (f.tipe !== 'dropdown' && f.opsi && (f.opsi.includes('=') || f.opsi.includes('!='))) {
-             dependsAttr = `data-depends="${f.opsi.trim()}"`;
-             wrapperStyle = 'style="display: none;"'; // hide initially
+        data.forEach((f) => {
+          let dependsAttr = "";
+          let wrapperStyle = "";
+          if (
+            f.tipe !== "dropdown" &&
+            f.opsi &&
+            (f.opsi.includes("=") || f.opsi.includes("!="))
+          ) {
+            dependsAttr = `data-depends="${f.opsi.trim()}"`;
+            wrapperStyle = 'style="display: none;"'; // hide initially
           }
 
           html += `<div class="mb-3 form-group-dynamic" ${dependsAttr} ${wrapperStyle}>`;
-          html += `<label class="form-label small fw-bold">${f.label} ${f.wajib ? '<span class="text-danger">*</span>' : ''}</label>`;
-          
-          if (f.tipe === 'date') {
-            html += `<input type="date" class="form-control" name="${f.id}" ${f.wajib ? 'required' : ''}>`;
-          } else if (f.tipe === 'keterangan') {
-            html += `<textarea class="form-control" rows="3" name="${f.id}" ${f.wajib ? 'required' : ''}></textarea>`;
-          } else if (f.tipe === 'dropdown' || f.tipe === 'master_cuti') {
-            html += `<select class="form-select" name="${f.id}" ${f.wajib ? 'required' : ''} onchange="evalFormConditions()">`;
+          html += `<label class="form-label small fw-bold">${f.label} ${f.wajib ? '<span class="text-danger">*</span>' : ""}</label>`;
+
+          if (f.tipe === "date") {
+            html += `<input type="date" class="form-control" name="${f.id}" ${f.wajib ? "required" : ""}>`;
+          } else if (f.tipe === "keterangan") {
+            html += `<textarea class="form-control" rows="3" name="${f.id}" ${f.wajib ? "required" : ""}></textarea>`;
+          } else if (f.tipe === "dropdown" || f.tipe === "master_cuti") {
+            html += `<select class="form-select" name="${f.id}" ${f.wajib ? "required" : ""} onchange="evalFormConditions()">`;
             html += `<option value="">-- Pilih --</option>`;
-            
-            if (f.tipe === 'dropdown' && f.opsi) {
-              f.opsi.split(',').forEach(o => {
+
+            if (f.tipe === "dropdown" && f.opsi) {
+              f.opsi.split(",").forEach((o) => {
                 html += `<option value="${o.trim()}">${o.trim()}</option>`;
               });
-            } else if (f.tipe === 'master_cuti' && window.masterCutiDb) {
-              window.masterCutiDb.forEach(m => {
+            } else if (f.tipe === "master_cuti" && window.masterCutiDb) {
+              window.masterCutiDb.forEach((m) => {
                 html += `<option value="${m.nama_cuti}">${m.nama_cuti}</option>`;
               });
             }
             html += `</select>`;
-          } else if (f.tipe === 'file') {
-            html += `<input type="file" class="form-control" name="${f.id}" ${f.wajib ? 'required' : ''}>`;
+          } else if (f.tipe === "file") {
+            html += `<input type="file" class="form-control" name="${f.id}" ${f.wajib ? "required" : ""}>`;
           }
-          
+
           html += `</div>`;
         });
-        
+
         container.innerHTML = html;
         evalFormConditions(); // evaluate on first load
       }
 
       function evalFormConditions() {
-        const container = document.getElementById('dynamic-form-container');
-        const groups = container.querySelectorAll('.form-group-dynamic');
-        
-        groups.forEach(group => {
-           const depends = group.getAttribute('data-depends');
-           if (!depends) return; // tidak ada syarat
-           
-           let operator = '=';
-           let parts = depends.split('!=');
-           if (parts.length === 2) {
-               operator = '!=';
-           } else {
-               parts = depends.split('=');
-           }
+        const container = document.getElementById("dynamic-form-container");
+        const groups = container.querySelectorAll(".form-group-dynamic");
 
-           if(parts.length === 2) {
-             const reqLabel = parts[0].trim().toLowerCase();
-             const reqValueStr = parts[1].trim().toLowerCase();
-             const reqValues = reqValueStr.split('|').map(v => v.trim()); // mendukung multi-value dengan pemisah pipa (|)
-             
-             // Cari apakah ada field dengan label tersebut dan nilainya cocok
-             let matched = false;
-             for (const config of currentFormConfig) {
-               if (config.label.toLowerCase() === reqLabel) {
-                 const inputEl = container.querySelector(`[name="${config.id}"]`);
-                 if (inputEl) {
-                   const actualValue = inputEl.value.toLowerCase();
-                   
-                   if (operator === '=') {
-                     // Cocok jika value saat ini ADA di dalam list reqValues
-                     if (reqValues.includes(actualValue)) {
-                       matched = true;
-                     }
-                   } else if (operator === '!=') {
-                     // Cocok jika value saat ini TIDAK ADA di dalam list reqValues (dan tidak kosong)
-                     if (!reqValues.includes(actualValue) && actualValue !== '') {
-                       matched = true;
-                     }
-                   }
-                 }
-               }
-             }
-             
-             if (matched) {
-               group.style.display = 'block';
-               // Aktifkan required jika aslinya wajib
-               const inputEl = group.querySelector('input, select, textarea');
-               const config = currentFormConfig.find(c => c.id === inputEl.name);
-               if (config && config.wajib) inputEl.setAttribute('required', 'true');
-             } else {
-               group.style.display = 'none';
-               // Nonaktifkan required saat disembunyikan
-               const inputEl = group.querySelector('input, select, textarea');
-               if (inputEl) {
-                 inputEl.removeAttribute('required');
-                 inputEl.value = ''; // kosongkan jika sembunyi
-               }
-             }
-           }
+        groups.forEach((group) => {
+          const depends = group.getAttribute("data-depends");
+          if (!depends) return; // tidak ada syarat
+
+          let operator = "=";
+          let parts = depends.split("!=");
+          if (parts.length === 2) {
+            operator = "!=";
+          } else {
+            parts = depends.split("=");
+          }
+
+          if (parts.length === 2) {
+            const reqLabel = parts[0].trim().toLowerCase();
+            const reqValueStr = parts[1].trim().toLowerCase();
+            const reqValues = reqValueStr.split("|").map((v) => v.trim()); // mendukung multi-value dengan pemisah pipa (|)
+
+            // Cari apakah ada field dengan label tersebut dan nilainya cocok
+            let matched = false;
+            for (const config of currentFormConfig) {
+              if (config.label.toLowerCase() === reqLabel) {
+                const inputEl = container.querySelector(
+                  `[name="${config.id}"]`,
+                );
+                if (inputEl) {
+                  const actualValue = inputEl.value.toLowerCase();
+
+                  if (operator === "=") {
+                    // Cocok jika value saat ini ADA di dalam list reqValues
+                    if (reqValues.includes(actualValue)) {
+                      matched = true;
+                    }
+                  } else if (operator === "!=") {
+                    // Cocok jika value saat ini TIDAK ADA di dalam list reqValues (dan tidak kosong)
+                    if (
+                      !reqValues.includes(actualValue) &&
+                      actualValue !== ""
+                    ) {
+                      matched = true;
+                    }
+                  }
+                }
+              }
+            }
+
+            if (matched) {
+              group.style.display = "block";
+              // Aktifkan required jika aslinya wajib
+              const inputEl = group.querySelector("input, select, textarea");
+              const config = currentFormConfig.find(
+                (c) => c.id === inputEl.name,
+              );
+              if (config && config.wajib)
+                inputEl.setAttribute("required", "true");
+            } else {
+              group.style.display = "none";
+              // Nonaktifkan required saat disembunyikan
+              const inputEl = group.querySelector("input, select, textarea");
+              if (inputEl) {
+                inputEl.removeAttribute("required");
+                inputEl.value = ""; // kosongkan jika sembunyi
+              }
+            }
+          }
         });
       }
 
       async function loadRiwayatCutiUser() {
-        if (!localStorage.getItem('userLogin')) return;
-        const userObj = JSON.parse(localStorage.getItem('userLogin'));
-        const tbody = document.getElementById('tabel-riwayat-cuti');
-        const theadTr = document.querySelector("#tabel-riwayat-cuti").previousElementSibling.querySelector("tr");
-        if(!tbody) return;
+        if (!localStorage.getItem("userLogin")) return;
+        const userObj = JSON.parse(localStorage.getItem("userLogin"));
+        const tbody = document.getElementById("tabel-riwayat-cuti");
+        const theadTr = document
+          .querySelector("#tabel-riwayat-cuti")
+          .previousElementSibling.querySelector("tr");
+        if (!tbody) return;
+
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center py-4"><div class="placeholder-glow"><span class="placeholder col-8 mb-2"></span><br><span class="placeholder col-6"></span></div></td></tr>`;
 
         // Ambil konfigurasi form untuk menjadi header kolom dinamis
-        const { data: formConfig } = await supabaseClient.from('form_cuti_config').select('label').order('urutan', { ascending: true });
+        const { data: formConfig } = await supabaseClient
+          .from("form_cuti_config")
+          .select("label")
+          .order("urutan", { ascending: true });
         let dynamicHeaders = [];
         if (formConfig) {
-            dynamicHeaders = formConfig.map(f => f.label);
+          dynamicHeaders = formConfig.map((f) => f.label);
         }
 
         // Bangun ulang Thead
@@ -1159,40 +1551,45 @@
             <th>Tanggal Pengajuan</th>
             <th>Tanggal Cuti</th>
         `;
-        dynamicHeaders.forEach(label => {
-            theadHTML += `<th>${label}</th>`;
+        dynamicHeaders.forEach((label) => {
+          theadHTML += `<th>${label}</th>`;
         });
         theadHTML += `
             <th>Durasi</th>
             <th>Status</th>
             <th>Aksi</th>
         `;
-        if(theadTr) theadTr.innerHTML = theadHTML;
+        if (theadTr) theadTr.innerHTML = theadHTML;
 
         const { data, error } = await supabaseClient
-          .from('cuti')
-          .select('*')
-          .eq('user_id', userObj.id)
-          .order('id', { ascending: false });
+          .from("cuti")
+          .select("*")
+          .eq("user_id", userObj.id)
+          .order("id", { ascending: false });
 
         if (error || !data || data.length === 0) {
           tbody.innerHTML = `<tr><td colspan="${4 + dynamicHeaders.length}" class="text-muted">Belum ada riwayat pengajuan cuti.</td></tr>`;
           return;
         }
 
-        tbody.innerHTML = '';
-        data.forEach(cuti => {
-          let badgeClass = 'bg-secondary';
-          if (cuti.status_pengajuan === 'Disetujui') badgeClass = 'bg-success';
-          else if (cuti.status_pengajuan === 'Ditolak') badgeClass = 'bg-danger';
-          else if (cuti.status_pengajuan === 'Menunggu') badgeClass = 'bg-warning text-dark';
+        tbody.innerHTML = "";
+        data.forEach((cuti) => {
+          let badgeClass = "bg-secondary";
+          if (cuti.status_pengajuan === "Disetujui") badgeClass = "bg-success";
+          else if (cuti.status_pengajuan === "Ditolak")
+            badgeClass = "bg-danger";
+          else if (cuti.status_pengajuan === "Menunggu")
+            badgeClass = "bg-warning text-dark";
 
-          let tglPengajuan = '-';
-          if(cuti.created_at) {
-             const d = new Date(cuti.created_at);
-             tglPengajuan = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-          } else if (cuti.data_tambahan && cuti.data_tambahan['Tanggal_Pengajuan_Sistem']) {
-             tglPengajuan = cuti.data_tambahan['Tanggal_Pengajuan_Sistem'];
+          let tglPengajuan = "-";
+          if (cuti.created_at) {
+            const d = new Date(cuti.created_at);
+            tglPengajuan = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+          } else if (
+            cuti.data_tambahan &&
+            cuti.data_tambahan["Tanggal_Pengajuan_Sistem"]
+          ) {
+            tglPengajuan = cuti.data_tambahan["Tanggal_Pengajuan_Sistem"];
           }
 
           let trHTML = `<tr>
@@ -1201,21 +1598,28 @@
           `;
 
           // Loop dynamic headers
-          dynamicHeaders.forEach(label => {
-              let val = (cuti.data_tambahan && cuti.data_tambahan[label]) ? cuti.data_tambahan[label] : '-';
-              if (val.toString().startsWith('http')) {
-                  val = `<a href="${val}" target="_blank" class="btn btn-sm btn-outline-info">File</a>`;
-              }
-              // Khusus alasan, jika kosong di data_tambahan tapi ada di cuti.alasan (backward compatible)
-              if (label.toLowerCase().includes('alasan') && val === '-' && cuti.alasan) {
-                  val = cuti.alasan;
-              }
-              trHTML += `<td class="text-wrap" style="max-width: 250px;">${val}</td>`;
+          dynamicHeaders.forEach((label) => {
+            let val =
+              cuti.data_tambahan && cuti.data_tambahan[label]
+                ? cuti.data_tambahan[label]
+                : "-";
+            if (val.toString().startsWith("http")) {
+              val = `<a href="${val}" target="_blank" class="btn btn-sm btn-outline-info">File</a>`;
+            }
+            // Khusus alasan, jika kosong di data_tambahan tapi ada di cuti.alasan (backward compatible)
+            if (
+              label.toLowerCase().includes("alasan") &&
+              val === "-" &&
+              cuti.alasan
+            ) {
+              val = cuti.alasan;
+            }
+            trHTML += `<td class="text-wrap" style="max-width: 250px;">${val}</td>`;
           });
 
-          let tombolAksi = '-';
-          if (cuti.status_pengajuan === 'Menunggu') {
-              tombolAksi = `<button class="btn btn-sm btn-outline-danger" onclick="batalkanCutiKaryawan('${cuti.id}')">Batalkan</button>`;
+          let tombolAksi = "-";
+          if (cuti.status_pengajuan === "Menunggu") {
+            tombolAksi = `<button class="btn btn-sm btn-outline-danger" onclick="batalkanCutiKaryawan('${cuti.id}')">Batalkan</button>`;
           }
 
           trHTML += `
@@ -1229,123 +1633,151 @@
       }
 
       async function batalkanCutiKaryawan(id) {
-          if (!confirm("Yakin ingin membatalkan pengajuan cuti ini?")) return;
-          
-          await supabaseClient.from('cuti').delete().eq('id', id);
-          Swal.fire("Dibatalkan", "Pengajuan cuti Anda telah dibatalkan.", "success");
-          
-          loadRiwayatCutiUser();
-          loadSisaCuti(); // Update jatah cuti di layar
+        if (!confirm("Yakin ingin membatalkan pengajuan cuti ini?")) return;
+
+        await supabaseClient.from("cuti").delete().eq("id", id);
+        Swal.fire(
+          "Dibatalkan",
+          "Pengajuan cuti Anda telah dibatalkan.",
+          "success",
+        );
+
+        loadRiwayatCutiUser();
+        loadSisaCuti(); // Update jatah cuti di layar
       }
 
       async function ajukanCuti(event) {
         event.preventDefault();
-        if (!localStorage.getItem('userLogin')) return;
-        const userObj = JSON.parse(localStorage.getItem('userLogin'));
+        if (!localStorage.getItem("userLogin")) return;
+        const userObj = JSON.parse(localStorage.getItem("userLogin"));
         const form = event.target;
-        
+
         const btnSubmit = form.querySelector('button[type="submit"]');
         btnSubmit.disabled = true;
         btnSubmit.innerText = "Mengirim...";
-        
+
         // 1. Ekstrak data dari field dinamis dan tangani upload file
         let dataTambahan = {};
         let tanggal_mulai = null;
         let tanggal_selesai = null;
-        let jenis_cuti = 'Lainnya';
-        let alasan = '-';
-        
+        let jenis_cuti = "Lainnya";
+        let alasan = "-";
+
         for (const config of currentFormConfig) {
           const inputEl = form.querySelector(`[name="${config.id}"]`);
           if (!inputEl) continue;
 
           let val = inputEl.value;
-          
+
           // Khusus file upload
-          if (config.tipe === 'file' && inputEl.files.length > 0) {
+          if (config.tipe === "file" && inputEl.files.length > 0) {
             const file = inputEl.files[0];
             const namaFile = `cuti-${Date.now()}-${file.name}`;
-            const { data, error } = await supabaseClient.storage.from('absensi-bucket').upload(namaFile, file);
+            const { data, error } = await supabaseClient.storage
+              .from("absensi-bucket")
+              .upload(namaFile, file);
             if (!error) {
-              const { data: publicUrlData } = supabaseClient.storage.from('absensi-bucket').getPublicUrl(namaFile);
+              const { data: publicUrlData } = supabaseClient.storage
+                .from("absensi-bucket")
+                .getPublicUrl(namaFile);
               val = publicUrlData.publicUrl;
             } else {
-              val = 'Gagal upload file';
+              val = "Gagal upload file";
             }
           }
 
           dataTambahan[config.label] = val;
-          
+
           // Coba tebak kolom-kolom utama untuk durasi dan tabel admin (berdasarkan label umum)
           const labelLower = config.label.toLowerCase();
-          if (config.tipe === 'date') {
-             if (labelLower.includes('mulai')) tanggal_mulai = val;
-             if (labelLower.includes('selesai') || labelLower.includes('akhir')) tanggal_selesai = val;
-             if (!tanggal_mulai) tanggal_mulai = val; // fallback ke date pertama
+          if (config.tipe === "date") {
+            if (labelLower.includes("mulai")) tanggal_mulai = val;
+            if (labelLower.includes("selesai") || labelLower.includes("akhir"))
+              tanggal_selesai = val;
+            if (!tanggal_mulai) tanggal_mulai = val; // fallback ke date pertama
           }
-          if (config.tipe === 'dropdown' && labelLower.includes('jenis')) jenis_cuti = val;
-          if (config.tipe === 'keterangan' && (labelLower.includes('alasan') || labelLower.includes('keterangan'))) alasan = val;
+          if (config.tipe === "dropdown" && labelLower.includes("jenis"))
+            jenis_cuti = val;
+          if (
+            config.tipe === "keterangan" &&
+            (labelLower.includes("alasan") || labelLower.includes("keterangan"))
+          )
+            alasan = val;
         }
 
         // Kalau tanggal selesai tidak diisi/tidak ada formnya, samakan dengan tanggal mulai (cuti 1 hari)
         if (tanggal_mulai && !tanggal_selesai) tanggal_selesai = tanggal_mulai;
-        
+
         // Simpan tanggal pengajuan saat ini agar tampil di riwayat (karena db tidak ada created_at)
-        dataTambahan['Tanggal_Pengajuan_Sistem'] = new Date().toISOString().split('T')[0];
-        
+        dataTambahan["Tanggal_Pengajuan_Sistem"] = new Date()
+          .toISOString()
+          .split("T")[0];
+
         let diffDays = 1;
         if (tanggal_mulai && tanggal_selesai) {
           const date1 = new Date(tanggal_mulai);
           const date2 = new Date(tanggal_selesai);
           if (date2 < date1) {
-            Swal.fire("Gagal", "Tanggal selesai tidak boleh sebelum tanggal mulai.", "error");
+            Swal.fire(
+              "Gagal",
+              "Tanggal selesai tidak boleh sebelum tanggal mulai.",
+              "error",
+            );
             btnSubmit.disabled = false;
             btnSubmit.innerText = "Kirim Pengajuan Cuti";
             return;
           }
-          
+
           // Hitung durasi dengan melewati hari libur karyawan
           diffDays = 0;
           let tempDate = new Date(date1);
           let liburArr = [];
           if (userObj.hari_libur) {
-              liburArr = userObj.hari_libur.split(',').map(Number);
+            liburArr = userObj.hari_libur.split(",").map(Number);
           }
-          
+
           while (tempDate <= date2) {
-              if (!liburArr.includes(tempDate.getDay())) {
-                  diffDays++;
-              }
-              tempDate.setDate(tempDate.getDate() + 1);
+            if (!liburArr.includes(tempDate.getDay())) {
+              diffDays++;
+            }
+            tempDate.setDate(tempDate.getDate() + 1);
           }
-          
+
           if (diffDays === 0) {
-            Swal.fire("Peringatan", "Durasi cuti 0 hari karena seluruh tanggal yang dipilih adalah hari libur rutin Anda.", "warning");
+            Swal.fire(
+              "Peringatan",
+              "Durasi cuti 0 hari karena seluruh tanggal yang dipilih adalah hari libur rutin Anda.",
+              "warning",
+            );
             btnSubmit.disabled = false;
             btnSubmit.innerText = "Kirim Pengajuan Cuti";
             return;
           }
-          
+
           // CEK OVERLAPPING CUTI (Apakah sudah ada pengajuan di tanggal yang sama)
           const { data: overlappingLeaves } = await supabaseClient
-            .from('cuti')
-            .select('tanggal_mulai, tanggal_selesai, status_pengajuan')
-            .eq('user_id', userObj.id)
-            .in('status_pengajuan', ['Disetujui', 'Menunggu']);
+            .from("cuti")
+            .select("tanggal_mulai, tanggal_selesai, status_pengajuan")
+            .eq("user_id", userObj.id)
+            .in("status_pengajuan", ["Disetujui", "Menunggu"]);
 
           if (overlappingLeaves) {
-             const isOverlap = overlappingLeaves.some(leaf => {
-                 const leafStart = new Date(leaf.tanggal_mulai);
-                 const leafEnd = new Date(leaf.tanggal_selesai);
-                 return (date1 <= leafEnd && date2 >= leafStart);
-             });
-             
-             if (isOverlap) {
-                 Swal.fire("Peringatan", "Anda sudah memiliki pengajuan cuti (Disetujui/Menunggu) pada rentang tanggal tersebut. Silakan pilih tanggal lain.", "warning");
-                 btnSubmit.disabled = false;
-                 btnSubmit.innerText = "Kirim Pengajuan Cuti";
-                 return;
-             }
+            const isOverlap = overlappingLeaves.some((leaf) => {
+              const leafStart = new Date(leaf.tanggal_mulai);
+              const leafEnd = new Date(leaf.tanggal_selesai);
+              return date1 <= leafEnd && date2 >= leafStart;
+            });
+
+            if (isOverlap) {
+              Swal.fire(
+                "Peringatan",
+                "Anda sudah memiliki pengajuan cuti (Disetujui/Menunggu) pada rentang tanggal tersebut. Silakan pilih tanggal lain.",
+                "warning",
+              );
+              btnSubmit.disabled = false;
+              btnSubmit.innerText = "Kirim Pengajuan Cuti";
+              return;
+            }
           }
         }
 
@@ -1355,49 +1787,61 @@
 
         // Cari tahu apakah user memilih salah satu dari master cuti
         if (window.sisaCutiMaster) {
-            for (const [key, val] of Object.entries(dataTambahan)) {
-                if (window.sisaCutiMaster[val]) {
-                    namaCutiTerpilih = val;
-                    infoMaster = window.sisaCutiMaster[val];
-                    break;
-                }
+          for (const [key, val] of Object.entries(dataTambahan)) {
+            if (window.sisaCutiMaster[val]) {
+              namaCutiTerpilih = val;
+              infoMaster = window.sisaCutiMaster[val];
+              break;
             }
-        }
-        
-        if (infoMaster && !infoMaster.is_unlimited) {
-           if (infoMaster.sisa <= 0) {
-              Swal.fire("Gagal", `Sisa jatah ${namaCutiTerpilih} Anda sudah habis!`, "error");
-              btnSubmit.disabled = false;
-              btnSubmit.innerText = "Kirim Pengajuan Cuti";
-              return;
-           }
-           if (diffDays > infoMaster.sisa) {
-              Swal.fire("Gagal", `Durasi pengajuan (${diffDays} hari) melebihi sisa ${namaCutiTerpilih} Anda (${infoMaster.sisa} hari).`, "error");
-              btnSubmit.disabled = false;
-              btnSubmit.innerText = "Kirim Pengajuan Cuti";
-              return;
-           }
+          }
         }
 
-        const { error } = await supabaseClient
-          .from('cuti')
-          .insert([
-            {
-              user_id: userObj.id,
-              tanggal_mulai: tanggal_mulai || new Date().toISOString().split('T')[0],
-              tanggal_selesai: tanggal_selesai || new Date().toISOString().split('T')[0],
-              alasan: alasan,
-              durasi_hari: diffDays,
-              status_pengajuan: 'Menunggu',
-              data_tambahan: dataTambahan // simpan ke kolom jsonb
-            }
-          ]);
-          
+        if (infoMaster && !infoMaster.is_unlimited) {
+          if (infoMaster.sisa <= 0) {
+            Swal.fire(
+              "Gagal",
+              `Sisa jatah ${namaCutiTerpilih} Anda sudah habis!`,
+              "error",
+            );
+            btnSubmit.disabled = false;
+            btnSubmit.innerText = "Kirim Pengajuan Cuti";
+            return;
+          }
+          if (diffDays > infoMaster.sisa) {
+            Swal.fire(
+              "Gagal",
+              `Durasi pengajuan (${diffDays} hari) melebihi sisa ${namaCutiTerpilih} Anda (${infoMaster.sisa} hari).`,
+              "error",
+            );
+            btnSubmit.disabled = false;
+            btnSubmit.innerText = "Kirim Pengajuan Cuti";
+            return;
+          }
+        }
+
+        const { error } = await supabaseClient.from("cuti").insert([
+          {
+            user_id: userObj.id,
+            tanggal_mulai:
+              tanggal_mulai || new Date().toISOString().split("T")[0],
+            tanggal_selesai:
+              tanggal_selesai || new Date().toISOString().split("T")[0],
+            alasan: alasan,
+            durasi_hari: diffDays,
+            status_pengajuan: "Menunggu",
+            data_tambahan: dataTambahan, // simpan ke kolom jsonb
+          },
+        ]);
+
         btnSubmit.disabled = false;
         btnSubmit.innerText = "Kirim Pengajuan Cuti";
 
         if (error) {
-          Swal.fire("Error", "Gagal mengirim pengajuan: " + error.message, "error");
+          Swal.fire(
+            "Error",
+            "Gagal mengirim pengajuan: " + error.message,
+            "error",
+          );
         } else {
           Swal.fire({
             title: "Berhasil!",
@@ -1411,15 +1855,20 @@
       }
 
       async function buatKalender(historyBulanIni = []) {
-        const userObj = JSON.parse(localStorage.getItem('userLogin') || '{}');
+        const userObj = JSON.parse(localStorage.getItem("userLogin") || "{}");
         let liburArr = [];
-        if (userObj.hari_libur) liburArr = userObj.hari_libur.split(',').map(Number);
-        
+        if (userObj.hari_libur)
+          liburArr = userObj.hari_libur.split(",").map(Number);
+
         // Ambil data cuti untuk ditampilkan di kalender
         let dataCuti = [];
         if (userObj.id) {
-            const { data } = await supabaseClient.from('cuti').select('*').eq('user_id', userObj.id).eq('status_pengajuan', 'Disetujui');
-            if (data) dataCuti = data;
+          const { data } = await supabaseClient
+            .from("cuti")
+            .select("*")
+            .eq("user_id", userObj.id)
+            .eq("status_pengajuan", "Disetujui");
+          if (data) dataCuti = data;
         }
 
         const tanggalSekarang = new Date();
@@ -1428,8 +1877,18 @@
         const hariIni = tanggalSekarang.getDate();
 
         const namaBulan = [
-          "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-          "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+          "Januari",
+          "Februari",
+          "Maret",
+          "April",
+          "Mei",
+          "Juni",
+          "Juli",
+          "Agustus",
+          "September",
+          "Oktober",
+          "November",
+          "Desember",
         ];
         document.getElementById("bulan-tahun").innerText =
           `${namaBulan[bulan]} ${tahun}`;
@@ -1438,7 +1897,7 @@
         const jumlahHari = new Date(tahun, bulan + 1, 0).getDate();
 
         let tbody = document.getElementById("kalender-body");
-        tbody.innerHTML = '';
+        tbody.innerHTML = "";
         let tr = document.createElement("tr");
 
         for (let i = 0; i < hariPertama; i++) {
@@ -1450,36 +1909,38 @@
           let td = document.createElement("td");
           td.innerText = i;
           td.className = "calendar-day";
-          
-          let tglStr = `${tahun}-${String(bulan + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+
+          let tglStr = `${tahun}-${String(bulan + 1).padStart(2, "0")}-${String(i).padStart(2, "0")}`;
           let currentDayOfWeek = new Date(tahun, bulan, i).getDay();
-          
+
           let isLiburMingguan = liburArr.includes(currentDayOfWeek);
-          let isSedangCuti = dataCuti.some(c => tglStr >= c.tanggal_mulai && tglStr <= c.tanggal_selesai);
+          let isSedangCuti = dataCuti.some(
+            (c) => tglStr >= c.tanggal_mulai && tglStr <= c.tanggal_selesai,
+          );
 
           if (i === hariIni) {
             td.classList.add("today");
           }
-          
+
           if (isSedangCuti) {
-             td.style.backgroundColor = '#f8d7da';
-             td.style.color = '#842029';
-             td.title = "Dalam Masa Cuti";
+            td.style.backgroundColor = "#f8d7da";
+            td.style.color = "#842029";
+            td.title = "Dalam Masa Cuti";
           } else if (isLiburMingguan) {
-             td.style.backgroundColor = '#f8d7da';
-             td.style.color = '#842029';
-             td.title = "Hari Libur Rutin";
+            td.style.backgroundColor = "#f8d7da";
+            td.style.color = "#842029";
+            td.title = "Hari Libur Rutin";
           } else {
-             const absenHist = historyBulanIni.find(h => h.tanggal === tglStr);
-             if (absenHist) {
-               if (absenHist.status === 'Hadir') {
-                 td.style.backgroundColor = '#d1e7dd';
-                 td.title = "Hadir Tepat Waktu";
-               } else if (absenHist.status === 'Terlambat') {
-                 td.style.backgroundColor = '#fff3cd';
-                 td.title = "Hadir Terlambat";
-               }
-             }
+            const absenHist = historyBulanIni.find((h) => h.tanggal === tglStr);
+            if (absenHist) {
+              if (absenHist.status === "Hadir") {
+                td.style.backgroundColor = "#d1e7dd";
+                td.title = "Hadir Tepat Waktu";
+              } else if (absenHist.status === "Terlambat") {
+                td.style.backgroundColor = "#fff3cd";
+                td.title = "Hadir Terlambat";
+              }
+            }
           }
 
           tr.appendChild(td);
@@ -1497,116 +1958,132 @@
       async function loadRiwayatAbsensi() {
         if (!userData) return;
         const userObj = JSON.parse(userData);
-        
+
         const tbody = document.getElementById("tabel-riwayat-body");
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center">Memuat riwayat...</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4"><div class="placeholder-glow"><span class="placeholder col-8 mb-2"></span><br><span class="placeholder col-6"></span></div></td></tr>`;
 
         const { data, error } = await supabaseClient
-          .from('absensi')
-          .select('*')
-          .eq('user_id', userObj.id)
-          .order('tanggal', { ascending: false });
+          .from("absensi")
+          .select("*")
+          .eq("user_id", userObj.id)
+          .order("tanggal", { ascending: false });
 
         if (error) {
-          tbody.innerHTML = '<tr><td colspan="4" class="text-danger">Gagal memuat data</td></tr>';
+          tbody.innerHTML =
+            '<tr><td colspan="4" class="text-danger">Gagal memuat data</td></tr>';
           return;
         }
 
         if (!data || data.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="4" class="text-muted">Belum ada riwayat absensi</td></tr>';
+          tbody.innerHTML =
+            '<tr><td colspan="4" class="text-muted">Belum ada riwayat absensi</td></tr>';
           return;
         }
 
-        tbody.innerHTML = '';
-        data.forEach(absen => {
-          let badgeClass = absen.status === 'Terlambat' ? 'warning' : 'success';
+        tbody.innerHTML = "";
+        data.forEach((absen) => {
+          let badgeClass = absen.status === "Terlambat" ? "warning" : "success";
           tbody.innerHTML += `
             <tr>
               <td>${absen.tanggal}</td>
-              <td>${absen.waktu_masuk || '-'}</td>
-              <td>${absen.waktu_keluar || '-'}</td>
+              <td>${absen.waktu_masuk || "-"}</td>
+              <td>${absen.waktu_keluar || "-"}</td>
               <td><span class="badge bg-${badgeClass}">${absen.status}</span></td>
             </tr>
           `;
         });
-        
+
         buatKalender(data);
       }
 
       // Generate kalender saat web dimuat (default kosong)
       buatKalender([]);
-      
+
       async function syncUserSession() {
         if (!userData) return;
         let u = JSON.parse(userData);
-        const { data, error } = await supabaseClient.from('users').select('*').eq('id', u.id).maybeSingle();
+        const { data, error } = await supabaseClient
+          .from("users")
+          .select("*")
+          .eq("id", u.id)
+          .maybeSingle();
         if (data) {
-           localStorage.setItem('userLogin', JSON.stringify(data));
-           // Update global reference
-           Object.assign(u, data);
+          localStorage.setItem("userLogin", JSON.stringify(data));
+          // Update global reference
+          Object.assign(u, data);
         }
       }
 
       // Load riwayat
       loadRiwayatAbsensi();
-      
+
       // Load ulang riwayat jika tab riwayat diklik
-      document.getElementById('tab-riwayat-btn').addEventListener('shown.bs.tab', function (e) {
-        loadRiwayatAbsensi();
-      });
-      
+      document
+        .getElementById("tab-riwayat-btn")
+        .addEventListener("shown.bs.tab", function (e) {
+          loadRiwayatAbsensi();
+        });
+
       // Load sisa cuti jika tab cuti diklik
-      document.getElementById('tab-cuti-btn').addEventListener('shown.bs.tab', function (e) {
+      document
+        .getElementById("tab-cuti-btn")
+        .addEventListener("shown.bs.tab", function (e) {
+          loadSisaCuti();
+          loadFormCutiBuilder();
+          loadRiwayatCutiUser();
+        });
+
+      // Jalankan sinkronisasi data user terlebih dahulu, baru load fungsi lainnya
+      syncUserSession().then(() => {
+        loadKantorUser(); // ini memanggil cekStatusAbsenHariIni di dalamnya
         loadSisaCuti();
         loadFormCutiBuilder();
         loadRiwayatCutiUser();
-      });
-      
-      // Jalankan sinkronisasi data user terlebih dahulu, baru load fungsi lainnya
-      syncUserSession().then(() => {
-          loadKantorUser(); // ini memanggil cekStatusAbsenHariIni di dalamnya
-          loadSisaCuti(); 
-          loadFormCutiBuilder(); 
-          loadRiwayatCutiUser();
       });
       // ==========================================
       // TAB PROFIL & PASSWORD
       // ==========================================
       function isiDataProfil() {
         if (!currentUser) return;
-        document.getElementById("profil-nama").innerText = currentUser.nama || '-';
-        document.getElementById("profil-role").innerText = currentUser.role || '-';
-        document.getElementById("profil-hp").innerText = currentUser.no_hp || '-';
-        document.getElementById("profil-cabang").innerText = currentUser.cabang || 'Pusat';
+        document.getElementById("profil-nama").innerText =
+          currentUser.nama || "-";
+        document.getElementById("profil-role").innerText =
+          currentUser.role || "-";
+        document.getElementById("profil-hp").innerText =
+          currentUser.no_hp || "-";
+        document.getElementById("profil-cabang").innerText =
+          currentUser.cabang || "Pusat";
       }
-      
+
       async function ubahPassword(e) {
         e.preventDefault();
         const pass1 = document.getElementById("profil-password-baru").value;
-        const pass2 = document.getElementById("profil-password-konfirmasi").value;
+        const pass2 = document.getElementById(
+          "profil-password-konfirmasi",
+        ).value;
         if (pass1 !== pass2) {
           Swal.fire("Error", "Konfirmasi password tidak cocok!", "error");
           return;
         }
-        
+
         const btn = e.target.querySelector("button");
         btn.disabled = true;
-        
+
         const { error } = await supabaseClient
-          .from('users')
+          .from("users")
           .update({ password: pass1 })
-          .eq('id', currentUser.id);
-          
+          .eq("id", currentUser.id);
+
         btn.disabled = false;
-        
+
         if (error) {
-           Swal.fire("Gagal", error.message, "error");
+          Swal.fire("Gagal", error.message, "error");
         } else {
-           Swal.fire({
-             title: "Sukses", 
-             text: "Password berhasil diubah. Silakan login ulang.", 
-             icon: "success"
-           }).then(() => logout());
+          Swal.fire({
+            title: "Sukses",
+            text: "Password berhasil diubah. Silakan login ulang.",
+            icon: "success",
+          }).then(() => logout());
         }
       }
     </script>
