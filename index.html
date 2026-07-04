@@ -943,7 +943,8 @@
         cekStatusAbsenHariIni();
       });
 
-      function logout() {
+      async function logout() {
+        await supabaseClient.auth.signOut();
         localStorage.removeItem("userLogin");
         window.location.href = "login.html";
       }
@@ -1171,7 +1172,18 @@
           },
         });
 
-        const now = new Date();
+        let now;
+        try {
+            // Ambil waktu dari API Independen (Mencegah Time Spoofing)
+            const res = await fetch("https://timeapi.io/api/Time/current/zone?timeZone=Asia/Jakarta");
+            if (!res.ok) throw new Error("Gagal");
+            const data = await res.json();
+            now = new Date(data.dateTime);
+        } catch (e) {
+            Swal.fire("Error", "Gagal melakukan verifikasi waktu dengan Server. Pastikan internet stabil dan matikan AdBlock/VPN.", "error");
+            return;
+        }
+
         const offset = now.getTimezoneOffset() * 60000;
         const localDate = new Date(now - offset);
         const localTime = localDate.toISOString().split("T")[1].substring(0, 8);
@@ -2125,16 +2137,33 @@
 
       async function syncUserSession() {
         if (!userData) return;
+        
+        // 1. Cek sesi JWT dari Supabase Auth
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) {
+          localStorage.removeItem("userLogin");
+          window.location.href = "login.html";
+          return;
+        }
+
         let u = JSON.parse(userData);
+        
+        // 2. Cek profil berdasarkan auth_id
         const { data, error } = await supabaseClient
           .from("users")
           .select("*")
-          .eq("id", u.id)
+          .eq("auth_id", session.user.id)
           .maybeSingle();
+
         if (data) {
           localStorage.setItem("userLogin", JSON.stringify(data));
           // Update global reference
           Object.assign(u, data);
+        } else {
+          // Jika auth ada tapi profil hilang (misal dihapus paksa oleh admin)
+          await supabaseClient.auth.signOut();
+          localStorage.removeItem("userLogin");
+          window.location.href = "login.html";
         }
       }
 
@@ -2233,6 +2262,18 @@
         const btn = e.target.querySelector("button");
         btn.disabled = true;
 
+        // 1. Update di Supabase Auth (wajib agar bisa login ke depannya)
+        const { error: authError } = await supabaseClient.auth.updateUser({
+          password: pass1
+        });
+
+        if (authError) {
+          btn.disabled = false;
+          Swal.fire("Gagal", "Gagal memperbarui kata sandi keamanan: " + authError.message, "error");
+          return;
+        }
+
+        // 2. Update di tabel manual (opsional, untuk backup/tampilan lama)
         const { error } = await supabaseClient
           .from("users")
           .update({ password: pass1 })

@@ -6,9 +6,49 @@ let isSuperAdmin = currentUser.role === 'Super Admin';
 let myCabang = currentUser.cabang || '';
 
 // Pastikan elemen dimuat
-document.addEventListener("DOMContentLoaded", () => {
-    // Pastikan user sudah login
+document.addEventListener("DOMContentLoaded", async () => {
+    // Pastikan user sudah login (Cek lokal)
     if (!currentUserData) {
+        window.location.href = "login.html";
+        return;
+    }
+
+    // --- Cek Sesi JWT & Profil Resmi ---
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) {
+            throw new Error("Sesi tidak valid");
+        }
+        
+        // Cek profil dari backend secara aman
+        const { data: profile, error } = await supabaseClient
+            .from('users')
+            .select('role, cabang')
+            .eq('auth_id', session.user.id)
+            .single();
+            
+        if (error || !profile) throw new Error("Profil tidak valid");
+        
+        // Jika ternyata dia bukan Admin/HR, tendang keluar ke halaman absen
+        if (profile.role !== 'Super Admin' && profile.role !== 'HR') {
+            window.location.href = "index.html";
+            return;
+        }
+
+        // Sinkronisasi hak akses
+        if (profile.role !== currentUser.role || profile.cabang !== currentUser.cabang) {
+            currentUser.role = profile.role;
+            currentUser.cabang = profile.cabang;
+            isSuperAdmin = profile.role === 'Super Admin';
+            myCabang = profile.cabang || '';
+            localStorage.setItem('userLogin', JSON.stringify({...currentUser, ...profile}));
+            // Refresh halaman agar UI menyesuaikan
+            window.location.reload();
+            return;
+        }
+    } catch (e) {
+        await supabaseClient.auth.signOut();
+        localStorage.removeItem('userLogin');
         window.location.href = "login.html";
         return;
     }
@@ -821,12 +861,14 @@ async function simpanKaryawan(event) {
 
         res = await supabaseClient.from('users').update(updateData).eq('id', id);
     } else {
-        // Insert Mode
+        // Insert Mode (Karyawan Baru)
         if (!password) {
             Swal.fire("Gagal", "Password wajib diisi untuk karyawan baru", "error");
             btn.disabled = false;
             return;
         }
+        
+        // Pendaftaran profil ke database (Akun Auth akan dibuat otomatis saat login pertama)
         res = await supabaseClient.from('users').insert([
             { nama, password, role, no_hp, cabang, hari_libur: checkedLibur, sisa_cuti: 12 }
         ]);
@@ -2548,14 +2590,20 @@ async function importKaryawan(event) {
 async function backupDatabase() {
     const includeMedia = document.getElementById('backup_media')?.checked;
     
-    Swal.fire({ title: includeMedia ? 'Membackup Database & Media...' : 'Membackup Database...', text: 'Proses ini mungkin memakan waktu agak lama.', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    Swal.fire({ title: includeMedia ? 'Membackup Database & Media...' : 'Membackup Database...', html: 'Proses ini mungkin memakan waktu agak lama.', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
     try {
         const dbBackup = {};
         const tables = ['users', 'cabang', 'absensi', 'cuti', 'form_cuti_config', 'app_settings'];
         
         for (const table of tables) {
-            const { data } = await supabaseClient.from(table).select('*');
-            dbBackup[table] = data || [];
+            try {
+                const { data, error } = await supabaseClient.from(table).select('*');
+                if (error) console.warn(`Supabase error for table ${table}:`, error);
+                dbBackup[table] = data || [];
+            } catch (e) {
+                console.warn(`Failed to fetch table ${table}`, e);
+                dbBackup[table] = [];
+            }
         }
         
         const json = JSON.stringify(dbBackup, null, 2);
@@ -2567,28 +2615,31 @@ async function backupDatabase() {
             zip.file("database_backup.json", json);
             const mediaFolder = zip.folder("media");
             
+            const mediaTasks = [];
+
             // Collect media from absensi
             for (const a of dbBackup['absensi'] || []) {
                 const userName = dbBackup['users']?.find(u => u.id === a.user_id)?.nama || 'Unknown';
                 const fName = `${userName}_${a.tanggal}`.replace(/[^a-z0-9]/gi, '_');
                 
-                const fetchMedia = async (url, suffix) => {
+                const addMediaTask = (url, suffix) => {
                     if (!url) return;
-                    try {
-                        const res = await fetch(url);
-                        if(res.ok) {
-                            const blob = await res.blob();
-                            // detect ext
-                            const ext = url.split('?')[0].split('.').pop() || 'jpg';
-                            mediaFolder.file(`absensi/${fName}_${suffix}.${ext}`, blob);
-                        }
-                    } catch(e) {}
+                    mediaTasks.push(async () => {
+                        try {
+                            const res = await fetch(url);
+                            if(res.ok) {
+                                const blob = await res.blob();
+                                const ext = url.split('?')[0].split('.').pop() || 'jpg';
+                                mediaFolder.file(`absensi/${fName}_${suffix}.${ext}`, blob);
+                            }
+                        } catch(e) {}
+                    });
                 };
                 
-                await fetchMedia(a.foto_masuk, "Masuk");
-                await fetchMedia(a.foto_pulang, "Pulang");
-                await fetchMedia(a.foto_mulai_istirahat, "Mulai_Ist");
-                await fetchMedia(a.foto_selesai_istirahat, "Selesai_Ist");
+                addMediaTask(a.foto_masuk, "Masuk");
+                addMediaTask(a.foto_pulang, "Pulang");
+                addMediaTask(a.foto_mulai_istirahat, "Mulai_Ist");
+                addMediaTask(a.foto_selesai_istirahat, "Selesai_Ist");
             }
             
             // Collect media from cuti
@@ -2599,19 +2650,32 @@ async function backupDatabase() {
                     
                     for (const [key, url] of Object.entries(c.data_tambahan)) {
                         if (typeof url === 'string' && url.startsWith('http')) {
-                            try {
-                                const res = await fetch(url);
-                                if(res.ok) {
-                                    const blob = await res.blob();
-                                    const ext = url.split('?')[0].split('.').pop() || 'jpg';
-                                    mediaFolder.file(`cuti/${fName}_${key.replace(/[^a-z0-9]/gi,'_')}.${ext}`, blob);
-                                }
-                            } catch(e) {}
+                            mediaTasks.push(async () => {
+                                try {
+                                    const res = await fetch(url);
+                                    if(res.ok) {
+                                        const blob = await res.blob();
+                                        const ext = url.split('?')[0].split('.').pop() || 'jpg';
+                                        mediaFolder.file(`cuti/${fName}_${key.replace(/[^a-z0-9]/gi,'_')}.${ext}`, blob);
+                                    }
+                                } catch(e) {}
+                            });
                         }
                     }
                 }
             }
             
+            // Execute fetching in batches to avoid hanging the browser
+            let completed = 0;
+            const batchSize = 10;
+            for (let i = 0; i < mediaTasks.length; i += batchSize) {
+                const batch = mediaTasks.slice(i, i + batchSize);
+                await Promise.all(batch.map(task => task()));
+                completed += batch.length;
+                Swal.update({ html: `Mendownload media... (${Math.min(completed, mediaTasks.length)} / ${mediaTasks.length})` });
+            }
+            
+            Swal.update({ html: `Membuat file ZIP, mohon tunggu...` });
             const zipContent = await zip.generateAsync({ type: "blob" });
             const url = URL.createObjectURL(zipContent);
             const link = document.createElement("a");
@@ -2766,4 +2830,66 @@ async function hapusDataAbsen(absenId, tanggal) {
     Swal.fire("Berhasil", "Data absen beserta foto berhasil dihapus.", "success");
     bootstrap.Modal.getInstance(document.getElementById('modalDetailAbsensi')).hide();
     loadDataAbsensi();
+}
+
+// ==========================================
+// FACTORY RESET
+// ==========================================
+async function factoryResetDatabase() {
+    if (!isSuperAdmin) {
+        Swal.fire("Akses Ditolak", "Hanya Super Admin yang dapat melakukan Factory Reset.", "error");
+        return;
+    }
+
+    const { value: confirmText } = await Swal.fire({
+        title: "Konfirmasi Factory Reset!",
+        text: "Ketik 'RESET' (huruf besar) untuk melanjutkan. SEMUA DATA AKAN HILANG PERMANEN!",
+        icon: "warning",
+        input: 'text',
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        confirmButtonText: "Eksekusi Reset!"
+    });
+
+    if (confirmText !== 'RESET') {
+        if (confirmText) Swal.fire("Dibatalkan", "Teks konfirmasi salah.", "info");
+        return;
+    }
+
+    Swal.fire({ 
+        title: 'Memproses Factory Reset...', 
+        html: 'Menghapus seluruh data absensi, cuti, cabang dan karyawan...<br><small>Proses ini mungkin memakan waktu agak lama.</small>', 
+        allowOutsideClick: false, 
+        didOpen: () => Swal.showLoading() 
+    });
+
+    try {
+        // Hapus isi tabel
+        const tablesToClear = ['absensi', 'cuti', 'form_cuti_config', 'cabang'];
+        
+        for (const table of tablesToClear) {
+            try {
+                const { data } = await supabaseClient.from(table).select('*');
+                if (data && data.length > 0) {
+                    let deleteCol = data[0].id !== undefined ? 'id' : (data[0].nama !== undefined ? 'nama' : Object.keys(data[0])[0]);
+                    await supabaseClient.from(table).delete().not(deleteCol, 'is', null);
+                }
+            } catch(e) {
+                console.warn("Gagal mereset tabel", table, e);
+            }
+        }
+
+        // Hapus semua users KECUALI super admin yang sedang login
+        try {
+            await supabaseClient.from('users').delete().neq('id', currentUser.id);
+        } catch(e) {
+            console.warn("Gagal mereset users", e);
+        }
+
+        Swal.fire("Berhasil", "Sistem telah direset ke pengaturan awal pabrik.", "success").then(() => {
+            window.location.reload();
+        });
+    } catch (err) {
+        Swal.fire("Gagal Reset", err.message, "error");
+    }
 }
