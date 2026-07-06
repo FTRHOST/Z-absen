@@ -63,21 +63,51 @@ Jika Anda harus menginstal atau memindahkan sistem ini ke Project Supabase yang 
 
 ## 5. Integrasi Notifikasi Telegram (Aman via Edge Functions)
 
-Sistem telah dilengkapi fitur otomatis untuk mengirim pesan ke Telegram (saat absen lokasi, absen foto wajah, dan pengajuan cuti). Mengingat bahayanya membocorkan Token Bot di Frontend, arsitektur yang digunakan adalah **Supabase Edge Functions**.
+Sistem telah dilengkapi fitur otomatis untuk mengirim notifikasi ke Telegram pada kejadian berikut:
+1. Absen Lokasi
+2. Absen Foto Wajah / Selfie
+3. Pengajuan Cuti / Izin / Sakit
 
-**Langkah Setup Telegram Bot:**
-1. Minta Token dari BotFather di Telegram.
-2. Dapatkan ID Grup Anda (Grup ID selalu diawali tanda minus `-`, misalnya `-1005348785847`). Jika dikirim ke akun pribadi (bukan grup), pastikan Anda pernah klik *Start* pada bot tersebut.
-3. Masukkan ID Grup/Chat ke file `config.js` pada bagian `TELEGRAM_CHAT_ID`.
-4. Buka terminal (dengan Supabase CLI yang sudah login), simpan Token rahasia ke server Supabase:
+Mengingat bahayanya membocorkan Token Bot di file *Frontend* (`config.js`), arsitektur yang digunakan untuk fitur ini adalah **Supabase Edge Functions**. Server Supabase-lah yang akan memegang Token Bot Anda secara rahasia dan mengirim pesan ke Telegram.
+
+**Panduan Lengkap Setup Telegram Bot:**
+
+**Langkah 1: Persiapan Bot & Chat ID**
+1. Buka Telegram, cari **@BotFather**, ketik `/newbot`, ikuti instruksi, dan simpan **Token Bot** yang diberikan.
+2. Buat Grup Telegram baru (opsional) atau gunakan obrolan pribadi Anda dengan bot. 
+3. *Wajib:* Masukkan bot yang baru Anda buat ke dalam grup tersebut (jika menggunakan grup), ATAU kirimkan pesan `/start` ke bot Anda (jika menggunakan chat pribadi).
+4. Dapatkan Chat ID Anda. (Grup ID selalu diawali tanda minus `-`, misalnya `-1005348785847`. Chat ID pribadi adalah angka positif).
+5. Masukkan Chat ID tersebut ke dalam file `config.js` pada baris `TELEGRAM_CHAT_ID`.
+
+**Langkah 2: Instalasi Supabase CLI (Jika Belum)**
+Buka Terminal/Command Prompt di PC Anda, lalu install Supabase CLI:
+- **Windows (via Scoop):** `scoop install supabase`
+- **Mac (via Homebrew):** `brew install supabase/tap/supabase`
+- **NPM/Node.js:** `npm install -g supabase`
+
+**Langkah 3: Tautkan Proyek & Set Secret**
+Di dalam folder proyek ini (lokasi yang sama dengan file `supabase/functions`), jalankan:
+1. Login ke akun Supabase Anda:
    ```bash
-   supabase secrets set TELEGRAM_BOT_TOKEN="TOKEN_ANDA_DISINI"
+   supabase login
    ```
-5. Deploy Edge Function ke server Anda dengan menjalankan perintah:
+2. Hubungkan folder ini ke project Supabase Anda (Ganti `<Project-Ref>` dengan 20 huruf ID project Anda yang ada di URL dasbor Supabase):
    ```bash
-   supabase functions deploy telegram-notif --no-verify-jwt
+   supabase link --project-ref <Project-Ref>
    ```
-*Catatan: `--no-verify-jwt` disertakan agar klien dapat memanggil API ini secara publik tanpa perlu melampirkan JWT di header HTTP.*
+3. Simpan Token Bot Anda secara aman di server Supabase (Secret):
+   ```bash
+   supabase secrets set TELEGRAM_BOT_TOKEN="TOKEN_DARI_BOTFATHER_ANDA"
+   ```
+
+**Langkah 4: Deploy Edge Function**
+Unggah kode perantara pengirim Telegram ke server Anda dengan menjalankan perintah:
+```bash
+supabase functions deploy telegram-notif --no-verify-jwt
+```
+*(Catatan: `--no-verify-jwt` disertakan agar klien dapat memanggil API ini secara publik tanpa perlu melampirkan JWT di header HTTP secara manual).*
+
+Setelah tulisan `Deployed Functions` muncul di terminal, fitur bot Telegram Anda telah resmi berjalan secara aman!
 
 ## 6. Panduan Backup dan Pemulihan (Disaster Recovery)
 Aplikasi memiliki menu bawaan untuk IT: **"Zona Bahaya"** di dalam panel Admin.
