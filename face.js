@@ -45,7 +45,11 @@ async function checkAndRegisterFace() {
     setInterval(async () => {
       if (faceDescriptorTemp) return; // Stop if already captured
       
-      const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = video.videoWidth;
+      tempCanvas.height = video.videoHeight;
+      tempCanvas.getContext("2d", { willReadFrequently: true }).drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+      const detection = await faceapi.detectSingleFace(tempCanvas, new faceapi.TinyFaceDetectorOptions())
         .withFaceLandmarks()
         .withFaceDescriptor();
         
@@ -70,7 +74,7 @@ async function simpanWajahUser() {
   const canvas = document.createElement("canvas");
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+  canvas.getContext('2d', { willReadFrequently: true }).drawImage(video, 0, 0, canvas.width, canvas.height);
   const dataUrl = canvas.toDataURL("image/jpeg");
   
   const faceDescriptorArray = Array.from(faceDescriptorTemp);

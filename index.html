@@ -556,7 +556,6 @@
       id="kameraModal"
       tabindex="-1"
       aria-labelledby="kameraModalLabel"
-      aria-hidden="true"
       data-bs-backdrop="static"
     >
       <div class="modal-dialog modal-dialog-centered">
@@ -1248,6 +1247,9 @@
         if (response.error) {
           Swal.fire("Gagal", response.error.message, "error");
         } else {
+          const textMsg = `<b>Laporan Absen (Lokasi)</b>\nNama: ${currentUser.nama}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${localTime}\nLokasi: Jarak ${Math.round(jarakAbsen)}m`;
+          await sendTelegramNotification(textMsg);
+
           Swal.fire("Berhasil!", "Absensi berhasil disimpan.", "success").then(
             () => {
               window.location.reload();
@@ -1279,7 +1281,7 @@
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         canvas
-          .getContext("2d")
+          .getContext("2d", { willReadFrequently: true })
           .drawImage(video, 0, 0, canvas.width, canvas.height);
 
         // Matikan stream video dan tampilkan hasil foto statis
@@ -1409,6 +1411,9 @@
           }
 
           if (dbError) throw dbError;
+
+          const textMsg = `<b>Laporan Absen (Wajah/Selfie)</b>\nNama: ${userObj.nama}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${waktu_sekarang}\nLokasi: ${lokasiTeks}\nFoto: <a href="${publicUrlData.publicUrl}">Lihat Foto</a>`;
+          await sendTelegramNotification(textMsg);
 
           await cekStatusAbsenHariIni();
 
@@ -2003,6 +2008,11 @@
             "error",
           );
         } else {
+          const tglMulai = tanggal_mulai || new Date().toISOString().split("T")[0];
+          const tglSelesai = tanggal_selesai || new Date().toISOString().split("T")[0];
+          const textMsg = `<b>Pengajuan Cuti/Izin/Sakit</b>\nNama: ${userObj.nama}\nJenis: ${namaCutiTerpilih || tipe_cuti_izin}\nDurasi: ${diffDays} Hari (${tglMulai} s/d ${tglSelesai})\nAlasan: ${alasan}`;
+          await sendTelegramNotification(textMsg);
+
           Swal.fire({
             title: "Berhasil!",
             text: "Pengajuan cuti berhasil dikirim ke HRD untuk ditinjau!",
@@ -2323,6 +2333,28 @@
             text: "Password berhasil diubah. Silakan login ulang.",
             icon: "success",
           }).then(() => logout());
+        }
+      }
+      async function sendTelegramNotification(message) {
+        if (typeof TELEGRAM_BOT_TOKEN === 'undefined' || !TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID || TELEGRAM_BOT_TOKEN === "ISI_DENGAN_TOKEN_BOT_ANDA") {
+          console.log("Telegram not configured");
+          return;
+        }
+        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+        try {
+          await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              chat_id: TELEGRAM_CHAT_ID,
+              text: message,
+              parse_mode: "HTML",
+            }),
+          });
+        } catch (error) {
+          console.error("Gagal kirim notifikasi Telegram:", error);
         }
       }
     </script>

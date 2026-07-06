@@ -263,7 +263,11 @@
 
         try {
           // Bersihkan sesi lama jika pengguna belum logout sempurna (Mencegah konflik auth_id)
-          await supabaseClient.auth.signOut();
+          try {
+            await supabaseClient.auth.signOut();
+          } catch(e) {
+            console.warn("signOut non-fatal error:", e);
+          }
 
           // Buat email palsu dari nama user (contoh: budi santoso -> budisantoso@zieabsen.com)
           const dummyEmail = `${namaUser.replace(/\s+/g, "").toLowerCase()}@zieabsen.com`;
@@ -314,12 +318,32 @@
             let authUserId = signUpResult.data?.user?.id;
 
             // 3. Selalu pastikan kita SignIn untuk mendapatkan Session aktif
-            const retryLogin = await supabaseClient.auth.signInWithPassword({
+            let retryLogin = await supabaseClient.auth.signInWithPassword({
               email: dummyEmail,
               password,
             });
-            if (retryLogin.error || !retryLogin.data.user) {
-              throw new Error("Sistem keamanan bentrok, hubungi Admin.");
+            
+            if (retryLogin.error || !retryLogin.data?.user) {
+              // Jika gagal, artinya password Auth bentrok dengan password baru di tabel public.users (diubah oleh Admin).
+              // Buat email unik baru untuk Auth agar tidak bentrok dengan yang lama.
+              const uniqueDummyEmail = `${namaUser.replace(/\s+/g, "").toLowerCase()}_${Date.now()}@zieabsen.com`;
+              const newSignUp = await supabaseClient.auth.signUp({
+                email: uniqueDummyEmail,
+                password: password,
+              });
+              
+              if (newSignUp.error) {
+                throw new Error("Sistem keamanan gagal diperbarui: " + newSignUp.error.message);
+              }
+              
+              retryLogin = await supabaseClient.auth.signInWithPassword({
+                email: uniqueDummyEmail,
+                password: password,
+              });
+              
+              if (retryLogin.error || !retryLogin.data?.user) {
+                throw new Error("Sistem keamanan bentrok permanen, hubungi Admin.");
+              }
             }
             authUserId = retryLogin.data.user.id;
 
