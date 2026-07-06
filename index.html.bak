@@ -1330,7 +1330,7 @@
           const tanggal = localDate.toISOString().split("T")[0]; // Format YYYY-MM-DD
           const waktu_sekarang = sekarang.toTimeString().split(" ")[0]; // Format HH:MM:SS
 let dbError;
-          const lokasiTeks = `Jarak: ${Math.round(jarakAbsen)}m`;
+          const lokasiTeks = `Jarak: ${Math.round(jarakAbsen)}m`; // Format lokasi sesuai tabel
 
           if (tipeAbsenSekarang === "Masuk") {
             let statusKehadiran = "Hadir";
@@ -1342,10 +1342,10 @@ let dbError;
                 user_id: userObj.id,
                 tanggal: tanggal,
                 waktu_masuk: waktu_sekarang,
-                lokasi_masuk: lokasiTeks,
-                foto_masuk: publicUrlData.publicUrl,
-                status: statusKehadiran,
-                status_wajah: faceAbsenStatus
+                lokasi_masuk: lokasiTeks,           // Menggunakan kolom lokasi_masuk
+                foto_masuk: publicUrlData.publicUrl, // Menggunakan kolom foto_masuk
+                status: statusKehadiran
+                // Hapus foto_url, jarak_meter, status_wajah krn tidak ada di DB
               },
             ]);
             dbError = res.error;
@@ -1355,9 +1355,8 @@ let dbError;
               .from("absensi")
               .update({
                 waktu_istirahat_keluar: waktu_sekarang,
-                lokasi_istirahat_keluar: lokasiTeks,
-                foto_istirahat_keluar: publicUrlData.publicUrl,
-                status_wajah: faceAbsenStatus
+                lokasi_istirahat_keluar: lokasiTeks
+                // DB Anda tidak punya kolom foto_istirahat, jadi jangan dikirim
               })
               .eq("id", absenHariIni.id);
             dbError = res.error;
@@ -1367,9 +1366,7 @@ let dbError;
               .from("absensi")
               .update({
                 waktu_istirahat_masuk: waktu_sekarang,
-                lokasi_istirahat_masuk: lokasiTeks,
-                foto_istirahat_masuk: publicUrlData.publicUrl,
-                status_wajah: faceAbsenStatus
+                lokasi_istirahat_masuk: lokasiTeks
               })
               .eq("id", absenHariIni.id);
             dbError = res.error;
@@ -1380,8 +1377,7 @@ let dbError;
               .update({
                 waktu_keluar: waktu_sekarang,
                 lokasi_keluar: lokasiTeks,
-                foto_keluar: publicUrlData.publicUrl,
-                status_wajah: faceAbsenStatus
+                foto_keluar: publicUrlData.publicUrl
               })
               .eq("id", absenHariIni.id);
             dbError = res.error;

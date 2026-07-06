@@ -1760,12 +1760,7 @@ async function prosesCuti(cuti_id, user_id, durasi, status) {
     
     Swal.fire("Berhasil", `Cuti ${status}`, "success");
     loadDataCuti();
-    loadDashboardStats(); // <-- DIPERBAIKI
-
-    // <-- TAMBAHAN: Tutup modal agar UI merefresh data terbaru
-    const modalEl = document.getElementById('modalDetailCuti');
-    const modalInstance = bootstrap.Modal.getInstance(modalEl);
-    if (modalInstance) modalInstance.hide();
+    loadDashboard();
 }
 
 async function editStatusCuti(cuti_id, currentStatus) {
@@ -1785,14 +1780,8 @@ async function editStatusCuti(cuti_id, currentStatus) {
     if (statusBaru && statusBaru !== currentStatus) {
         await supabaseClient.from('cuti').update({ status_pengajuan: statusBaru }).eq('id', cuti_id);
         Swal.fire('Berhasil', 'Status cuti telah diperbarui.', 'success');
-        
         loadDataCuti();
-        loadDashboardStats(); // <-- DIPERBAIKI
-        
-        // <-- TAMBAHAN: Tutup modal agar UI merefresh data terbaru
-        const modalEl = document.getElementById('modalDetailCuti');
-        const modalInstance = bootstrap.Modal.getInstance(modalEl);
-        if (modalInstance) modalInstance.hide();
+        loadDashboard();
     }
 }
 

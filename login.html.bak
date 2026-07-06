@@ -41,7 +41,7 @@
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
         overflow: hidden;
       }
-      .login-header {
+      .<-header {
         background: linear-gradient(135deg, #e5b82a, #d4af37) !important;
         color: #3e2723 !important;
         padding: 30px 20px;
