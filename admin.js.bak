@@ -2576,7 +2576,7 @@ async function loadSettings() {
 
             if (data.nama_aplikasi) {
                 const brand = document.querySelector('.navbar-brand');
-                if (brand) brand.innerHTML = `Admin Panel ${data.nama_aplikasi}`;
+                if (brand) brand.innerHTML = `⚙️ Admin Panel ${data.nama_aplikasi}`;
             }
         }
     } catch (err) {
