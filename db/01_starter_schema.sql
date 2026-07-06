@@ -21,6 +21,8 @@ ON CONFLICT (id) DO UPDATE SET public = true;
 CREATE TABLE IF NOT EXISTS app_settings (
     id SERIAL PRIMARY KEY,
     nama_aplikasi TEXT DEFAULT 'Zieda Absen',
+    logo_url TEXT,
+    login_subteks TEXT,
     form_judul TEXT DEFAULT 'Form Kehadiran Harian',
     pengumuman TEXT,
     pengumuman_warna TEXT DEFAULT 'alert-info',
@@ -135,6 +137,7 @@ ALTER TABLE master_jenis_cuti ENABLE ROW LEVEL SECURITY;
 -- Kebijakan Keamanan (Public Read untuk setting)
 CREATE POLICY "Allow public read app_settings" ON app_settings FOR SELECT USING (true);
 CREATE POLICY "Allow auth update app_settings" ON app_settings FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow auth insert app_settings" ON app_settings FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
 -- Akses Penuh untuk tabel operasional jika sudah login
 CREATE POLICY "Allow auth all on absensi" ON absensi FOR ALL USING (auth.role() = 'authenticated');
@@ -168,28 +171,78 @@ SECURITY DEFINER
 AS $$
 DECLARE
   v_user record;
+  v_auth_exists boolean;
 BEGIN
-  -- Cek apakah nama dan password manual di database cocok (Case Sensitive)
-  SELECT * INTO v_user FROM users WHERE nama = p_nama AND password = p_password;
-  
+  -- Cek apakah nama dan password manual di database cocok (case insensitive)
+  SELECT * INTO v_user FROM users WHERE nama ILIKE p_nama AND password = p_password;
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'Nama atau Password salah!';
+    RAISE EXCEPTION 'Nama Pengguna atau Password salah!';
   END IF;
 
-  -- Cek apakah profil ini sudah diikat oleh akun Auth lain
+  -- Kaitkan profil tabel dengan UID Supabase Auth
   IF v_user.auth_id IS NOT NULL THEN
-    IF v_user.auth_id != auth.uid() THEN
-      RAISE EXCEPTION 'Akun ini sudah terhubung ke perangkat/sesi lain!';
+    -- Cek apakah auth_id lama sebenarnya masih ada di auth.users (mungkin sudah dihapus manual)
+    SELECT EXISTS(SELECT 1 FROM auth.users WHERE id = v_user.auth_id) INTO v_auth_exists;
+    
+    IF v_auth_exists AND auth.uid() IS NOT NULL AND v_user.auth_id != auth.uid() THEN
+      RAISE EXCEPTION 'Akun ini sudah terhubung ke sesi lain!';
     END IF;
-  ELSE
-    -- Jika belum diikat, kaitkan profil tabel dengan UID Supabase Auth
-    UPDATE users SET auth_id = auth.uid() WHERE id = v_user.id;
   END IF;
   
-  RETURN json_build_object(
-    'id', v_user.id, 
-    'role', v_user.role, 
-    'nama', v_user.nama
-  );
+  -- Update hanya jika auth.uid() tersedia
+  IF auth.uid() IS NOT NULL THEN
+      UPDATE users SET auth_id = auth.uid() WHERE id = v_user.id;
+  END IF;
+  
+  RETURN row_to_json(v_user);
+END;
+$$;
+
+-- ------------------------------------------
+-- 6. BUAT AKUN SUPER ADMIN DEFAULT
+-- ------------------------------------------
+INSERT INTO public.users (nama, password, role, cabang)
+SELECT 'Super Admin', 'admin123', 'Super Admin', 'Pusat'
+WHERE NOT EXISTS (
+    SELECT 1 FROM public.users WHERE role = 'Super Admin'
+);
+
+-- ------------------------------------------
+-- 7. AKTIFKAN SUPABASE REALTIME
+-- ------------------------------------------
+-- Wajib agar dashboard Admin bisa otomatis me-reload data jika ada perubahan
+BEGIN;
+  DROP PUBLICATION IF EXISTS supabase_realtime;
+  CREATE PUBLICATION supabase_realtime;
+COMMIT;
+
+ALTER PUBLICATION supabase_realtime ADD TABLE absensi;
+ALTER PUBLICATION supabase_realtime ADD TABLE cuti;
+ALTER PUBLICATION supabase_realtime ADD TABLE users;
+ALTER PUBLICATION supabase_realtime ADD TABLE kantor;
+-- ------------------------------------------
+-- 8. FUNGSI ADMIN UPDATE PASSWORD
+-- ------------------------------------------
+CREATE OR REPLACE FUNCTION admin_change_password(p_user_id INT, p_new_password TEXT)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth, extensions
+AS $$
+DECLARE
+  v_auth_id uuid;
+BEGIN
+  -- Get the auth_id of the user
+  SELECT auth_id INTO v_auth_id FROM public.users WHERE id = p_user_id;
+  
+  -- Update public.users password
+  UPDATE public.users SET password = p_new_password WHERE id = p_user_id;
+
+  -- Update auth.users if auth_id exists
+  IF v_auth_id IS NOT NULL THEN
+    UPDATE auth.users 
+    SET encrypted_password = crypt(p_new_password, gen_salt('bf'))
+    WHERE id = v_auth_id;
+  END IF;
 END;
 $$;

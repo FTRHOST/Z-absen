@@ -38,8 +38,8 @@ Untuk mencoba atau menggunakan aplikasi ini untuk perusahaan Anda, silakan ikuti
    Karena aplikasi ini sepenuhnya menggunakan HTML/JS, Anda bisa langsung membuka `login.html` menggunakan *Live Server* di VS Code, atau meng-host file ini di Github Pages, Vercel, maupun cPanel standar.
 
 5. **Login Pertama Kali**
-   Gunakan kredensial yang dibuat otomatis oleh script tadi:
-   - **Username:** `admin` (atau `admin@zieabsen.internal`)
+   Gunakan kredensial Super Admin yang ditanamkan otomatis oleh skrip di atas:
+   - **Nama Pengguna:** `Super Admin`
    - **Password:** `admin123`
 
 ## 📚 Dokumentasi Khusus Tim IT

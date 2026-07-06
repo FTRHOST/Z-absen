@@ -311,11 +311,11 @@
                         </div>
                         <div class="col-md-4">
                           <label class="form-label small text-muted mb-0">Latitude</label>
-                          <input type="text" class="form-control" id="kantor_lat" placeholder="Latitude" required readonly />
+                          <input type="text" class="form-control" id="kantor_lat" placeholder="Latitude" required />
                         </div>
                         <div class="col-md-4">
                           <label class="form-label small text-muted mb-0">Longitude</label>
-                          <input type="text" class="form-control" id="kantor_lng" placeholder="Longitude" required readonly />
+                          <input type="text" class="form-control" id="kantor_lng" placeholder="Longitude" required />
                         </div>
                         <div class="col-md-4">
                           <label class="form-label small text-muted mb-0">Radius (Meter)</label>
@@ -680,8 +680,7 @@
                         <th>Tipe</th>
                         <th>Opsi Dropdown</th>
                         <th>Wajib?</th>
-                        <th>Urutan</th>
-                        <th>Aksi</th>
+                        <th style="min-width: 150px;">Aksi (Urutan & Edit)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -737,6 +736,18 @@
                     <div class="mb-3">
                       <label class="form-label fw-bold">Nama Aplikasi (Tampil di Navbar)</label>
                       <input type="text" id="setting_nama_aplikasi" class="form-control" placeholder="Contoh: Zie Absen">
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label fw-bold">Subteks Form Login (Mendukung Markdown)</label>
+                      <textarea id="setting_login_subteks" class="form-control" rows="2" placeholder="Contoh: Silakan masuk ke akun Anda. Butuh bantuan? [Hubungi Admin](https://wa.me/...)"></textarea>
+                      <small class="text-muted">Teks ini akan muncul di bawah judul aplikasi pada halaman login. Anda bisa menggunakan format Markdown untuk membuat link/teks miring/tebal.</small>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label fw-bold">Logo Aplikasi (Form Login & Favicon)</label>
+                      <input type="file" id="setting_logo_file" class="form-control" accept="image/*" onchange="previewSettingLogo(event)">
+                      <div class="mt-2 text-start">
+                          <img id="preview_setting_logo" src="" alt="Logo" style="max-height: 80px; display: none;" class="img-thumbnail rounded">
+                      </div>
                     </div>
                     <div class="mb-3">
                       <label class="form-label fw-bold">Judul Form Absensi (Halaman Depan)</label>
@@ -894,16 +905,12 @@ Besok **17 Agustus** kita libur ya!"></textarea>
                 <small class="text-muted" id="hint-opsi">Untuk dropdown, pisahkan opsi dengan koma.</small>
               </div>
               <div class="row">
-                <div class="col-6 mb-3">
+                <div class="col-12 mb-3">
                   <label class="form-label">Wajib Diisi?</label>
                   <select class="form-select" id="field-wajib">
                     <option value="true">Ya (Wajib)</option>
                     <option value="false">Tidak (Opsional)</option>
                   </select>
-                </div>
-                <div class="col-6 mb-3">
-                  <label class="form-label">Urutan Tampil</label>
-                  <input type="number" class="form-control" id="field-urutan" value="0" required />
                 </div>
               </div>
             </div>
@@ -989,5 +996,25 @@ Besok **17 Agustus** kita libur ya!"></textarea>
         window.location.href = 'login.html';
       }
     </script>
+    
+    <!-- Modal Preview File Cuti -->
+    <div class="modal fade" id="modalPreviewFile" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+          <div class="modal-header bg-primary text-white border-0">
+            <h5 class="modal-title fw-bold">Preview Lampiran</h5>
+            <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body text-center p-3 bg-light d-flex align-items-center justify-content-center" style="min-height: 50vh;">
+            <img id="previewImage" src="" style="max-width:100%; max-height:70vh; display:none; object-fit:contain;" alt="Preview Lampiran">
+            <iframe id="previewFileFrame" src="" style="width:100%; height:70vh; border:none; display:none;" allowfullscreen></iframe>
+          </div>
+          <div class="modal-footer bg-light">
+            <a id="btnDownloadPreview" href="#" target="_blank" download class="btn btn-success"><i class="fas fa-download"></i> Download</a>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </body>
 </html>

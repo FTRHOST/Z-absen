@@ -15,7 +15,7 @@ Sistem menggunakan 6 tabel utama di PostgreSQL:
 1. `users`: Profil karyawan (Nama, Role, No HP, Cabang, Sisa Cuti, dll).
 2. `absensi`: Rekaman jam masuk, keluar, dan istirahat karyawan beserta lokasinya.
 3. `cuti`: Rekaman pengajuan cuti beserta alasannya.
-4. `cabang`: Master data cabang perusahaan.
+4. `kantor`: Master data cabang/kantor perusahaan (koordinat dan jam kerja).
 5. `form_cuti_config`: Konfigurasi *form builder* dinamis untuk pengajuan cuti.
 6. `app_settings`: Pengaturan nama aplikasi.
 
@@ -27,7 +27,7 @@ Aplikasi ini telah diaudit dan mengimplementasikan berbagai lapis keamanan:
 - **Row Level Security (RLS):** Operasi DML (Insert, Update, Delete) pada tabel-tabel utama dikunci dan mewajibkan otentikasi JWT (JSON Web Token) yang valid (`auth.role() = 'authenticated'`).
 - **API Key Leak Protection:** `SUPABASE_ANON_KEY` aman untuk dipublikasikan ke klien. Klien tidak bisa membaca data sensitif orang lain karena diblokir oleh kebijakan RLS.
 - **Anti-Bypass UI:** Pengecekan role Super Admin / HR tidak lagi mempercayai `localStorage` secara mentah, melainkan melakukan validasi silang (cross-check) ke database menggunakan JWT Session bawaan Supabase.
-- **Secure RPC Functions:** Aplikasi tidak diberikan izin akses langsung ke tabel `users` untuk membuat data. Semuanya di-handle menggunakan fungsi *PostgreSQL RPC* (`create_new_employee`) yang menggunakan level akses `SECURITY DEFINER`.
+- **Secure RPC Functions:** Aplikasi memusatkan operasi krusial pada level *PostgreSQL RPC* dengan `SECURITY DEFINER` (misalnya `link_my_account` untuk pendaftaran otomatis dan `admin_change_password` untuk enkripsi sinkronisasi *password* lintas tabel).
 
 ## 4. Panduan Instalasi Baru (Fresh Install)
 
@@ -40,21 +40,18 @@ Jika Anda harus menginstal atau memindahkan sistem ini ke Project Supabase yang 
    Buka menu **SQL Editor**, *copy* dan *paste* seluruh isi dari file `db/01_starter_schema.sql`. Tekan **Run**.
    Script ini akan men-generate:
    - Semua Tabel Utama dan Relasinya.
+   - Ekstensi kriptografi (`pgcrypto`).
    - Keamanan RLS (Row Level Security) yang sangat ketat.
    - Kebijakan Storage Bucket (`absensi-bucket`).
    - Fungsi `link_my_account` (RPC) untuk pendaftaran karyawan otomatis.
+   - Fungsi `admin_change_password` (RPC) untuk penggantian sandi oleh Admin.
 
-3. **Buat Akun Super Admin (Manual)**
-   Karena larangan ketat keamanan Supabase versi terbaru, akun admin pertama **wajib** dibuat secara manual:
-   - Buka menu **Authentication -> Users** di dashboard Supabase.
-   - Klik **Add User -> Create new user**.
-   - Masukkan Email: `admin@zieabsen.internal` dan Password (bebas, misal: `admin123`). Hapus centang "Auto Confirm Email". Klik Create.
-   - Klik tombol kotak kecil untuk **Copy UUID (User ID)** akun tersebut.
-   - Buka **SQL Editor** dan jalankan perintah ini (ganti UUID-nya):
-     ```sql
-     INSERT INTO public.users (nama, password, role, auth_id, cabang)
-     VALUES ('admin', 'admin123', 'Super Admin', 'PASTE_UUID_DISINI', 'Pusat');
-     ```
+3. **Login Sebagai Super Admin Pertama**
+   Tidak ada lagi proses manual pembuatan akun (berkat fungsi `link_my_account`). Script otomatis menanamkan satu akun profil master.
+   - Buka halaman `login.html` di browser Anda.
+   - Masukkan Nama Pengguna: `Super Admin`
+   - Masukkan Password: `admin123`
+   - Saat Anda menekan Login, sistem akan otomatis membuatkan Kredensial *Supabase Auth* dan menautkannya ke profil `Super Admin`. Sangat praktis!
 
 4. **Konfigurasi URL & API Key**
    Buka menu **Project Settings -> API** di Supabase.
@@ -62,7 +59,7 @@ Jika Anda harus menginstal atau memindahkan sistem ini ke Project Supabase yang 
    Buka file `config.js` di dalam source code aplikasi, lalu *paste* nilainya pada variabel `SUPABASE_URL` dan `SUPABASE_ANON_KEY`.
 
 5. **Testing**
-   Jalankan file HTML di browser (atau gunakan server lokal ringan seperti Live Server). Login dengan akun `admin` dan sandi `admin123`. Selesai!
+   Jalankan file HTML di browser (atau gunakan server lokal ringan seperti Live Server). Login dengan akun `Super Admin` dan sandi `admin123`. Selesai!
 
 ## 5. Panduan Backup dan Pemulihan (Disaster Recovery)
 Aplikasi memiliki menu bawaan untuk IT: **"Zona Bahaya"** di dalam panel Admin.

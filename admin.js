@@ -123,24 +123,38 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
 
-    // Real-time listener for Dashboard
+    // Real-time listener untuk semua tabel di Dashboard
     supabaseClient
       .channel('dashboard-channel')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'absensi' }, payload => {
           loadDashboardStats();
+          loadDataAbsensi();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cuti' }, payload => {
           loadDashboardStats();
+          loadDataCuti();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, payload => {
+          loadDashboardStats();
+          loadDataKaryawan();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'kantor' }, payload => {
+          loadDataKantor();
       })
       .subscribe();
 });
 let adminMap = null;
 let adminMarker = null;
+let adminCircle = null;
 
 function initAdminMap() {
-    if (adminMap) return;
     const mapEl = document.getElementById('map-kantor');
     if (!mapEl) return;
+    
+    if (adminMap) {
+        setTimeout(() => adminMap.invalidateSize(), 100);
+        return;
+    }
     
     adminMap = L.map('map-kantor').setView([-6.200000, 106.816666], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(adminMap);
@@ -150,11 +164,24 @@ function initAdminMap() {
     });
 }
 
-function setMapLocation(lat, lng) {
-    document.getElementById('kantor_lat').value = parseFloat(lat).toFixed(6);
-    document.getElementById('kantor_lng').value = parseFloat(lng).toFixed(6);
+function setMapLocation(lat, lng, updateInputs = true) {
+    if (updateInputs) {
+        document.getElementById('kantor_lat').value = parseFloat(lat).toFixed(6);
+        document.getElementById('kantor_lng').value = parseFloat(lng).toFixed(6);
+    }
+    
     if (adminMarker) adminMap.removeLayer(adminMarker);
     adminMarker = L.marker([lat, lng]).addTo(adminMap);
+    
+    const radius = parseFloat(document.getElementById('kantor_rad').value) || 100;
+    if (adminCircle) adminMap.removeLayer(adminCircle);
+    adminCircle = L.circle([lat, lng], {
+        color: 'red',
+        fillColor: '#f03',
+        fillOpacity: 0.2,
+        radius: radius
+    }).addTo(adminMap);
+    
     adminMap.setView([lat, lng], 16);
 }
 
@@ -554,17 +581,14 @@ function editKantor(id, nama, lat, lng, rad, masuk, keluar, mulaiIstirahat, sele
     document.getElementById('kantor_btn').innerText = 'Update Data Cabang';
     document.getElementById('kantor-card-header').innerText = '✏️ Edit Data Kantor';
 
-    // Buka Modal
-    const modalKantor = new bootstrap.Modal(document.getElementById('modalKantor'));
+    // Simpan koordinat di atribut modal untuk digunakan saat event shown
+    const modalEl = document.getElementById('modalKantor');
+    modalEl.dataset.lat = lat || '';
+    modalEl.dataset.lng = lng || '';
+
+    // Buka Modal dengan instance global atau baru
+    const modalKantor = bootstrap.Modal.getOrCreateInstance(modalEl);
     modalKantor.show();
-    
-    // Invalidate map size after modal is fully shown to prevent map rendering bugs
-    setTimeout(() => {
-        initAdminMap();
-        if (lat && lng) {
-            setMapLocation(lat, lng);
-        }
-    }, 300);
 }
 
 function batalEditKantor() {
@@ -573,6 +597,13 @@ function batalEditKantor() {
     document.getElementById('kantor_btn').innerText = 'Simpan Data Cabang';
     document.getElementById('kantor-card-header').innerText = '➕ Tambah Kantor Baru';
     if (adminMarker) adminMap.removeLayer(adminMarker);
+    if (adminCircle) adminMap.removeLayer(adminCircle);
+    adminMarker = null;
+    adminCircle = null;
+    
+    const modalEl = document.getElementById('modalKantor');
+    modalEl.dataset.lat = '';
+    modalEl.dataset.lng = '';
 }
 
 // Ensure map is correctly rendered when modal is opened for 'Tambah Baru'
@@ -581,11 +612,35 @@ document.addEventListener('DOMContentLoaded', () => {
     if (modalEl) {
         modalEl.addEventListener('shown.bs.modal', () => {
             initAdminMap();
+            
+            const lat = modalEl.dataset.lat;
+            const lng = modalEl.dataset.lng;
+            
+            if (lat && lng) {
+                setMapLocation(lat, lng);
+            } else if (!adminMarker) {
+                // Mode Tambah Baru: otomatis cari lokasi saat ini agar tidak stuck di Jakarta
+                gunakanLokasiSaatIni();
+            }
+            
             if (adminMap) {
-                setTimeout(() => adminMap.invalidateSize(), 100);
+                setTimeout(() => adminMap.invalidateSize(), 200);
             }
         });
     }
+
+    ['kantor_lat', 'kantor_lng', 'kantor_rad'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', () => {
+                const lat = parseFloat(document.getElementById('kantor_lat').value);
+                const lng = parseFloat(document.getElementById('kantor_lng').value);
+                if (!isNaN(lat) && !isNaN(lng) && adminMap) {
+                    setMapLocation(lat, lng, false);
+                }
+            });
+        }
+    });
 });
 
 async function simpanKantor(event) {
@@ -833,11 +888,13 @@ function showDetailKaryawan(id) {
     
     // Set button click handlers
     document.getElementById("btn-detail-edit").onclick = () => {
+        document.activeElement.blur();
         bootstrap.Modal.getInstance(document.getElementById('modalDetailKaryawan')).hide();
         editKaryawan(user.id, user.nama, user.role, user.no_hp || '', user.cabang || '');
     };
     
     document.getElementById("btn-detail-hapus").onclick = () => {
+        document.activeElement.blur();
         bootstrap.Modal.getInstance(document.getElementById('modalDetailKaryawan')).hide();
         hapusKaryawan(user.id);
     };
@@ -872,12 +929,17 @@ async function simpanKaryawan(event) {
             updateData.role = role;
         }
         
+        let { data, error } = await supabaseClient.from('users').update(updateData).eq('id', id);
+        
         // Hanya update password jika diisi
         if (password.trim() !== '') {
-            updateData.password = password;
+            const { error: rpcError } = await supabaseClient.rpc('admin_change_password', {
+                p_user_id: id,
+                p_new_password: password
+            });
+            if (rpcError) error = rpcError;
         }
-
-        res = await supabaseClient.from('users').update(updateData).eq('id', id);
+        res = { error };
     } else {
         // Insert Mode (Karyawan Baru)
         if (!password) {
@@ -1161,9 +1223,20 @@ async function loadDataAbsensi() {
             </div>
         `;
     });
+
+    // Auto-refresh modal jika sedang terbuka
+    const modalEl = document.getElementById("modalDetailAbsensi");
+    if (modalEl && modalEl.classList.contains("show") && currentAbsensiTanggal) {
+        showDetailAbsensi(currentAbsensiTanggal, currentAbsensiDateStr);
+    }
 }
 
+let currentAbsensiTanggal = null;
+let currentAbsensiDateStr = null;
+
 function showDetailAbsensi(tanggal, dateStr) {
+    currentAbsensiTanggal = tanggal;
+    currentAbsensiDateStr = dateStr;
     const tbody = document.getElementById("modalDetailAbsensiBody");
     document.getElementById("modalDetailAbsensiTitle").innerHTML = `<i class="fas fa-calendar-day me-2"></i>Detail Absensi - ${dateStr}`;
     tbody.innerHTML = '';
@@ -1218,7 +1291,10 @@ const fotoHTML = hasFoto
         `;
     });
     
-    new bootstrap.Modal(document.getElementById('modalDetailAbsensi')).show();
+    const modalEl = document.getElementById('modalDetailAbsensi');
+    if (!modalEl.classList.contains('show')) {
+        new bootstrap.Modal(modalEl).show();
+    }
 }
 
 async function exportCsvHarian(tanggal) {
@@ -1524,9 +1600,20 @@ async function loadDataCuti() {
             </div>
         `;
     });
+
+    // Auto-refresh modal jika sedang terbuka
+    const modalEl = document.getElementById("modalDetailCuti");
+    if (modalEl && modalEl.classList.contains("show") && currentCutiBulan) {
+        showDetailCuti(currentCutiBulan, currentCutiNamaBln);
+    }
 }
 
+let currentCutiBulan = null;
+let currentCutiNamaBln = null;
+
 function showDetailCuti(bulan, namaBln) {
+    currentCutiBulan = bulan;
+    currentCutiNamaBln = namaBln;
     let titleHTML = `<i class="fas fa-calendar-alt me-2"></i>Detail Cuti - ${namaBln}`;
     const d = allCutiGrouped[bulan];
     if (d && d.menunggu > 0) {
@@ -1562,7 +1649,10 @@ function showDetailCuti(bulan, namaBln) {
     currentDetailCutiRecords = records;
     renderTableDetailCuti(true);
     
-    new bootstrap.Modal(document.getElementById('modalDetailCuti')).show();
+    const modalEl = document.getElementById('modalDetailCuti');
+    if (!modalEl.classList.contains('show')) {
+        new bootstrap.Modal(modalEl).show();
+    }
     
     // Setup Observer
     if (!observerCuti) {
@@ -1627,7 +1717,7 @@ function renderTableDetailCuti(reset = false) {
         globalFormConfig.forEach(label => {
             let val = (cuti.data_tambahan && cuti.data_tambahan[label]) ? cuti.data_tambahan[label] : '-';
             if (val.toString().startsWith('http')) {
-                val = `<a href="${val}" target="_blank" class="btn btn-sm btn-outline-info">Lihat File</a>`;
+                val = `<button type="button" class="btn btn-sm btn-outline-info" onclick="previewFile('${val}')">Lihat File</button>`;
             }
             if (label.toLowerCase().includes('alasan') && val === '-' && cuti.alasan) {
                 val = cuti.alasan;
@@ -1650,6 +1740,35 @@ function renderTableDetailCuti(reset = false) {
     } else {
         sentinel.style.display = "block";
     }
+}
+
+function previewFile(url) {
+    const frame = document.getElementById('previewFileFrame');
+    const img = document.getElementById('previewImage');
+    const btnDownload = document.getElementById('btnDownloadPreview');
+    
+    if (btnDownload) {
+        btnDownload.href = url;
+    }
+
+    const isImage = url.match(/\.(jpeg|jpg|gif|png|webp)$/i) || url.includes('alt=media');
+    
+    if (isImage) {
+        if (frame) frame.style.display = 'none';
+        if (img) {
+            img.style.display = 'block';
+            img.src = url;
+        }
+    } else {
+        if (img) img.style.display = 'none';
+        if (frame) {
+            frame.style.display = 'block';
+            frame.src = url;
+        }
+    }
+
+    const modal = new bootstrap.Modal(document.getElementById('modalPreviewFile'));
+    modal.show();
 }
 
 async function exportCsvCuti(bulan) {
@@ -1830,7 +1949,6 @@ function showModalFormCuti(id = '') {
         document.getElementById('field-tipe').value = 'keterangan';
         document.getElementById('field-opsi').value = '';
         document.getElementById('field-wajib').value = 'true';
-        document.getElementById('field-urutan').value = '0';
         toggleOpsiDropdown();
     }
     formCutiModalInstance.show();
@@ -1876,15 +1994,18 @@ async function loadDataFormCuti() {
     window.formCutiConfigData = data;
 
     tbody.innerHTML = '';
-    data.forEach(f => {
+    data.forEach((f, index) => {
         tbody.innerHTML += `
             <tr>
                 <td>${f.label}</td>
                 <td><span class="badge bg-secondary">${f.tipe}</span></td>
                 <td>${f.opsi ? f.opsi : '-'}</td>
                 <td>${f.wajib ? 'Wajib' : 'Opsional'}</td>
-                <td>${f.urutan}</td>
                 <td>
+                    <div class="btn-group me-2" role="group">
+                        <button class="btn btn-sm btn-light border" onclick="moveUrutanCuti('${f.id}', -1)" title="Naik" ${index === 0 ? 'disabled' : ''}>⬆️</button>
+                        <button class="btn btn-sm btn-light border" onclick="moveUrutanCuti('${f.id}', 1)" title="Turun" ${index === data.length - 1 ? 'disabled' : ''}>⬇️</button>
+                    </div>
                     <button class="btn btn-sm btn-outline-primary" onclick="editFieldCuti('${f.id}')">Edit</button>
                     <button class="btn btn-sm btn-outline-danger" onclick="hapusFieldCuti('${f.id}')">Hapus</button>
                 </td>
@@ -1906,7 +2027,6 @@ function editFieldCuti(id) {
     document.getElementById('field-tipe').value = f.tipe;
     document.getElementById('field-opsi').value = f.opsi || '';
     document.getElementById('field-wajib').value = f.wajib ? 'true' : 'false';
-    document.getElementById('field-urutan').value = f.urutan;
     
     toggleOpsiDropdown();
     
@@ -1921,14 +2041,18 @@ async function simpanFieldCuti(event) {
     const tipe = document.getElementById('field-tipe').value;
     const opsi = document.getElementById('field-opsi').value;
     const wajib = document.getElementById('field-wajib').value === 'true';
-    const urutan = parseInt(document.getElementById('field-urutan').value);
 
-    let payload = { label, tipe, opsi, wajib, urutan };
+    let payload = { label, tipe, opsi, wajib };
     let res;
 
     if (id) {
         res = await supabaseClient.from('form_cuti_config').update(payload).eq('id', id);
     } else {
+        let nextUrutan = 1;
+        if (window.formCutiConfigData && window.formCutiConfigData.length > 0) {
+            nextUrutan = Math.max(...window.formCutiConfigData.map(d => d.urutan || 0)) + 1;
+        }
+        payload.urutan = nextUrutan;
         res = await supabaseClient.from('form_cuti_config').insert([payload]);
     }
 
@@ -2421,11 +2545,30 @@ async function loadSettings() {
         
         if (data) {
             document.getElementById('setting_nama_aplikasi').value = data.nama_aplikasi || '';
+            document.getElementById('setting_login_subteks').value = data.login_subteks || '';
             document.getElementById('setting_form_judul').value = data.form_judul || '';
             document.getElementById('setting_pengumuman').value = data.pengumuman || '';
             document.getElementById('setting_pengumuman_warna').value = data.pengumuman_warna || 'alert-info';
             document.getElementById('setting_enable_lokasi').checked = data.enable_lokasi !== false;
             document.getElementById('setting_enable_kamera').checked = data.enable_kamera !== false;
+            
+            if (data.logo_url) {
+                currentLogoUrl = data.logo_url;
+                const imgPreview = document.getElementById('preview_setting_logo');
+                if (imgPreview) {
+                    imgPreview.src = data.logo_url;
+                    imgPreview.style.display = 'inline-block';
+                }
+                
+                // Set Favicon
+                let link = document.querySelector("link[rel~='icon']");
+                if (!link) {
+                    link = document.createElement('link');
+                    link.rel = 'icon';
+                    document.head.appendChild(link);
+                }
+                link.href = data.logo_url;
+            }
 
             if (data.nama_aplikasi) {
                 const brand = document.querySelector('.navbar-brand');
@@ -2439,15 +2582,38 @@ async function loadSettings() {
 
 async function saveSettings() {
     const nama_aplikasi = document.getElementById('setting_nama_aplikasi').value;
+    const login_subteks = document.getElementById('setting_login_subteks').value;
     const form_judul = document.getElementById('setting_form_judul').value;
     const pengumuman = document.getElementById('setting_pengumuman').value;
     const pengumuman_warna = document.getElementById('setting_pengumuman_warna').value;
     const enable_lokasi = document.getElementById('setting_enable_lokasi').checked;
     const enable_kamera = document.getElementById('setting_enable_kamera').checked;
+    const fileInput = document.getElementById('setting_logo_file');
     
     try {
         Swal.fire({ title: 'Menyimpan...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-        const payload = { id: 1, nama_aplikasi, form_judul, pengumuman, pengumuman_warna, enable_lokasi, enable_kamera };
+        
+        let logo_url = currentLogoUrl;
+        
+        if (fileInput && fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            const fileExt = file.name.split('.').pop();
+            const fileName = `logo-${Date.now()}.${fileExt}`;
+            
+            const { data: uploadData, error: uploadError } = await supabaseClient.storage
+                .from('absensi-bucket')
+                .upload(`assets/${fileName}`, file, { upsert: true });
+                
+            if (uploadError) throw uploadError;
+            
+            const { data: publicUrlData } = supabaseClient.storage
+                .from('absensi-bucket')
+                .getPublicUrl(`assets/${fileName}`);
+                
+            logo_url = publicUrlData.publicUrl;
+        }
+
+        const payload = { id: 1, nama_aplikasi, login_subteks, form_judul, logo_url, pengumuman, pengumuman_warna, enable_lokasi, enable_kamera };
         
         const { error } = await supabaseClient.from('app_settings').upsert(payload, { onConflict: 'id' });
         
@@ -2466,7 +2632,7 @@ async function saveSettings() {
 
 async function downloadTemplateKaryawan() {
     // Ambil info cabang untuk instruksi
-    const { data: cabangData } = await supabaseClient.from('cabang').select('nama');
+    const { data: cabangData } = await supabaseClient.from('kantor').select('nama');
     let listCabang = ['Pusat'];
     if(cabangData && cabangData.length > 0) {
         listCabang = cabangData.map(c => c.nama);
@@ -2932,3 +3098,55 @@ async function factoryResetDatabase() {
         Swal.fire("Gagal Reset", err.message, "error");
     }
 }
+
+let currentLogoUrl = '';
+
+function previewSettingLogo(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('preview_setting_logo').src = e.target.result;
+            document.getElementById('preview_setting_logo').style.display = 'inline-block';
+        }
+        reader.readAsDataURL(file);
+    }
+}
+
+async function moveUrutanCuti(id, direction) {
+    if (!window.formCutiConfigData) return;
+    const data = window.formCutiConfigData;
+    const currentIndex = data.findIndex(item => item.id == id);
+    if (currentIndex === -1) return;
+    
+    const targetIndex = currentIndex + direction;
+    if (targetIndex < 0 || targetIndex >= data.length) return;
+    
+    const currentItem = data[currentIndex];
+    const targetItem = data[targetIndex];
+    
+    // Tukar urutan
+    const tempUrutan = currentItem.urutan;
+    currentItem.urutan = targetItem.urutan;
+    targetItem.urutan = tempUrutan;
+    
+    try {
+        Swal.fire({ title: 'Memperbarui urutan...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        
+        await supabaseClient.from('form_cuti_config').update({ urutan: currentItem.urutan }).eq('id', currentItem.id);
+        await supabaseClient.from('form_cuti_config').update({ urutan: targetItem.urutan }).eq('id', targetItem.id);
+        
+        Swal.close();
+        loadDataFormCuti();
+    } catch(err) {
+        console.error(err);
+        Swal.fire('Error', 'Gagal memperbarui urutan', 'error');
+    }
+}
+
+// Global fix for Bootstrap 5 aria-hidden focus warnings on all modals
+document.addEventListener('hide.bs.modal', function () {
+    if (document.activeElement) {
+        document.activeElement.blur();
+    }
+});
