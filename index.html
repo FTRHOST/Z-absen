@@ -2336,25 +2336,23 @@
         }
       }
       async function sendTelegramNotification(message) {
-        if (typeof TELEGRAM_BOT_TOKEN === 'undefined' || !TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID || TELEGRAM_BOT_TOKEN === "ISI_DENGAN_TOKEN_BOT_ANDA") {
-          console.log("Telegram not configured");
+        if (typeof TELEGRAM_CHAT_ID === 'undefined' || !TELEGRAM_CHAT_ID || TELEGRAM_CHAT_ID === "ISI_DENGAN_CHAT_ID_GRUP_ANDA") {
+          console.log("Telegram Chat ID not configured");
           return;
         }
-        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+        
         try {
-          await fetch(url, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              chat_id: TELEGRAM_CHAT_ID,
-              text: message,
-              parse_mode: "HTML",
-            }),
+          const { data, error } = await supabaseClient.functions.invoke('telegram-notif', {
+            body: { message: message, chat_id: TELEGRAM_CHAT_ID }
           });
+          
+          if (error) throw error;
+          
+          if (data && !data.ok) {
+            console.error("Gagal kirim notifikasi Telegram:", data);
+          }
         } catch (error) {
-          console.error("Gagal kirim notifikasi Telegram:", error);
+          console.error("Error memanggil Supabase Edge Function (telegram-notif):", error);
         }
       }
     </script>

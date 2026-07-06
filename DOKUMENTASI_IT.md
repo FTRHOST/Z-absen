@@ -61,7 +61,25 @@ Jika Anda harus menginstal atau memindahkan sistem ini ke Project Supabase yang 
 5. **Testing**
    Jalankan file HTML di browser (atau gunakan server lokal ringan seperti Live Server). Login dengan akun `Super Admin` dan sandi `admin123`. Selesai!
 
-## 5. Panduan Backup dan Pemulihan (Disaster Recovery)
+## 5. Integrasi Notifikasi Telegram (Aman via Edge Functions)
+
+Sistem telah dilengkapi fitur otomatis untuk mengirim pesan ke Telegram (saat absen lokasi, absen foto wajah, dan pengajuan cuti). Mengingat bahayanya membocorkan Token Bot di Frontend, arsitektur yang digunakan adalah **Supabase Edge Functions**.
+
+**Langkah Setup Telegram Bot:**
+1. Minta Token dari BotFather di Telegram.
+2. Dapatkan ID Grup Anda (Grup ID selalu diawali tanda minus `-`, misalnya `-1005348785847`). Jika dikirim ke akun pribadi (bukan grup), pastikan Anda pernah klik *Start* pada bot tersebut.
+3. Masukkan ID Grup/Chat ke file `config.js` pada bagian `TELEGRAM_CHAT_ID`.
+4. Buka terminal (dengan Supabase CLI yang sudah login), simpan Token rahasia ke server Supabase:
+   ```bash
+   supabase secrets set TELEGRAM_BOT_TOKEN="TOKEN_ANDA_DISINI"
+   ```
+5. Deploy Edge Function ke server Anda dengan menjalankan perintah:
+   ```bash
+   supabase functions deploy telegram-notif --no-verify-jwt
+   ```
+*Catatan: `--no-verify-jwt` disertakan agar klien dapat memanggil API ini secara publik tanpa perlu melampirkan JWT di header HTTP.*
+
+## 6. Panduan Backup dan Pemulihan (Disaster Recovery)
 Aplikasi memiliki menu bawaan untuk IT: **"Zona Bahaya"** di dalam panel Admin.
 - **Backup Database:** Mengekspor seluruh data absensi, pengguna, dan cuti ke dalam format ber-enkripsi JSON (Otomatis ZIP). Fitur ini memiliki sistem *auto-batching* untuk mencegah *hang* pada RAM browser.
 - **Factory Reset:** Berfungsi untuk membersihkan seluruh transaksi database ke titik nol (kecuali akun admin yang sedang login). Sangat berguna saat akan men-*deploy* aplikasi dari *Staging* ke *Production*.

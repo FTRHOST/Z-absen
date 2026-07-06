@@ -10,7 +10,7 @@ const SUPABASE_ANON_KEY =
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ==========================================
-// KONFIGURASI TELEGRAM BOT
+// KONFIGURASI TELEGRAM BOT (Aman di Frontend)
 // ==========================================
-const TELEGRAM_BOT_TOKEN = "8928448687:AAHZx5XMiGe2wDrEPyS77FvEy2wCgqtx0iM";
-const TELEGRAM_CHAT_ID = "-5348785847";
+// Token bot sekarang disimpan secara rahasia di Supabase Secrets
+const TELEGRAM_CHAT_ID = "5348785847";
