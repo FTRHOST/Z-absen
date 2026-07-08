@@ -127,6 +127,9 @@
                   <button class="nav-link fw-bold text-start text-lg-center px-3 w-100" data-bs-toggle="pill" data-bs-target="#tab-absensi" type="button" role="tab" onclick="closeMenu()">📍 Rekap Absensi</button>
                 </li>
                 <li class="nav-item">
+                  <button class="nav-link fw-bold text-start text-lg-center px-3 w-100" data-bs-toggle="pill" data-bs-target="#tab-tipe-absen" type="button" role="tab" onclick="loadTipeAbsenAdmin(); closeMenu()">🏷️ Tipe Absen</button>
+                </li>
+                <li class="nav-item">
                   <button class="nav-link fw-bold text-start text-lg-center px-3 w-100" data-bs-toggle="pill" data-bs-target="#tab-cuti" type="button" role="tab" onclick="closeMenu()">
                     📝 Pengajuan Cuti 
                     <span id="badge-cuti" class="badge bg-danger rounded-pill ms-1 d-none">0</span>
@@ -321,22 +324,7 @@
                           <label class="form-label small text-muted mb-0">Radius (Meter)</label>
                           <input type="number" class="form-control" id="kantor_rad" placeholder="Radius (Meter)" value="100" required />
                         </div>
-                        <div class="col-md-2">
-                          <label class="form-label small text-muted mb-0">Jam Masuk</label>
-                          <input type="time" class="form-control" id="kantor_jam_masuk" value="08:00" required />
-                        </div>
-                        <div class="col-md-2">
-                          <label class="form-label small text-muted mb-0">Jam Pulang</label>
-                          <input type="time" class="form-control" id="kantor_jam_keluar" value="17:00" required />
-                        </div>
-                        <div class="col-md-2">
-                          <label class="form-label small text-muted mb-0">Mulai Istirahat</label>
-                          <input type="time" class="form-control" id="kantor_jam_mulai_istirahat" value="12:00" required />
-                        </div>
-                        <div class="col-md-2">
-                          <label class="form-label small text-muted mb-0">Selesai Istirahat</label>
-                          <input type="time" class="form-control" id="kantor_jam_selesai_istirahat" value="13:00" required />
-                        </div>
+
                         <div class="col-md-12 text-end mt-4">
                           <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Batal</button>
                           <button type="submit" class="btn btn-success" id="kantor_btn">Simpan Data Cabang</button>
@@ -362,7 +350,7 @@
                         <tr>
                           <th>Nama Kantor</th>
                           <th>Koordinat & Radius</th>
-                          <th>Jam Kerja</th>
+
                           <th>Aksi</th>
                         </tr>
                       </thead>
@@ -542,6 +530,77 @@
               </div>
             </div>
 
+            <!-- TAB MASTER TIPE ABSEN -->
+            <div class="tab-pane" id="tab-tipe-absen">
+              <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold mb-0 text-primary"><i class="fas fa-tags me-2"></i>Master Tipe Absen</h5>
+                <button class="btn btn-primary fw-bold shadow-sm" onclick="batalEditTipeAbsen(); new bootstrap.Modal(document.getElementById('modalTambahTipeAbsen')).show();">
+                  <i class="fas fa-plus me-1"></i> Tambah Tipe
+                </button>
+              </div>
+
+              <div class="card shadow-sm border-0">
+                <div class="card-body p-0">
+                  <div class="table-responsive">
+                    <table class="table table-hover table-striped mb-0 align-middle text-center">
+                      <thead class="table-light">
+                        <tr>
+                          <th>No</th>
+                          <th>Nama Tipe</th>
+                          <th>Jam (Mulai - Batas)</th>
+                          <th>Checkout?</th>
+                          <th>Status Aktif</th>
+                          <th>Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody id="tabel-tipe-absen">
+                        <tr><td colspan="4" class="text-muted">Memuat data...</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Modal Tambah Tipe Absen -->
+            <div class="modal fade" id="modalTambahTipeAbsen" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                  <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold" id="modalTipeAbsenLabel">Tambah Tipe Absen</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body">
+                    <input type="hidden" id="tipe-absen-id" value="">
+                    <div class="mb-3">
+                      <label class="form-label fw-bold">Nama Tipe Absen</label>
+                      <input type="text" id="tipe-absen-nama" class="form-control" placeholder="Contoh: Izin Keluar">
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label fw-bold">Jam Mulai</label>
+                      <input type="time" id="tipe-absen-mulai" class="form-control" value="07:00">
+                      <small class="text-muted">Waktu paling awal karyawan bisa absen tipe ini.</small>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label fw-bold">Batas Terlambat</label>
+                      <input type="time" id="tipe-absen-batas" class="form-control" value="08:00">
+                      <small class="text-muted">Lewat dari waktu ini akan dicatat sebagai Terlambat.</small>
+                    </div>
+                    <div class="form-check mb-3">
+                      <input class="form-check-input" type="checkbox" id="tipe-absen-checkout">
+                      <label class="form-check-label fw-bold" for="tipe-absen-checkout">
+                        Ini adalah Absen Pulang / Selesai (Checkout)
+                      </label>
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-primary" onclick="simpanTipeAbsen()">Simpan</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="tab-pane" id="tab-absensi">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="fw-bold mb-0 text-primary"><i class="fas fa-calendar-alt me-2"></i>Rekap Absensi Harian</h5>
@@ -573,10 +632,9 @@
                             <tr>
                               <th class="text-start ps-3">Karyawan</th>
                               <th>Kantor</th>
-                              <th>Masuk</th>
-                              <th>Istirahat Keluar</th>
-                              <th>Istirahat Masuk</th>
-                              <th>Pulang</th>
+                              <th>Tipe Absen</th>
+                              <th>Waktu</th>
+                              <th>Lokasi</th>
                               <th>Foto Muka</th>
                               <th>Status Kehadiran</th>
                               <th>Aksi</th>

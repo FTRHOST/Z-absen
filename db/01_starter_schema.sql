@@ -38,10 +38,6 @@ CREATE TABLE IF NOT EXISTS kantor (
     lat TEXT,
     lng TEXT,
     radius INTEGER DEFAULT 100,
-    jam_masuk TIME DEFAULT '08:00',
-    jam_keluar TIME DEFAULT '17:00',
-    jam_mulai_istirahat TIME DEFAULT '12:00',
-    jam_selesai_istirahat TIME DEFAULT '13:00',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
 );
 
@@ -61,23 +57,26 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
 );
 
--- Tabel Absensi (Lengkap dengan foto istirahat & status wajah)
+-- Tabel Master Tipe Absen
+CREATE TABLE IF NOT EXISTS master_tipe_absen (
+    id SERIAL PRIMARY KEY,
+    nama_tipe TEXT NOT NULL,
+    jam_mulai TIME,
+    batas_terlambat TIME,
+    is_checkout BOOLEAN DEFAULT false,
+    is_aktif BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+);
+
+-- Tabel Absensi (Transaksi Log)
 CREATE TABLE IF NOT EXISTS absensi (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     tanggal DATE NOT NULL,
-    waktu_masuk TIME,
-    lokasi_masuk TEXT,
-    foto_masuk TEXT,
-    waktu_istirahat_keluar TIME,
-    lokasi_istirahat_keluar TEXT,
-    foto_istirahat_keluar TEXT,
-    waktu_istirahat_masuk TIME,
-    lokasi_istirahat_masuk TEXT,
-    foto_istirahat_masuk TEXT,
-    waktu_keluar TIME,
-    lokasi_keluar TEXT,
-    foto_keluar TEXT,
+    waktu TIME NOT NULL,
+    tipe_absen TEXT NOT NULL,
+    lokasi TEXT,
+    foto TEXT,
     status TEXT DEFAULT 'Hadir',
     status_wajah TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
@@ -133,6 +132,7 @@ ALTER TABLE form_cuti_config ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE master_jenis_cuti ENABLE ROW LEVEL SECURITY;
+ALTER TABLE master_tipe_absen ENABLE ROW LEVEL SECURITY;
 
 -- Kebijakan Keamanan (Public Read untuk setting)
 CREATE POLICY "Allow public read app_settings" ON app_settings FOR SELECT USING (true);
@@ -145,6 +145,7 @@ CREATE POLICY "Allow auth all on cuti" ON cuti FOR ALL USING (auth.role() = 'aut
 CREATE POLICY "Allow auth all on kantor" ON kantor FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow auth all on master_jenis_cuti" ON master_jenis_cuti FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow auth all on form_cuti_config" ON form_cuti_config FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow auth all on master_tipe_absen" ON master_tipe_absen FOR ALL USING (auth.role() = 'authenticated');
 
 -- Kebijakan Khusus Tabel Users
 CREATE POLICY "Allow auth select users" ON users FOR SELECT USING (auth.role() = 'authenticated');
@@ -220,6 +221,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE absensi;
 ALTER PUBLICATION supabase_realtime ADD TABLE cuti;
 ALTER PUBLICATION supabase_realtime ADD TABLE users;
 ALTER PUBLICATION supabase_realtime ADD TABLE kantor;
+ALTER PUBLICATION supabase_realtime ADD TABLE master_tipe_absen;
 -- ------------------------------------------
 -- 8. FUNGSI ADMIN UPDATE PASSWORD
 -- ------------------------------------------

@@ -530,7 +530,7 @@ function renderKantor() {
         const hapusBtnGrid = isSuperAdmin ? `<button class="btn btn-sm btn-danger ms-2 shadow-sm" onclick="hapusKantor('${kantor.id}')"><i class="fas fa-trash me-1"></i>Hapus</button>` : '';
         const hapusBtnTable = isSuperAdmin ? `<button class="btn btn-sm btn-danger ms-1" onclick="hapusKantor('${kantor.id}')">Hapus</button>` : '';
         
-        const argsStr = `'${kantor.id}', '${kantor.nama}', '${kantor.lat}', '${kantor.lng}', '${kantor.radius}', '${kantor.jam_masuk || '08:00:00'}', '${kantor.jam_keluar || '17:00:00'}', '${kantor.jam_mulai_istirahat || '12:00:00'}', '${kantor.jam_selesai_istirahat || '13:00:00'}'`;
+        const argsStr = `'${kantor.id}', '${kantor.nama}', '${kantor.lat}', '${kantor.lng}', '${kantor.radius}'`;
 
         // Render Grid
         gridContainer.innerHTML += `
@@ -543,9 +543,6 @@ function renderKantor() {
                         <p class="card-text small text-muted mb-2">
                             <i class="fas fa-map-marker-alt me-2 text-danger"></i>${kantor.lat}, ${kantor.lng} (Rad: ${kantor.radius}m)
                         </p>
-                        <div class="d-flex justify-content-between text-muted small bg-light p-2 rounded mb-3">
-                            <div><i class="fas fa-sign-in-alt me-1"></i> ${kantor.jam_masuk || '08:00'}</div>
-                            <div><i class="fas fa-sign-out-alt me-1"></i> ${kantor.jam_keluar || '17:00'}</div>
                         </div>
                         <div class="d-flex justify-content-end mt-auto border-top pt-2">
                             <button class="btn btn-sm btn-warning shadow-sm" onclick="editKantor(${argsStr})"><i class="fas fa-edit me-1"></i>Edit</button>
@@ -561,7 +558,7 @@ function renderKantor() {
             <tr>
                 <td class="fw-bold">${kantor.nama}</td>
                 <td>${kantor.lat}, ${kantor.lng} <br> <span class="badge bg-secondary">Rad: ${kantor.radius}m</span></td>
-                <td><small>Masuk: ${kantor.jam_masuk || '08:00'} <br> Pulang: ${kantor.jam_keluar || '17:00'}</small></td>
+                <td></td>
                 <td>
                     <button class="btn btn-sm btn-warning" onclick="editKantor(${argsStr})">Edit</button>
                     ${hapusBtnTable}
@@ -571,14 +568,10 @@ function renderKantor() {
     });
 }
 
-function editKantor(id, nama, lat, lng, rad, masuk, keluar, mulaiIstirahat, selesaiIstirahat) {
+function editKantor(id, nama, lat, lng, rad) {
     document.getElementById('kantor_id').value = id;
     document.getElementById('kantor_nama').value = nama;
     document.getElementById('kantor_rad').value = rad;
-    document.getElementById('kantor_jam_masuk').value = masuk;
-    document.getElementById('kantor_jam_keluar').value = keluar;
-    document.getElementById('kantor_jam_mulai_istirahat').value = mulaiIstirahat;
-    document.getElementById('kantor_jam_selesai_istirahat').value = selesaiIstirahat;
     document.getElementById('kantor_btn').innerText = 'Update Data Cabang';
     document.getElementById('kantor-card-header').innerText = '✏️ Edit Data Kantor';
 
@@ -654,29 +647,18 @@ async function simpanKantor(event) {
     const lat = document.getElementById('kantor_lat').value;
     const lng = document.getElementById('kantor_lng').value;
     const rad = document.getElementById('kantor_rad').value;
-    const masuk = document.getElementById('kantor_jam_masuk').value;
-    const keluar = document.getElementById('kantor_jam_keluar').value;
-    const mulaiIstirahat = document.getElementById('kantor_jam_mulai_istirahat').value;
-    const selesaiIstirahat = document.getElementById('kantor_jam_selesai_istirahat').value;
-    
     let res;
     if (id) {
         res = await supabaseClient.from('kantor').update({
             nama: nama,
             lat: lat,
             lng: lng,
-            radius: rad,
-            jam_masuk: masuk,
-            jam_keluar: keluar,
-            jam_mulai_istirahat: mulaiIstirahat,
-            jam_selesai_istirahat: selesaiIstirahat
+            radius: rad
         }).eq('id', id);
     } else {
         res = await supabaseClient.from('kantor').insert([
             { 
-              nama: nama, lat: lat, lng: lng, radius: rad, 
-              jam_masuk: masuk, jam_keluar: keluar,
-              jam_mulai_istirahat: mulaiIstirahat, jam_selesai_istirahat: selesaiIstirahat
+              nama: nama, lat: lat, lng: lng, radius: rad
             }
         ]);
     }
@@ -1248,13 +1230,13 @@ function showDetailAbsensi(tanggal, dateStr) {
     const records = allAbsensiGrouped[tanggal]?.records || [];
     
     records.forEach(absen => {
-        let hasFoto = absen.foto_masuk || absen.foto_istirahat_keluar || absen.foto_istirahat_masuk || absen.foto_keluar;
-const fotoHTML = hasFoto 
-    ? `<button class="btn btn-sm btn-info text-white shadow-sm" onclick="lihatFotoAbsen('${absen.foto_masuk || ''}', '${absen.foto_istirahat_keluar || ''}', '${absen.foto_istirahat_masuk || ''}', '${absen.foto_keluar || ''}')">📸 Lihat Foto</button>` 
-    : `<span class="text-muted small fst-italic">Tidak tersedia</span>`;
+        const hasFoto = absen.foto;
+        const fotoHTML = hasFoto 
+            ? `<button class="btn btn-sm btn-info text-white shadow-sm" onclick="lihatFotoAbsenSingle('${absen.foto}')">📸 Lihat Foto</button>` 
+            : `<span class="text-muted small fst-italic">Tidak tersedia</span>`;
             
         let badgeClass = "bg-secondary text-white";
-        if (absen.status === "Hadir") badgeClass = "bg-success text-white";
+        if (absen.status === "Hadir" || absen.status === "Tepat Waktu") badgeClass = "bg-success text-white";
         else if (absen.status === "Terlambat") badgeClass = "bg-warning text-dark";
         else if (absen.status === "Alpha") badgeClass = "bg-danger text-white";
         else if (absen.status === "Cuti") badgeClass = "bg-info text-dark";
@@ -1266,24 +1248,17 @@ const fotoHTML = hasFoto
         else if (faceStatus.includes("Error")) faceBadgeClass = "bg-warning text-dark";
 
         const statusHTML = `
-            <span class="badge ${badgeClass} fs-6 mb-1">${absen.status}</span><br>
+            <span class="badge ${badgeClass} fs-6 mb-1">${absen.status || 'Hadir'}</span><br>
             <span class="badge ${faceBadgeClass} mb-1" title="Status Pengenalan Wajah"><i class="fas fa-user-check"></i> ${faceStatus}</span>
-            <div class="small text-muted mt-1">${absen.lokasi_masuk || 0}</div>
         `;
             
-        let isLateBreak = false;
-        if (absen.waktu_istirahat_masuk && absen.waktu_istirahat_masuk > "13:00:00") {
-            isLateBreak = true;
-        }
-
         tbody.innerHTML += `
             <tr>
                 <td class="text-start ps-3 fw-bold">${absen.users?.nama || 'Unknown'}</td>
                 <td>${absen.users?.cabang || '-'}</td>
-                <td>${absen.waktu_masuk || '-'}</td>
-                <td>${absen.waktu_istirahat_keluar || '-'}</td>
-                <td>${absen.waktu_istirahat_masuk || '-'} ${isLateBreak ? '<br><span class="badge bg-danger">Terlambat</span>' : ''}</td>
-                <td>${absen.waktu_keluar || '-'}</td>
+                <td><span class="badge bg-primary">${absen.tipe_absen || '-'}</span></td>
+                <td>${absen.waktu || '-'}</td>
+                <td><span class="small text-muted">${absen.lokasi || '-'}</span></td>
                 <td>${fotoHTML}</td>
                 <td>${statusHTML}</td>
                 <td>
@@ -3154,3 +3129,126 @@ document.addEventListener('hide.bs.modal', function () {
         document.activeElement.blur();
     }
 });
+
+function lihatFotoAbsenSingle(url) {
+    tampilkanPopupFoto(url, 'Absen');
+}
+
+async function loadTipeAbsenAdmin() {
+    const tbody = document.getElementById("tabel-tipe-absen");
+    tbody.innerHTML = '<tr><td colspan="4" class="text-muted">Memuat data...</td></tr>';
+    
+    const { data, error } = await supabaseClient.from("master_tipe_absen").select("*").order("id", { ascending: true });
+    if (error) {
+        tbody.innerHTML = `<tr><td colspan="4" class="text-danger">Error: ${error.message}</td></tr>`;
+        return;
+    }
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-muted">Belum ada tipe absen.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = data.map((item, index) => `
+        <tr>
+            <td>${index + 1}</td>
+            <td class="fw-bold">${item.nama_tipe}</td>
+            <td><small>${item.jam_mulai || '-'} s/d ${item.batas_terlambat || '-'}</small></td>
+            <td>${item.is_checkout ? '<span class="badge bg-success">Ya</span>' : '<span class="badge bg-secondary">Tidak</span>'}</td>
+            <td>
+                <div class="form-check form-switch d-flex justify-content-center">
+                    <input class="form-check-input" type="checkbox" ${item.is_aktif ? 'checked' : ''} onchange="toggleStatusTipeAbsen(${item.id}, this.checked)">
+                </div>
+            </td>
+            <td>
+                <button class="btn btn-sm btn-warning shadow-sm me-1" onclick="editTipeAbsen(${item.id}, '${item.nama_tipe}', '${item.jam_mulai || ''}', '${item.batas_terlambat || ''}', ${item.is_checkout})"><i class="fas fa-edit me-1"></i>Edit</button>
+                <button class="btn btn-sm btn-danger shadow-sm" onclick="hapusTipeAbsen(${item.id})"><i class="fas fa-trash-alt me-1"></i>Hapus</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function batalEditTipeAbsen() {
+    document.getElementById("tipe-absen-id").value = "";
+    document.getElementById("tipe-absen-nama").value = "";
+    document.getElementById("tipe-absen-mulai").value = "07:00";
+    document.getElementById("tipe-absen-batas").value = "08:00";
+    document.getElementById("tipe-absen-checkout").checked = false;
+    const label = document.getElementById("modalTipeAbsenLabel");
+    if(label) label.innerText = "Tambah Tipe Absen";
+}
+
+function editTipeAbsen(id, nama, mulai, batas, isCheckout) {
+    document.getElementById("tipe-absen-id").value = id;
+    document.getElementById("tipe-absen-nama").value = nama;
+    document.getElementById("tipe-absen-mulai").value = mulai || '';
+    document.getElementById("tipe-absen-batas").value = batas || '';
+    document.getElementById("tipe-absen-checkout").checked = isCheckout === true || isCheckout === 'true';
+    const label = document.getElementById("modalTipeAbsenLabel");
+    if(label) label.innerText = "Edit Tipe Absen";
+    new bootstrap.Modal(document.getElementById('modalTambahTipeAbsen')).show();
+}
+
+async function simpanTipeAbsen() {
+    const id = document.getElementById("tipe-absen-id").value;
+    const nama = document.getElementById("tipe-absen-nama").value.trim();
+    const mulai = document.getElementById("tipe-absen-mulai").value;
+    const batas = document.getElementById("tipe-absen-batas").value;
+    const isCheckout = document.getElementById("tipe-absen-checkout").checked;
+
+    if (!nama) {
+        Swal.fire("Peringatan", "Nama tipe absen harus diisi", "warning");
+        return;
+    }
+    
+    let error;
+    if (id) {
+        const res = await supabaseClient.from("master_tipe_absen").update({ 
+            nama_tipe: nama,
+            jam_mulai: mulai,
+            batas_terlambat: batas,
+            is_checkout: isCheckout
+        }).eq("id", id);
+        error = res.error;
+    } else {
+        const res = await supabaseClient.from("master_tipe_absen").insert([{ 
+            nama_tipe: nama,
+            jam_mulai: mulai,
+            batas_terlambat: batas,
+            is_checkout: isCheckout
+        }]);
+        error = res.error;
+    }
+    
+    if (error) {
+        Swal.fire("Gagal", error.message, "error");
+    } else {
+        batalEditTipeAbsen();
+        bootstrap.Modal.getInstance(document.getElementById("modalTambahTipeAbsen")).hide();
+        loadTipeAbsenAdmin();
+        Swal.fire("Berhasil", id ? "Tipe absen diperbarui" : "Tipe absen ditambahkan", "success");
+    }
+}
+
+async function toggleStatusTipeAbsen(id, isAktif) {
+    await supabaseClient.from("master_tipe_absen").update({ is_aktif: isAktif }).eq("id", id);
+}
+
+async function hapusTipeAbsen(id) {
+    const confirm = await Swal.fire({
+        title: "Hapus Tipe Absen?",
+        text: "Data yang dihapus tidak bisa dikembalikan.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Ya, Hapus!"
+    });
+    
+    if (confirm.isConfirmed) {
+        const { error } = await supabaseClient.from("master_tipe_absen").delete().eq("id", id);
+        if (error) {
+            Swal.fire("Gagal", error.message, "error");
+        } else {
+            loadTipeAbsenAdmin();
+            Swal.fire("Berhasil", "Dihapus", "success");
+        }
+    }
+}
