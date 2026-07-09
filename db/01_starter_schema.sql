@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS master_tipe_absen (
     nama_tipe TEXT NOT NULL,
     jam_mulai TIME,
     batas_terlambat TIME,
+    jam_tutup TIME,
     is_checkout BOOLEAN DEFAULT false,
     is_aktif BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())

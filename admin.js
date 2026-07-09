@@ -507,6 +507,33 @@ async function loadDataKantor() {
     
     allKantor = data || [];
     renderKantor();
+    refreshCabangDropdowns();
+}
+
+function refreshCabangDropdowns() {
+    // Dropdown di Form Tambah/Edit Karyawan
+    const selectCabang = document.getElementById("pilih-cabang");
+    if(selectCabang) {
+        const val = selectCabang.value;
+        selectCabang.innerHTML = '<option value="">Pilih Kantor...</option>';
+        allKantor.forEach(k => {
+            if (!isSuperAdmin && k.nama !== myCabang) return;
+            selectCabang.innerHTML += `<option value="${k.nama}">${k.nama}</option>`;
+        });
+        selectCabang.value = val;
+    }
+
+    // Dropdown di Filter Karyawan
+    const filterCabang = document.getElementById("karyawan-filter-cabang");
+    if (filterCabang) {
+        const val = filterCabang.value;
+        filterCabang.innerHTML = '<option value="">Semua Cabang</option>';
+        allKantor.forEach(k => {
+            if (!isSuperAdmin && k.nama !== myCabang) return;
+            filterCabang.innerHTML += `<option value="${k.nama}">${k.nama}</option>`;
+        });
+        filterCabang.value = val;
+    }
 }
 
 function renderKantor() {
@@ -3152,7 +3179,8 @@ async function loadTipeAbsenAdmin() {
         <tr>
             <td>${index + 1}</td>
             <td class="fw-bold">${item.nama_tipe}</td>
-            <td><small>${item.jam_mulai || '-'} s/d ${item.batas_terlambat || '-'}</small></td>
+            <td><small>${item.jam_mulai || '-'} s/d ${item.jam_tutup || '-'}</small></td>
+            <td><small>${item.batas_terlambat || '-'}</small></td>
             <td>${item.is_checkout ? '<span class="badge bg-success">Ya</span>' : '<span class="badge bg-secondary">Tidak</span>'}</td>
             <td>
                 <div class="form-check form-switch d-flex justify-content-center">
@@ -3160,7 +3188,7 @@ async function loadTipeAbsenAdmin() {
                 </div>
             </td>
             <td>
-                <button class="btn btn-sm btn-warning shadow-sm me-1" onclick="editTipeAbsen(${item.id}, '${item.nama_tipe}', '${item.jam_mulai || ''}', '${item.batas_terlambat || ''}', ${item.is_checkout})"><i class="fas fa-edit me-1"></i>Edit</button>
+                <button class="btn btn-sm btn-warning shadow-sm me-1" onclick="editTipeAbsen(${item.id}, '${item.nama_tipe}', '${item.jam_mulai || ''}', '${item.batas_terlambat || ''}', '${item.jam_tutup || ''}', ${item.is_checkout})"><i class="fas fa-edit me-1"></i>Edit</button>
                 <button class="btn btn-sm btn-danger shadow-sm" onclick="hapusTipeAbsen(${item.id})"><i class="fas fa-trash-alt me-1"></i>Hapus</button>
             </td>
         </tr>
@@ -3172,16 +3200,18 @@ function batalEditTipeAbsen() {
     document.getElementById("tipe-absen-nama").value = "";
     document.getElementById("tipe-absen-mulai").value = "07:00";
     document.getElementById("tipe-absen-batas").value = "08:00";
+    document.getElementById("tipe-absen-tutup").value = "";
     document.getElementById("tipe-absen-checkout").checked = false;
     const label = document.getElementById("modalTipeAbsenLabel");
     if(label) label.innerText = "Tambah Tipe Absen";
 }
 
-function editTipeAbsen(id, nama, mulai, batas, isCheckout) {
+function editTipeAbsen(id, nama, mulai, batas, tutup, isCheckout) {
     document.getElementById("tipe-absen-id").value = id;
     document.getElementById("tipe-absen-nama").value = nama;
     document.getElementById("tipe-absen-mulai").value = mulai || '';
     document.getElementById("tipe-absen-batas").value = batas || '';
+    document.getElementById("tipe-absen-tutup").value = tutup || '';
     document.getElementById("tipe-absen-checkout").checked = isCheckout === true || isCheckout === 'true';
     const label = document.getElementById("modalTipeAbsenLabel");
     if(label) label.innerText = "Edit Tipe Absen";
@@ -3191,8 +3221,9 @@ function editTipeAbsen(id, nama, mulai, batas, isCheckout) {
 async function simpanTipeAbsen() {
     const id = document.getElementById("tipe-absen-id").value;
     const nama = document.getElementById("tipe-absen-nama").value.trim();
-    const mulai = document.getElementById("tipe-absen-mulai").value;
-    const batas = document.getElementById("tipe-absen-batas").value;
+    const mulai = document.getElementById("tipe-absen-mulai").value || null;
+    const batas = document.getElementById("tipe-absen-batas").value || null;
+    const tutup = document.getElementById("tipe-absen-tutup").value || null;
     const isCheckout = document.getElementById("tipe-absen-checkout").checked;
 
     if (!nama) {
@@ -3206,6 +3237,7 @@ async function simpanTipeAbsen() {
             nama_tipe: nama,
             jam_mulai: mulai,
             batas_terlambat: batas,
+            jam_tutup: tutup,
             is_checkout: isCheckout
         }).eq("id", id);
         error = res.error;
@@ -3214,6 +3246,7 @@ async function simpanTipeAbsen() {
             nama_tipe: nama,
             jam_mulai: mulai,
             batas_terlambat: batas,
+            jam_tutup: tutup,
             is_checkout: isCheckout
         }]);
         error = res.error;

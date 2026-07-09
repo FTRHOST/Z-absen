@@ -547,7 +547,8 @@
                         <tr>
                           <th>No</th>
                           <th>Nama Tipe</th>
-                          <th>Jam (Mulai - Batas)</th>
+                          <th>Jam (Mulai - Tutup)</th>
+                          <th>Batas Telat</th>
                           <th>Checkout?</th>
                           <th>Status Aktif</th>
                           <th>Aksi</th>
@@ -585,6 +586,11 @@
                       <label class="form-label fw-bold">Batas Terlambat</label>
                       <input type="time" id="tipe-absen-batas" class="form-control" value="08:00">
                       <small class="text-muted">Lewat dari waktu ini akan dicatat sebagai Terlambat.</small>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label fw-bold">Jam Tutup (Batas Akhir Absen)</label>
+                      <input type="time" id="tipe-absen-tutup" class="form-control">
+                      <small class="text-muted">Kosongkan jika absen boleh dilakukan kapan saja hingga pergantian hari.</small>
                     </div>
                     <div class="form-check mb-3">
                       <input class="form-check-input" type="checkbox" id="tipe-absen-checkout">

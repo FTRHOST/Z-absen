@@ -270,8 +270,14 @@
 
               <hr class="my-4" />
               <button
+                class="btn btn-outline-info w-100 py-2 fw-bold mb-3 shadow-sm"
+                onclick="showJadwalAbsen()"
+              >
+                ℹ️ Informasi Jadwal Absen Hari Ini
+              </button>
+              <button
                 id="btn-cek-lokasi"
-                class="btn btn-primary w-100 py-3 fw-bold fs-5"
+                class="btn btn-primary w-100 py-3 fw-bold fs-5 shadow-sm"
                 onclick="pilihTipeAbsenPopup()"
               >
                 📍 Absen Sekarang
@@ -738,7 +744,7 @@
       let map;
       let markerKaryawan;
       let jarakAbsen = 0;
-      let absenHariIni = null;
+      let absenHariIni = [];
       let tipeAbsenSekarang = "Masuk";
 
       async function loadKantorUser() {
@@ -807,10 +813,9 @@
           .select("*")
           .eq("user_id", userObj.id)
           .eq("tanggal", tanggalHariIni)
-          .order("id", { ascending: false })
-          .limit(1);
+          .order("id", { ascending: false });
 
-        const data = rows && rows.length > 0 ? rows[0] : null;
+        absenHariIni = rows || [];
         if (error) console.error("Error fetching absensi:", error);
 
         const btnCekLokasi = document.getElementById("btn-cek-lokasi");
@@ -866,10 +871,6 @@
           return;
         }
 
-        if (data) {
-          absenHariIni = data;
-        }
-        
         await loadTipeAbsen();
       }
 
@@ -879,6 +880,7 @@
           .from("master_tipe_absen")
           .select("*")
           .eq("is_aktif", true)
+          .order("jam_mulai", { ascending: true, nullsFirst: false })
           .order("id", { ascending: true });
 
         if (error || !data || data.length === 0) {
@@ -889,19 +891,76 @@
       }
 
       function pilihTipeAbsenPopup() {
-        let optionsHtml = '<div class="d-flex flex-column gap-2 mt-3">';
+        const sekarang = new Date();
+        const jam = String(sekarang.getHours()).padStart(2, "0");
+        const menit = String(sekarang.getMinutes()).padStart(2, "0");
+        const waktu_sekarang = `${jam}:${menit}:00`;
+
+        let optionsHtml = '<div class="d-flex flex-column gap-2 mt-2">';
+        let nextAbsenFound = false;
+
         masterTipeAbsen.forEach(item => {
-            optionsHtml += `<button class="btn btn-outline-primary w-100 py-2 fw-bold" onclick="pilihAbsen('${item.nama_tipe}')">${item.nama_tipe}</button>`;
+            const sudahAbsen = absenHariIni.some(absen => absen.tipe_absen === item.nama_tipe);
+            const belumBuka = item.jam_mulai && waktu_sekarang < item.jam_mulai;
+            const waktuHabis = item.jam_tutup && waktu_sekarang > item.jam_tutup;
+            
+            if (sudahAbsen) {
+                // Selesai
+                optionsHtml += `<button class="btn btn-success w-100 py-2 fw-bold absen-btn-item" disabled><i class="fas fa-check-circle me-1"></i>${item.nama_tipe} (Selesai)</button>`;
+            } else if (belumBuka) {
+                // Sembunyikan sepenuhnya (sesuai permintaan user)
+            } else if (waktuHabis) {
+                // Waktu Habis
+                optionsHtml += `<button class="btn btn-danger w-100 py-2 fw-bold absen-btn-item opacity-75" disabled><i class="fas fa-times-circle me-1"></i>${item.nama_tipe} (Waktu Habis)</button>`;
+            } else if (!nextAbsenFound) {
+                // Langkah selanjutnya (Direkomendasikan)
+                optionsHtml += `<button class="btn btn-primary w-100 py-2 fw-bold absen-btn-item shadow-sm" onclick="pilihAbsen('${item.nama_tipe}')"><i class="fas fa-arrow-circle-right me-1"></i>Pilih ${item.nama_tipe}</button>`;
+                nextAbsenFound = true;
+            } else {
+                // Langkah masa depan (Tetap bisa diklik jika terlewat)
+                optionsHtml += `<button class="btn btn-outline-secondary w-100 py-2 fw-bold absen-btn-item" onclick="pilihAbsen('${item.nama_tipe}')">${item.nama_tipe} (Lewati & Pilih)</button>`;
+            }
         });
+        
+        if (!nextAbsenFound) {
+            optionsHtml += `<div class="alert alert-success text-center fw-bold mt-2 mb-0"><i class="fas fa-tasks me-2"></i>Semua absensi hari ini selesai!</div>`;
+        }
+
         optionsHtml += '</div>';
 
         Swal.fire({
-            title: 'Pilih Tipe Absen',
+            title: 'Langkah Absensi',
             html: optionsHtml,
             showCancelButton: true,
             cancelButtonText: 'Kembali',
             showConfirmButton: false,
             showCloseButton: true
+        });
+      }
+
+      function showJadwalAbsen() {
+        let jadwalHtml = '<ul class="list-group text-start mt-3">';
+        if (masterTipeAbsen.length === 0) {
+            jadwalHtml += '<li class="list-group-item text-center text-muted">Belum ada jadwal absen.</li>';
+        } else {
+            masterTipeAbsen.forEach(item => {
+                const mulai = item.jam_mulai || '00:00';
+                const tutup = item.jam_tutup || '23:59';
+                jadwalHtml += `
+                    <li class="list-group-item">
+                        <strong>${item.nama_tipe}</strong><br>
+                        <small class="text-muted"><i class="fas fa-clock me-1"></i> ${mulai} s/d ${tutup}</small>
+                    </li>
+                `;
+            });
+        }
+        jadwalHtml += '</ul>';
+
+        Swal.fire({
+            title: 'Jadwal Absen Hari Ini',
+            html: jadwalHtml,
+            icon: 'info',
+            confirmButtonText: 'Tutup'
         });
       }
 
