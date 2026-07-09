@@ -169,23 +169,15 @@
           <div class="tab-content w-100" id="adminTabsContent">
             <div class="tab-pane" id="tab-dashboard">
               <div class="row g-3 mb-4">
-                <div class="col-6 col-md-3">
+                <div class="col-12 col-md-4">
                   <div class="card shadow-sm bg-success text-white h-100 border-0 dashboard-card-hover" onclick="showDashboardDetail('hadir')" style="cursor:pointer; transition: transform 0.2s;">
                     <div class="card-body text-center">
-                      <h6 class="fw-bold mb-1"><i class="fas fa-check-circle"></i> Hadir Hari Ini</h6>
+                      <h6 class="fw-bold mb-1"><i class="fas fa-check-circle"></i> Sudah Absen</h6>
                       <h2 id="stat-hadir" class="fw-bold mb-0">0</h2>
                     </div>
                   </div>
                 </div>
-                <div class="col-6 col-md-3">
-                  <div class="card shadow-sm bg-warning text-dark h-100 border-0 dashboard-card-hover" onclick="showDashboardDetail('terlambat')" style="cursor:pointer; transition: transform 0.2s;">
-                    <div class="card-body text-center">
-                      <h6 class="fw-bold mb-1"><i class="fas fa-clock"></i> Terlambat</h6>
-                      <h2 id="stat-terlambat" class="fw-bold mb-0">0</h2>
-                    </div>
-                  </div>
-                </div>
-                <div class="col-6 col-md-3">
+                <div class="col-6 col-md-4">
                   <div class="card shadow-sm bg-info text-white h-100 border-0 dashboard-card-hover" onclick="showDashboardDetail('cuti')" style="cursor:pointer; transition: transform 0.2s;">
                     <div class="card-body text-center">
                       <h6 class="fw-bold mb-1"><i class="fas fa-suitcase-rolling"></i> Sedang Cuti</h6>
@@ -193,7 +185,7 @@
                     </div>
                   </div>
                 </div>
-                <div class="col-6 col-md-3">
+                <div class="col-6 col-md-4">
                   <div class="card shadow-sm bg-secondary text-white h-100 border-0 dashboard-card-hover" onclick="showDashboardDetail('belum')" style="cursor:pointer; transition: transform 0.2s;">
                     <div class="card-body text-center">
                       <h6 class="fw-bold mb-1"><i class="fas fa-question-circle"></i> Belum Absen</h6>
@@ -250,12 +242,8 @@
                   <div class="modal-body p-0">
                     <div class="table-responsive">
                       <table class="table table-hover mb-0 text-center align-middle">
-                        <thead class="table-light">
-                          <tr>
-                            <th class="text-start ps-4">Nama Karyawan</th>
-                            <th>Cabang</th>
-                            <th id="modalDetailDashboardExtraCol">Info</th>
-                          </tr>
+                        <thead class="table-light" id="modalDetailDashboardHead">
+                          <!-- Dynamic Header -->
                         </thead>
                         <tbody id="modalDetailDashboardBody">
                           <!-- Data baris detail -->
@@ -632,22 +620,19 @@
                       <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body p-0">
+                      <div class="p-3 border-bottom bg-light">
+                        <div class="input-group">
+                          <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                          <input type="text" id="searchDetailAbsensi" class="form-control" placeholder="Cari nama karyawan, kantor, atau tipe absen..." onkeyup="filterDetailAbsensi()">
+                        </div>
+                      </div>
                       <div class="table-responsive">
                         <table class="table table-hover table-striped mb-0 text-center align-middle">
-                          <thead class="table-light">
-                            <tr>
-                              <th class="text-start ps-3">Karyawan</th>
-                              <th>Kantor</th>
-                              <th>Tipe Absen</th>
-                              <th>Waktu</th>
-                              <th>Lokasi</th>
-                              <th>Foto Muka</th>
-                              <th>Status Kehadiran</th>
-                              <th>Aksi</th>
-                            </tr>
+                          <thead class="table-light" id="modalDetailAbsensiHead">
+                            <!-- Headers dimuat dinamis -->
                           </thead>
                           <tbody id="modalDetailAbsensiBody">
-                            <!-- Data akan dimuat via JS -->
+                            <!-- Data dimuat dinamis -->
                           </tbody>
                         </table>
                       </div>

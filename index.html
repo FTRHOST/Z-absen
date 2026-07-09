@@ -821,6 +821,9 @@
         const btnCekLokasi = document.getElementById("btn-cek-lokasi");
         const btnAmbilFoto = document.getElementById("btn-ambil-foto");
 
+        btnCekLokasi.disabled = false;
+        btnCekLokasi.innerHTML = "📍 Absen Sekarang";
+
         // CEK HARI LIBUR
         const currentDay = new Date().getDay();
         let liburArr = [];
@@ -871,6 +874,15 @@
           return;
         }
 
+        // CEK SUDAH CHECKOUT/PULANG
+        const sudahPulang = absenHariIni.some(absen => absen.tipe_absen.toLowerCase().includes("pulang") || absen.tipe_absen.toLowerCase().includes("checkout"));
+        if (sudahPulang) {
+          tipeAbsenSekarang = "Selesai";
+          btnCekLokasi.disabled = true;
+          btnCekLokasi.innerHTML = "Absensi Selesai";
+          return;
+        }
+
         await loadTipeAbsen();
       }
 
@@ -898,32 +910,37 @@
 
         let optionsHtml = '<div class="d-flex flex-column gap-2 mt-2">';
         let nextAbsenFound = false;
-
-        masterTipeAbsen.forEach(item => {
-            const sudahAbsen = absenHariIni.some(absen => absen.tipe_absen === item.nama_tipe);
-            const belumBuka = item.jam_mulai && waktu_sekarang < item.jam_mulai;
-            const waktuHabis = item.jam_tutup && waktu_sekarang > item.jam_tutup;
-            
-            if (sudahAbsen) {
-                // Selesai
-                optionsHtml += `<button class="btn btn-success w-100 py-2 fw-bold absen-btn-item" disabled><i class="fas fa-check-circle me-1"></i>${item.nama_tipe} (Selesai)</button>`;
-            } else if (belumBuka) {
-                // Sembunyikan sepenuhnya (sesuai permintaan user)
-            } else if (waktuHabis) {
-                // Waktu Habis
-                optionsHtml += `<button class="btn btn-danger w-100 py-2 fw-bold absen-btn-item opacity-75" disabled><i class="fas fa-times-circle me-1"></i>${item.nama_tipe} (Waktu Habis)</button>`;
-            } else if (!nextAbsenFound) {
-                // Langkah selanjutnya (Direkomendasikan)
-                optionsHtml += `<button class="btn btn-primary w-100 py-2 fw-bold absen-btn-item shadow-sm" onclick="pilihAbsen('${item.nama_tipe}')"><i class="fas fa-arrow-circle-right me-1"></i>Pilih ${item.nama_tipe}</button>`;
-                nextAbsenFound = true;
-            } else {
-                // Langkah masa depan (Tetap bisa diklik jika terlewat)
-                optionsHtml += `<button class="btn btn-outline-secondary w-100 py-2 fw-bold absen-btn-item" onclick="pilihAbsen('${item.nama_tipe}')">${item.nama_tipe} (Lewati & Pilih)</button>`;
-            }
-        });
         
-        if (!nextAbsenFound) {
+        const sudahPulang = absenHariIni.some(absen => absen.tipe_absen.toLowerCase().includes("pulang") || absen.tipe_absen.toLowerCase().includes("checkout"));
+
+        if (sudahPulang) {
             optionsHtml += `<div class="alert alert-success text-center fw-bold mt-2 mb-0"><i class="fas fa-tasks me-2"></i>Semua absensi hari ini selesai!</div>`;
+        } else {
+            masterTipeAbsen.forEach(item => {
+                const sudahAbsen = absenHariIni.some(absen => absen.tipe_absen === item.nama_tipe);
+                const belumBuka = item.jam_mulai && waktu_sekarang < item.jam_mulai;
+                const waktuHabis = item.jam_tutup && waktu_sekarang > item.jam_tutup;
+                
+                if (sudahAbsen) {
+                    // Selesai
+                    optionsHtml += `<button class="btn btn-success w-100 py-2 fw-bold absen-btn-item" disabled><i class="fas fa-check-circle me-1"></i>${item.nama_tipe} (Selesai)</button>`;
+                } else if (belumBuka) {
+                    // Sembunyikan sepenuhnya
+                } else if (waktuHabis) {
+                    // Sembunyikan jika waktu habis (sesuai permintaan)
+                } else if (!nextAbsenFound) {
+                    // Langkah selanjutnya (Direkomendasikan)
+                    optionsHtml += `<button class="btn btn-primary w-100 py-2 fw-bold absen-btn-item shadow-sm" onclick="pilihAbsen('${item.nama_tipe}')"><i class="fas fa-arrow-circle-right me-1"></i>Pilih ${item.nama_tipe}</button>`;
+                    nextAbsenFound = true;
+                } else {
+                    // Langkah masa depan
+                    optionsHtml += `<button class="btn btn-outline-secondary w-100 py-2 fw-bold absen-btn-item" onclick="pilihAbsen('${item.nama_tipe}')">${item.nama_tipe} (Lewati & Pilih)</button>`;
+                }
+            });
+            
+            if (!nextAbsenFound) {
+                optionsHtml += `<div class="alert alert-success text-center fw-bold mt-2 mb-0"><i class="fas fa-tasks me-2"></i>Semua absensi hari ini selesai!</div>`;
+            }
         }
 
         optionsHtml += '</div>';
@@ -1032,6 +1049,18 @@
       loadAppSettings().then(() => {
         loadKantorUser();
         cekStatusAbsenHariIni();
+        
+        // Real-time listener riwayat absen
+        if (userData) {
+          const uData = JSON.parse(userData);
+          supabaseClient
+            .channel('karyawan-absensi')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'absensi', filter: `user_id=eq.${uData.id}` }, payload => {
+                loadRiwayatAbsensi();
+                cekStatusAbsenHariIni();
+            })
+            .subscribe();
+        }
       });
 
       async function logout() {
@@ -1291,13 +1320,21 @@
         const localTime = localDate.toISOString().split("T")[1].substring(0, 8);
         const tanggalHariIni = localDate.toISOString().split("T")[0];
 
+        let statusKehadiran = "Hadir";
+        const tipeData = getTipeAbsenData();
+        if (tipeAbsenSekarang === "Masuk" && tipeData.batas_terlambat && localTime > tipeData.batas_terlambat) {
+          statusKehadiran = "Terlambat";
+        } else if (tipeAbsenSekarang === "Pulang" && tipeData.jam_tutup && localTime > tipeData.jam_tutup) {
+          statusKehadiran = "Lembur";
+        }
+
         let payload = {
           user_id: currentUser.id,
           tanggal: tanggalHariIni,
           waktu: localTime,
           tipe_absen: tipeAbsenSekarang,
           lokasi: `Jarak: ${Math.round(jarakAbsen)}m`,
-          status: (tipeData.batas_terlambat && localTime > tipeData.batas_terlambat) ? "Terlambat" : "Hadir",
+          status: statusKehadiran,
         };
 
         const response = await supabaseClient.from("absensi").insert([payload]);
@@ -1416,8 +1453,10 @@
           let statusKehadiran = "Hadir";
           const lokasiTeks = `Jarak: ${Math.round(jarakAbsen)}m`;
           const tipeData = masterTipeAbsen.find(m => m.nama_tipe === tipeAbsenSekarang) || {};
-          if (tipeData.batas_terlambat && waktu_sekarang > tipeData.batas_terlambat) {
+          if (tipeAbsenSekarang === "Masuk" && tipeData.batas_terlambat && waktu_sekarang > tipeData.batas_terlambat) {
             statusKehadiran = "Terlambat";
+          } else if (tipeAbsenSekarang === "Pulang" && tipeData.jam_tutup && waktu_sekarang > tipeData.jam_tutup) {
+            statusKehadiran = "Lembur";
           }
           const res = await supabaseClient.from("absensi").insert([
             {
@@ -1437,6 +1476,7 @@
           await sendTelegramNotification(textMsg);
 
           await cekStatusAbsenHariIni();
+          await loadRiwayatAbsensi();
 
           const modalEl = document.getElementById("kameraModal");
           const modalInstance =
@@ -1449,8 +1489,8 @@
           let swalIcon = "success";
 
           if (
-            tipeAbsenSekarang === "Istirahat_Masuk" &&
-            waktu_sekarang > jamSelesaiIstirahat
+            (tipeAbsenSekarang === "Istirahat_Masuk" || tipeAbsenSekarang === "Istirahat Masuk") &&
+            typeof jamSelesaiIstirahat !== 'undefined' && waktu_sekarang > jamSelesaiIstirahat
           ) {
             swalTitle = "Peringatan!";
             swalText = `Anda kembali istirahat melewati jam ${jamSelesaiIstirahat}. Data tetap tersimpan.`;
@@ -2202,7 +2242,7 @@
           
           tbody.innerHTML += trHtml;
           
-          if (absen.tanggal === tanggalHariIni) {
+          if (String(absen.tanggal).trim() === String(tanggalHariIni).trim()) {
              dataHariIniHtml += trHtml;
           }
         });

@@ -213,7 +213,6 @@ async function loadDashboardStats() {
     
     // Set skeleton loader for stats
     document.getElementById("stat-hadir").innerHTML = '<div class="spinner-border spinner-border-sm" role="status"></div>';
-    document.getElementById("stat-terlambat").innerHTML = '<div class="spinner-border spinner-border-sm" role="status"></div>';
     document.getElementById("stat-cuti").innerHTML = '<div class="spinner-border spinner-border-sm" role="status"></div>';
     document.getElementById("stat-belum").innerHTML = '<div class="spinner-border spinner-border-sm" role="status"></div>';
 
@@ -229,8 +228,32 @@ async function loadDashboardStats() {
     if (!isSuperAdmin) qAbsen = qAbsen.eq('users.cabang', myCabang);
     const { data: absenData } = await qAbsen;
     
-    dbHadirList = absenData || [];
-    dbTerlambatList = dbHadirList.filter(a => a.status === 'Terlambat');
+    const groupedHadir = {};
+    (absenData || []).forEach(a => {
+        if (a.status === 'Alpha' || a.status === 'Cuti') return;
+        
+        if (!groupedHadir[a.user_id]) {
+            groupedHadir[a.user_id] = {
+                user_id: a.user_id,
+                users: a.users,
+                waktu_masuk: a.waktu, // Set default to their first record
+                tipe_absen: a.tipe_absen,
+                terlambat: false
+            };
+        }
+        
+        if (a.tipe_absen === 'Masuk') {
+            groupedHadir[a.user_id].waktu_masuk = a.waktu;
+            groupedHadir[a.user_id].tipe_absen = a.tipe_absen;
+        }
+        
+        if (a.status === 'Terlambat') {
+            groupedHadir[a.user_id].terlambat = true;
+        }
+    });
+    
+    dbHadirList = Object.values(groupedHadir);
+    dbTerlambatList = dbHadirList.filter(item => item.terlambat);
     
     const hadir = dbHadirList.length;
     const terlambat = dbTerlambatList.length;
@@ -266,7 +289,6 @@ async function loadDashboardStats() {
     const safeSetText = (id, text) => { if(document.getElementById(id)) document.getElementById(id).innerText = text; };
     
     safeSetText("stat-hadir", hadir);
-    safeSetText("stat-terlambat", terlambat);
     safeSetText("stat-cuti", sedangCuti);
     safeSetText("stat-belum", belumAbsen);
     
@@ -314,74 +336,97 @@ async function loadDashboardStats() {
 function showDashboardDetail(type) {
     const titleEl = document.getElementById('modalDetailDashboardTitle');
     const headerEl = document.getElementById('modalDetailDashboardHeader');
+    const thead = document.getElementById('modalDetailDashboardHead');
     const tbody = document.getElementById('modalDetailDashboardBody');
-    const extraCol = document.getElementById('modalDetailDashboardExtraCol');
     
     let dataList = [];
     
     headerEl.className = 'modal-header text-white'; // Reset class
     
     if (type === 'hadir') {
-        titleEl.innerHTML = '<i class="fas fa-check-circle"></i> Karyawan Hadir Hari Ini';
+        titleEl.innerHTML = '<i class="fas fa-check-circle"></i> Karyawan Sudah Absen';
         headerEl.classList.add('bg-success');
-        extraCol.innerText = 'Jam Masuk';
         dataList = dbHadirList;
-    } else if (type === 'terlambat') {
-        titleEl.innerHTML = '<i class="fas fa-clock"></i> Karyawan Terlambat';
-        headerEl.classList.add('bg-warning', 'text-dark');
-        headerEl.classList.remove('text-white');
-        extraCol.innerText = 'Jam Masuk';
-        dataList = dbTerlambatList;
     } else if (type === 'cuti') {
         titleEl.innerHTML = '<i class="fas fa-suitcase-rolling"></i> Karyawan Sedang Cuti';
         headerEl.classList.add('bg-info');
-        extraCol.innerText = 'Jenis Cuti';
         dataList = dbCutiList;
     } else if (type === 'belum') {
         titleEl.innerHTML = '<i class="fas fa-question-circle"></i> Karyawan Belum Absen';
         headerEl.classList.add('bg-secondary');
-        extraCol.innerText = 'Status';
         dataList = dbBelumList;
+    }
+    
+    // Build Dynamic Header
+    if (type === 'hadir') {
+        thead.innerHTML = `<tr>
+            <th class="text-start ps-4">Nama Karyawan</th>
+            <th>Cabang</th>
+            <th>Tipe Absen</th>
+            <th>Waktu</th>
+        </tr>`;
+    } else if (type === 'cuti') {
+        thead.innerHTML = `<tr>
+            <th class="text-start ps-4">Nama Karyawan</th>
+            <th>Cabang</th>
+            <th>Jenis Cuti</th>
+        </tr>`;
+    } else {
+        thead.innerHTML = `<tr>
+            <th class="text-start ps-4">Nama Karyawan</th>
+            <th>Cabang</th>
+            <th>Status</th>
+        </tr>`;
     }
     
     tbody.innerHTML = '';
     
     if (dataList.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">Tidak ada data untuk ditampilkan.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Tidak ada data untuk ditampilkan.</td></tr>`;
     } else {
         dataList.forEach(item => {
-            let nama = '';
-            let cabang = '';
-            let info = '';
+            let trHtml = '';
             
-            if (type === 'hadir' || type === 'terlambat') {
-                nama = item.users?.nama || '-';
-                cabang = item.users?.cabang || '-';
-                info = `<span class="badge bg-light text-dark border">${item.waktu_masuk || '-'}</span>`;
-            } else if (type === 'cuti') {
-                nama = item.users?.nama || '-';
-                cabang = item.users?.cabang || '-';
+            if (type === 'hadir') {
+                const nama = item.users?.nama || '-';
+                const cabang = item.users?.cabang || '-';
+                const tipe = `<span class="badge bg-primary">${item.tipe_absen || '-'}</span>`;
+                const waktu = `<span class="badge bg-light text-dark border">${item.waktu_masuk || '-'}</span>`;
                 
+                trHtml = `<tr>
+                    <td class="text-start ps-4 fw-bold">${nama}</td>
+                    <td>${cabang}</td>
+                    <td>${tipe}</td>
+                    <td>${waktu}</td>
+                </tr>`;
+            } else if (type === 'cuti') {
+                const nama = item.users?.nama || '-';
+                const cabang = item.users?.cabang || '-';
                 let jenis = 'Cuti';
                 if (item.data_tambahan) {
-                    // Coba cari key yang mengandung kata 'Jenis'
                     const keyJenis = Object.keys(item.data_tambahan).find(k => k.toLowerCase().includes('jenis'));
                     if (keyJenis) jenis = item.data_tambahan[keyJenis];
                 }
-                info = `<span class="badge bg-primary">${jenis}</span>`;
-            } else if (type === 'belum') {
-                nama = item.nama || '-';
-                cabang = item.cabang || '-';
-                info = `<span class="text-muted fst-italic">Belum Absen</span>`;
-            }
-            
-            tbody.innerHTML += `
-                <tr>
+                const info = `<span class="badge bg-primary">${jenis}</span>`;
+                
+                trHtml = `<tr>
                     <td class="text-start ps-4 fw-bold">${nama}</td>
                     <td>${cabang}</td>
                     <td>${info}</td>
-                </tr>
-            `;
+                </tr>`;
+            } else if (type === 'belum') {
+                const nama = item.nama || '-';
+                const cabang = item.cabang || '-';
+                const info = `<span class="text-muted fst-italic">Belum Absen</span>`;
+                
+                trHtml = `<tr>
+                    <td class="text-start ps-4 fw-bold">${nama}</td>
+                    <td>${cabang}</td>
+                    <td>${info}</td>
+                </tr>`;
+            }
+            
+            tbody.innerHTML += trHtml;
         });
     }
     
@@ -1166,6 +1211,11 @@ async function loadDataAbsensi() {
         return;
     }
 
+    let qTotal = supabaseClient.from('users').select('id');
+    if (!isSuperAdmin) qTotal = qTotal.eq('cabang', myCabang);
+    const { data: usersDataTotal } = await qTotal;
+    const totalUsersCount = usersDataTotal ? usersDataTotal.length : 0;
+
     if (!data || data.length === 0) {
         gridContainer.innerHTML = '<div class="col-12"><div class="alert alert-light text-center border">Belum ada data absensi di bulan ini.</div></div>';
         allAbsensiGrouped = {};
@@ -1176,27 +1226,42 @@ async function loadDataAbsensi() {
     allAbsensiGrouped = {};
     data.forEach(absen => {
         if (!allAbsensiGrouped[absen.tanggal]) {
-            allAbsensiGrouped[absen.tanggal] = { records: [], hadir: 0, terlambat: 0, alpha: 0, cuti: 0 };
+            allAbsensiGrouped[absen.tanggal] = { 
+                records: [], 
+                hadirSet: new Set(), 
+                terlambatSet: new Set(), 
+                alpha: 0, 
+                cuti: 0 
+            };
         }
         allAbsensiGrouped[absen.tanggal].records.push(absen);
         
-        if (absen.status === 'Hadir') allAbsensiGrouped[absen.tanggal].hadir++;
-        else if (absen.status === 'Terlambat') allAbsensiGrouped[absen.tanggal].terlambat++;
-        else if (absen.status === 'Alpha') allAbsensiGrouped[absen.tanggal].alpha++;
-        else if (absen.status === 'Cuti') allAbsensiGrouped[absen.tanggal].cuti++;
+        if (absen.status === 'Alpha') {
+            allAbsensiGrouped[absen.tanggal].alpha++;
+        } else if (absen.status === 'Cuti') {
+            allAbsensiGrouped[absen.tanggal].cuti++;
+        } else {
+            // Semua status lain (Hadir, Tepat Waktu, Terlambat, Lembur) masuk ke hadirSet
+            allAbsensiGrouped[absen.tanggal].hadirSet.add(absen.user_id);
+            if (absen.status === 'Terlambat') {
+                allAbsensiGrouped[absen.tanggal].terlambatSet.add(absen.user_id);
+            }
+        }
     });
 
     gridContainer.innerHTML = '';
     
     Object.keys(allAbsensiGrouped).forEach(tanggal => {
         const d = allAbsensiGrouped[tanggal];
+        d.hadir = d.hadirSet.size;
+        d.terlambat = d.terlambatSet.size;
         
         // Format Tanggal
         const dateObj = new Date(tanggal);
         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
         const dateStr = dateObj.toLocaleDateString('id-ID', options);
         
-        const totalAbsen = d.hadir + d.terlambat;
+        const tidakAbsen = totalUsersCount - d.hadir - d.cuti;
 
         gridContainer.innerHTML += `
             <div class="col-md-6 col-lg-4 col-xl-3">
@@ -1206,17 +1271,13 @@ async function loadDataAbsensi() {
                             <h6 class="card-title fw-bold text-primary mb-0"><i class="fas fa-calendar-day me-2"></i>${dateStr}</h6>
                         </div>
                         <div class="d-flex flex-column gap-2 mb-4">
-                            <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded">
-                                <span class="text-muted small fw-bold">Total Masuk</span>
-                                <span class="badge bg-primary rounded-pill">${totalAbsen} Orang</span>
-                            </div>
                             <div class="d-flex justify-content-between align-items-center px-2">
-                                <span class="text-muted small"><i class="fas fa-check-circle text-success me-1"></i>Tepat Waktu</span>
+                                <span class="text-muted small"><i class="fas fa-check-circle text-success me-1"></i>Absen</span>
                                 <span class="fw-bold">${d.hadir}</span>
                             </div>
                             <div class="d-flex justify-content-between align-items-center px-2">
-                                <span class="text-muted small"><i class="fas fa-clock text-warning me-1"></i>Terlambat</span>
-                                <span class="fw-bold">${d.terlambat}</span>
+                                <span class="text-muted small"><i class="fas fa-times-circle text-danger me-1"></i>Tidak Absen</span>
+                                <span class="fw-bold">${tidakAbsen < 0 ? 0 : tidakAbsen}</span>
                             </div>
                             <div class="d-flex justify-content-between align-items-center px-2 border-top pt-1 mt-1">
                                 <span class="text-muted small"><i class="fas fa-umbrella-beach text-info me-1"></i>Cuti / Izin</span>
@@ -1250,56 +1311,153 @@ let currentAbsensiDateStr = null;
 function showDetailAbsensi(tanggal, dateStr) {
     currentAbsensiTanggal = tanggal;
     currentAbsensiDateStr = dateStr;
+    const thead = document.getElementById("modalDetailAbsensiHead");
     const tbody = document.getElementById("modalDetailAbsensiBody");
     document.getElementById("modalDetailAbsensiTitle").innerHTML = `<i class="fas fa-calendar-day me-2"></i>Detail Absensi - ${dateStr}`;
+    const searchInput = document.getElementById("searchDetailAbsensi");
+    if (searchInput) searchInput.value = '';
+    
+    thead.innerHTML = '';
     tbody.innerHTML = '';
     
     const records = allAbsensiGrouped[tanggal]?.records || [];
     
-    records.forEach(absen => {
-        const hasFoto = absen.foto;
-        const fotoHTML = hasFoto 
-            ? `<button class="btn btn-sm btn-info text-white shadow-sm" onclick="lihatFotoAbsenSingle('${absen.foto}')">📸 Lihat Foto</button>` 
-            : `<span class="text-muted small fst-italic">Tidak tersedia</span>`;
-            
-        let badgeClass = "bg-secondary text-white";
-        if (absen.status === "Hadir" || absen.status === "Tepat Waktu") badgeClass = "bg-success text-white";
-        else if (absen.status === "Terlambat") badgeClass = "bg-warning text-dark";
-        else if (absen.status === "Alpha") badgeClass = "bg-danger text-white";
-        else if (absen.status === "Cuti") badgeClass = "bg-info text-dark";
-        
-        let faceBadgeClass = "bg-secondary text-white";
-        const faceStatus = absen.status_wajah || "Sesuai";
-        if (faceStatus.includes("Dicurigai") || faceStatus.includes("Tidak Sama")) faceBadgeClass = "bg-danger text-white";
-        else if (faceStatus.includes("Sesuai") || faceStatus.includes("Sama")) faceBadgeClass = "bg-success text-white";
-        else if (faceStatus.includes("Error")) faceBadgeClass = "bg-warning text-dark";
+    if (records.length === 0) {
+        tbody.innerHTML = `<tr><td class="text-center py-4 text-muted">Tidak ada data detail absensi</td></tr>`;
+        return;
+    }
 
-        const statusHTML = `
-            <span class="badge ${badgeClass} fs-6 mb-1">${absen.status || 'Hadir'}</span><br>
-            <span class="badge ${faceBadgeClass} mb-1" title="Status Pengenalan Wajah"><i class="fas fa-user-check"></i> ${faceStatus}</span>
-        `;
+    // 1. Group records by Employee and get unique tipe_absen
+    const grouped = {};
+    const tipeAbsenSet = new Set();
+    
+    records.forEach(row => {
+        const namaUser = row.users?.nama || 'Unknown';
+        const cabangUser = row.users?.cabang || '-';
+        
+        if (!grouped[namaUser]) {
+            grouped[namaUser] = { nama: namaUser, cabang: cabangUser, absensi: {} };
+        }
+        
+        const tipe = row.tipe_absen || 'Unknown';
+        tipeAbsenSet.add(tipe);
+        
+        grouped[namaUser].absensi[tipe] = row;
+    });
+
+    const tipeAbsenList = Array.from(tipeAbsenSet).sort();
+    
+    // 2. Build Dynamic Header
+    let trHead = `<tr><th class="text-start ps-3 align-middle" rowspan="2">Karyawan</th><th class="align-middle" rowspan="2">Kantor</th>`;
+    // Top headers for categories
+    trHead += `<th colspan="${tipeAbsenList.length}">Waktu</th>`;
+    trHead += `<th colspan="${tipeAbsenList.length}">Status Kehadiran</th>`;
+    trHead += `<th colspan="${tipeAbsenList.length}">Lokasi / Jarak</th>`;
+    trHead += `<th colspan="${tipeAbsenList.length}">Foto Muka</th>`;
+    trHead += `<th colspan="${tipeAbsenList.length}">Aksi</th>`;
+    trHead += `</tr><tr>`;
+    // Sub-headers for tipe_absen within categories
+    ['Waktu', 'Status', 'Lokasi', 'Foto', 'Aksi'].forEach(() => {
+        tipeAbsenList.forEach(tipe => {
+            trHead += `<th><span class="badge bg-secondary">${tipe}</span></th>`;
+        });
+    });
+    trHead += `</tr>`;
+    thead.innerHTML = trHead;
+
+    // 3. Build Body Rows
+    for (const namaUser in grouped) {
+        const g = grouped[namaUser];
+        let trHtml = `<tr>
+            <td class="text-start ps-3 fw-bold align-middle">${g.nama}</td>
+            <td class="align-middle">${g.cabang}</td>`;
             
-        tbody.innerHTML += `
-            <tr>
-                <td class="text-start ps-3 fw-bold">${absen.users?.nama || 'Unknown'}</td>
-                <td>${absen.users?.cabang || '-'}</td>
-                <td><span class="badge bg-primary">${absen.tipe_absen || '-'}</span></td>
-                <td>${absen.waktu || '-'}</td>
-                <td><span class="small text-muted">${absen.lokasi || '-'}</span></td>
-                <td>${fotoHTML}</td>
-                <td>${statusHTML}</td>
-                <td>
-                    <button class="btn btn-sm btn-danger shadow-sm text-white" onclick="hapusDataAbsen('${absen.id}', '${tanggal}')">
+        // Waktu
+        tipeAbsenList.forEach(tipe => {
+            const a = g.absensi[tipe];
+            trHtml += `<td class="align-middle">${a ? (a.waktu || '-') : '-'}</td>`;
+        });
+        
+        // Status
+        tipeAbsenList.forEach(tipe => {
+            const a = g.absensi[tipe];
+            if (a) {
+                let badgeClass = "bg-secondary";
+                if (a.status === "Hadir" || a.status === "Tepat Waktu") badgeClass = "bg-success";
+                else if (a.status === "Terlambat") badgeClass = "bg-warning text-dark";
+                else if (a.status === "Alpha") badgeClass = "bg-danger";
+                else if (a.status === "Cuti") badgeClass = "bg-info text-dark";
+                
+                let faceBadgeClass = "bg-secondary";
+                const faceStatus = a.status_wajah || "Sesuai";
+                if (faceStatus.includes("Dicurigai") || faceStatus.includes("Tidak Sama")) faceBadgeClass = "bg-danger";
+                else if (faceStatus.includes("Sesuai") || faceStatus.includes("Sama")) faceBadgeClass = "bg-success";
+                else if (faceStatus.includes("Error")) faceBadgeClass = "bg-warning text-dark";
+
+                trHtml += `<td class="align-middle" style="min-width: 130px;">
+                    <span class="badge ${badgeClass} mb-1 w-100">${a.status || 'Hadir'}</span><br>
+                    <span class="badge ${faceBadgeClass} w-100" title="Status Wajah"><i class="fas fa-user-check"></i> ${faceStatus}</span>
+                </td>`;
+            } else {
+                trHtml += `<td class="align-middle">-</td>`;
+            }
+        });
+        
+        // Lokasi
+        tipeAbsenList.forEach(tipe => {
+            const a = g.absensi[tipe];
+            trHtml += `<td class="align-middle"><span class="small text-muted">${a ? (a.lokasi || '-') : '-'}</span></td>`;
+        });
+        
+        // Foto
+        tipeAbsenList.forEach(tipe => {
+            const a = g.absensi[tipe];
+            if (a && a.foto) {
+                trHtml += `<td class="align-middle"><button class="btn btn-sm btn-info text-white shadow-sm" onclick="lihatFotoAbsenSingle('${a.foto}')">📸 Lihat</button></td>`;
+            } else {
+                trHtml += `<td class="align-middle text-muted small fst-italic">-</td>`;
+            }
+        });
+        
+        // Aksi
+        tipeAbsenList.forEach(tipe => {
+            const a = g.absensi[tipe];
+            if (a) {
+                trHtml += `<td class="align-middle">
+                    <button class="btn btn-sm btn-danger shadow-sm text-white" onclick="hapusDataAbsen('${a.id}', '${tanggal}')" title="Hapus ${tipe}">
                         <i class="fas fa-trash-alt me-1"></i>Hapus
                     </button>
-                </td>
-            </tr>
-        `;
-    });
+                </td>`;
+            } else {
+                trHtml += `<td class="align-middle">-</td>`;
+            }
+        });
+
+        trHtml += `</tr>`;
+        tbody.innerHTML += trHtml;
+    }
     
     const modalEl = document.getElementById('modalDetailAbsensi');
     if (!modalEl.classList.contains('show')) {
         new bootstrap.Modal(modalEl).show();
+    }
+}
+
+function filterDetailAbsensi() {
+    const input = document.getElementById("searchDetailAbsensi");
+    if (!input) return;
+    const filter = input.value.toLowerCase();
+    const tbody = document.getElementById("modalDetailAbsensiBody");
+    const trs = tbody.getElementsByTagName("tr");
+    
+    for (let i = 0; i < trs.length; i++) {
+        const tr = trs[i];
+        const textValue = tr.textContent || tr.innerText;
+        if (textValue.toLowerCase().indexOf(filter) > -1) {
+            tr.style.display = "";
+        } else {
+            tr.style.display = "none";
+        }
     }
 }
 
@@ -1325,39 +1483,118 @@ async function exportCsvHarian(tanggal) {
         if (!result.isConfirmed && !result.isDenied) return;
 
         const includeMedia = result.isDenied;
-
-        let header = "Tanggal,Nama,Cabang,Waktu Masuk,Waktu Istirahat Keluar,Waktu Istirahat Masuk,Waktu Pulang,Status Kehadiran,Jarak (Meter)";
-        if (includeMedia) {
-            header += ",Link Foto Masuk,Link Foto Mulai Istirahat,Link Foto Selesai Istirahat,Link Foto Pulang";
-        }
-        
-        let csvContent = header + "\n";
         const escapeCSV = (str) => '"' + String(str).replace(/"/g, '""') + '"';
 
+        // 1. Group records by Employee
+        const grouped = {};
+        const tipeAbsenSet = new Set();
+        
         records.forEach(row => {
+            const namaUser = row.users?.nama || 'Unknown';
+            const cabangUser = row.users?.cabang || '-';
+            
+            if (!grouped[namaUser]) {
+                grouped[namaUser] = {
+                    nama: namaUser,
+                    cabang: cabangUser,
+                    absensi: {}
+                };
+            }
+            
+            const tipe = row.tipe_absen || 'Unknown';
+            tipeAbsenSet.add(tipe);
+            
+            grouped[namaUser].absensi[tipe] = {
+                waktu: row.waktu || '-',
+                status: row.status || '-',
+                jarak: row.lokasi || '-',
+                foto: row.foto || ''
+            };
+        });
+
+        const tipeAbsenList = Array.from(tipeAbsenSet).sort();
+
+        // 2. Build 2-Tier Header
+        const nTypes = tipeAbsenList.length;
+        const emptyCols = nTypes > 1 ? ','.repeat(nTypes - 1) : '';
+        
+        let headerRow1 = "Tanggal,Nama,Cabang";
+        headerRow1 += `,"Waktu"${emptyCols}`;
+        headerRow1 += `,"Status Kehadiran"${emptyCols}`;
+        headerRow1 += `,"Lokasi / Jarak"${emptyCols}`;
+        if (includeMedia) headerRow1 += `,"Foto Muka"${emptyCols}`;
+        
+        let headerRow2 = ",,";
+        tipeAbsenList.forEach(t => headerRow2 += `,"${t}"`); // Waktu
+        tipeAbsenList.forEach(t => headerRow2 += `,"${t}"`); // Status
+        tipeAbsenList.forEach(t => headerRow2 += `,"${t}"`); // Jarak
+        if (includeMedia) {
+            tipeAbsenList.forEach(t => headerRow2 += `,"${t}"`); // Foto
+        }
+        
+        let csvContent = headerRow1 + "\n" + headerRow2 + "\n";
+        
+        // 3. Build CSV Rows and Handle ZIP if media is included
+        let rootFolder, mediaFolder, zip;
+        if (includeMedia) {
+            zip = new JSZip();
+            rootFolder = zip.folder(`Export_Harian_${tanggal}`);
+            mediaFolder = rootFolder.folder("media");
+        }
+
+        for (const namaUser in grouped) {
+            const g = grouped[namaUser];
             let cols = [
-                escapeCSV(row.tanggal),
-                escapeCSV(row.users?.nama || 'Unknown'),
-                escapeCSV(row.users?.cabang || '-'),
-                escapeCSV(row.waktu_masuk || '-'),
-                escapeCSV(row.waktu_istirahat_keluar || '-'),
-                escapeCSV(row.waktu_istirahat_masuk || '-'),
-                escapeCSV(row.waktu_keluar || '-'),
-                escapeCSV(row.status || '-'),
-                escapeCSV(row.jarak_meter || 0)
+                escapeCSV(tanggal),
+                escapeCSV(g.nama),
+                escapeCSV(g.cabang)
             ];
             
+            tipeAbsenList.forEach(tipe => {
+                const a = g.absensi[tipe];
+                cols.push(a ? escapeCSV(a.waktu) : "-");
+            });
+            tipeAbsenList.forEach(tipe => {
+                const a = g.absensi[tipe];
+                cols.push(a ? escapeCSV(a.status) : "-");
+            });
+            tipeAbsenList.forEach(tipe => {
+                const a = g.absensi[tipe];
+                cols.push(a ? escapeCSV(a.jarak) : "-");
+            });
             if (includeMedia) {
-                cols.push(
-                    escapeCSV(row.foto_masuk || ''),
-                    escapeCSV(row.foto_istirahat_keluar || ''),
-                    escapeCSV(row.foto_istirahat_masuk || ''),
-                    escapeCSV(row.foto_keluar || '')
-                );
+                tipeAbsenList.forEach(tipe => {
+                    const a = g.absensi[tipe];
+                    cols.push(a ? escapeCSV(a.foto) : "-");
+                });
             }
             
             csvContent += cols.join(",") + "\n";
-        });
+            
+            // Download photo if ZIP
+            if (includeMedia) {
+                const userFolder = mediaFolder.folder(g.nama);
+                const simpanFoto = async (url, namaFile) => {
+                    if (url && url.startsWith('http')) {
+                        try {
+                            const response = await fetch(url);
+                            const blob = await response.blob();
+                            userFolder.file(namaFile, blob);
+                        } catch (err) {
+                            console.error("Gagal mendownload foto:", url, err);
+                        }
+                    }
+                };
+                
+                for (const tipe of tipeAbsenList) {
+                    const a = g.absensi[tipe];
+                    if (a && a.foto) {
+                        const cleanTipe = tipe.replace(/ /g, '_');
+                        await simpanFoto(a.foto, `${tanggal}_${cleanTipe}.png`);
+                    }
+                }
+            }
+        }
 
         if (includeMedia) {
             Swal.fire({
@@ -2247,30 +2484,82 @@ async function prosesExport(event) {
         const folderName = `${tglMulai.split('-').reverse().join('-')}_sd_${tglSelesai.split('-').reverse().join('-')}`;
         const rootFolder = zip.folder(folderName);
         
-        // 1. Buat CSV
-        let csvContent = "Tanggal,Nama,Cabang,Waktu Masuk,Waktu Istirahat Keluar,Waktu Istirahat Masuk,Waktu Pulang,Status Kehadiran,Jarak (Meter)\n";
+        // 1. Group Data & Get Unique Tipe Absen
+        const grouped = {};
+        const tipeAbsenSet = new Set();
+
+        data.forEach(row => {
+            const namaUser = row.users ? row.users.nama : 'Unknown';
+            const cabangUser = row.users ? row.users.cabang : '-';
+            const key = `${row.tanggal}_${namaUser}`;
+            
+            if (!grouped[key]) {
+                grouped[key] = {
+                    tanggal: row.tanggal,
+                    nama: namaUser,
+                    cabang: cabangUser,
+                    absensi: {}
+                };
+            }
+            
+            const tipe = row.tipe_absen || 'Unknown';
+            tipeAbsenSet.add(tipe);
+            
+            grouped[key].absensi[tipe] = {
+                waktu: row.waktu || '-',
+                status: row.status || '-',
+                jarak: row.lokasi || '-',
+                foto: row.foto || ''
+            };
+        });
+
+        // 2. Build 2-Tier Header
+        const nTypes = tipeAbsenList.length;
+        const emptyCols = nTypes > 1 ? ','.repeat(nTypes - 1) : '';
         
+        let headerRow1 = "Tanggal,Nama,Cabang";
+        headerRow1 += `,"Waktu"${emptyCols}`;
+        headerRow1 += `,"Status Kehadiran"${emptyCols}`;
+        headerRow1 += `,"Lokasi / Jarak"${emptyCols}`;
+        
+        let headerRow2 = ",,";
+        tipeAbsenList.forEach(t => headerRow2 += `,"${t}"`); // Waktu
+        tipeAbsenList.forEach(t => headerRow2 += `,"${t}"`); // Status
+        tipeAbsenList.forEach(t => headerRow2 += `,"${t}"`); // Jarak
+        
+        let csvContent = headerRow1 + "\n" + headerRow2 + "\n";
+
         // 2. Siapkan Folder Media jika dicentang
         let mediaFolder;
         if (isMedia) {
             mediaFolder = rootFolder.folder("media");
         }
 
-        // Gunakan for...of karena kita butuh await di dalam loop untuk fetch gambar
-        for (const row of data) {
-            const namaUser = row.users ? row.users.nama : 'Unknown';
-            const cabangUser = row.users ? row.users.cabang : '-';
+        // 3. Process Export Rows
+        for (const key in grouped) {
+            const g = grouped[key];
+            const safeName = `"${g.nama}"`;
+            const safeCabang = `"${g.cabang}"`;
+            let rowCsv = `${g.tanggal},${safeName},${safeCabang}`;
             
-            // Tambahkan baris ke CSV
-            const safeName = `"${namaUser}"`;
-            const safeCabang = `"${cabangUser}"`;
-            csvContent += `${row.tanggal},${safeName},${safeCabang},${row.waktu_masuk || '-'},${row.waktu_istirahat_keluar || '-'},${row.waktu_istirahat_masuk || '-'},${row.waktu_keluar || '-'},${row.status || '-'},${row.jarak_meter || 0}\n`;
+            tipeAbsenList.forEach(tipe => {
+                const a = g.absensi[tipe];
+                rowCsv += a ? `,${a.waktu}` : ',-';
+            });
+            tipeAbsenList.forEach(tipe => {
+                const a = g.absensi[tipe];
+                rowCsv += a ? `,${a.status}` : ',-';
+            });
+            tipeAbsenList.forEach(tipe => {
+                const a = g.absensi[tipe];
+                rowCsv += a ? `,"${a.jarak}"` : ',-';
+            });
+            
+            csvContent += rowCsv + "\n";
 
             // Proses Foto jika diceklis
             if (isMedia) {
-                const userFolder = mediaFolder.folder(namaUser);
-                const tgl = row.tanggal;
-                
+                const userFolder = mediaFolder.folder(g.nama);
                 const simpanFoto = async (url, namaFile) => {
                     if (url && url.startsWith('http')) {
                         try {
@@ -2282,18 +2571,22 @@ async function prosesExport(event) {
                         }
                     }
                 };
-
-                await simpanFoto(row.foto_masuk, `${tgl}_Masuk.png`);
-                await simpanFoto(row.foto_istirahat_keluar, `${tgl}_IstirahatKeluar.png`);
-                await simpanFoto(row.foto_istirahat_masuk, `${tgl}_IstirahatMasuk.png`);
-                await simpanFoto(row.foto_keluar, `${tgl}_Keluar.png`);
+                
+                // Sequential download to prevent overload
+                for (const tipe of tipeAbsenList) {
+                    const a = g.absensi[tipe];
+                    if (a && a.foto) {
+                        const cleanTipe = tipe.replace(/ /g, '_');
+                        await simpanFoto(a.foto, `${g.tanggal}_${cleanTipe}.png`);
+                    }
+                }
             }
         }
 
         // Simpan CSV ke root folder zip
         rootFolder.file("rekap_absen.csv", csvContent);
 
-        // 3. AMBIL DATA CUTI / IZIN
+        // 4. AMBIL DATA CUTI / IZIN
         let queryCuti = supabaseClient.from('cuti').select('*, users!inner(nama, cabang)')
             .lte('tanggal_mulai', tglSelesai)
             .gte('tanggal_selesai', tglMulai)
@@ -3039,7 +3332,6 @@ async function hapusDataAbsen(absenId, tanggal) {
     }
     
     Swal.fire("Berhasil", "Data absen beserta foto berhasil dihapus.", "success");
-    bootstrap.Modal.getInstance(document.getElementById('modalDetailAbsensi')).hide();
     loadDataAbsensi();
 }
 
