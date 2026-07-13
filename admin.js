@@ -3044,6 +3044,13 @@ async function importKaryawan(event) {
             if (!no_hp || no_hp === "") {
                 no_hp = "-";
             }
+
+            // Penanganan hari_libur
+            if (hari_libur === "-" || (hari_libur || "").toLowerCase() === "kosong") {
+                hari_libur = ""; // Tidak ada hari libur
+            } else if (!hari_libur) {
+                hari_libur = "0,6"; // Default jika benar-benar tidak diisi
+            }
             
             // Periksa duplicate nama (karena login pake nama)
             const { data: existingUser } = await supabaseClient.from('users').select('id, nama').eq('nama', nama).single();
@@ -3060,7 +3067,7 @@ async function importKaryawan(event) {
                 role: role || "Karyawan",
                 cabang: cabang || "Pusat",
                 no_hp: no_hp,
-                hari_libur: hari_libur || "0,6",
+                hari_libur: hari_libur,
                 sisa_cuti: 12
             }]);
             
