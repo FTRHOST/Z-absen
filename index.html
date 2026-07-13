@@ -353,49 +353,22 @@
 
         <div class="tab-pane fade" id="tab-riwayat" role="tabpanel">
           <div class="row g-4">
-            <div class="col-lg-5">
-              <div class="card shadow-sm h-100">
-                <div class="card-header bg-white fw-bold">
-                  Tabel Riwayat Kehadiran (Bulan Ini)
-                </div>
-                <div class="card-body p-0 overflow-auto">
-                  <table
-                    class="table table-striped table-hover mb-0 text-center small"
-                  >
-                    <thead class="table-light">
-                      <tr>
-                        <th>Tanggal</th>
-                        <th>Tipe Absen</th>
-                        <th>Waktu</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody id="tabel-riwayat-body">
-                      <!-- Data absensi akan dimuat dari database -->
-                      <tr>
-                        <td colspan="4" class="text-muted">
-                          Belum ada riwayat absensi
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <div class="col-lg-7">
+            <div class="col-lg-12">
               <div class="card shadow-sm h-100">
                 <div
-                  class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center"
+                  class="card-header bg-white border-0 py-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2"
                 >
-                  <h6 class="mb-0 fw-bold">Statistik Kehadiran</h6>
+                  <div>
+                    <h6 class="mb-1 fw-bold">Statistik Kehadiran</h6>
+                    <small class="text-muted"><i class="fas fa-info-circle me-1"></i>Klik pada tanggal di kalender untuk melihat detail riwayat absensi.</small>
+                  </div>
                   <span
                     id="bulan-tahun"
                     class="badge bg-primary text-white fs-6"
                   ></span>
                 </div>
                 <div class="card-body p-0 overflow-auto">
-                  <table class="table table-bordered mb-0 text-center">
+                  <table class="table table-bordered mb-0 text-center table-hover" style="cursor: pointer;">
                     <thead class="table-light">
                       <tr>
                         <th class="text-danger">Min</th>
@@ -2195,6 +2168,7 @@
           let td = document.createElement("td");
           td.innerText = i;
           td.className = "calendar-day";
+          td.style.cursor = "pointer";
 
           let tglStr = `${tahun}-${String(bulan + 1).padStart(2, "0")}-${String(i).padStart(2, "0")}`;
           let currentDayOfWeek = new Date(tahun, bulan, i).getDay();
@@ -2228,6 +2202,37 @@
               }
             }
           }
+          
+          td.onclick = function() {
+              const absenList = historyBulanIni.filter(h => h.tanggal === tglStr);
+              let popupHtml = `<div class="table-responsive"><table class="table table-bordered table-striped small mt-3 text-center">
+                  <thead class="table-light"><tr><th>Tipe</th><th>Waktu</th><th>Status</th></tr></thead><tbody>`;
+                  
+              if (absenList.length === 0) {
+                  let ket = "Belum ada absensi";
+                  if (isSedangCuti) ket = "Sedang Cuti";
+                  else if (isLiburMingguan) ket = "Hari Libur Rutin";
+                  popupHtml += `<tr><td colspan="3" class="text-muted py-3">${ket}</td></tr>`;
+              } else {
+                  absenList.forEach(absen => {
+                      let bClass = absen.status === "Terlambat" ? "warning text-dark" : "success text-white";
+                      if (absen.status === "Alpha") bClass = "danger text-white";
+                      if (absen.status === "Lembur") bClass = "info text-dark";
+                      popupHtml += `<tr><td>${absen.tipe_absen || '-'}</td><td>${absen.waktu || '-'}</td><td><span class="badge bg-${bClass}">${absen.status}</span></td></tr>`;
+                  });
+              }
+              popupHtml += `</tbody></table></div>`;
+              
+              const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+              const tglFormat = new Date(tahun, bulan, i).toLocaleDateString('id-ID', options);
+              
+              Swal.fire({
+                  title: `Riwayat Kehadiran`,
+                  html: `<b>${tglFormat}</b><br>${popupHtml}`,
+                  confirmButtonText: 'Tutup',
+                  confirmButtonColor: '#3085d6'
+              });
+          };
 
           tr.appendChild(td);
 
@@ -2245,9 +2250,6 @@
         if (!userData) return;
         const userObj = JSON.parse(userData);
 
-        const tbody = document.getElementById("tabel-riwayat-body");
-        tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4"><div class="placeholder-glow"><span class="placeholder col-8 mb-2"></span><br><span class="placeholder col-6"></span></div></td></tr>`;
-        
         const tbodyHariIni = document.getElementById("tabel-riwayat-hari-ini");
         if (tbodyHariIni) tbodyHariIni.innerHTML = `<tr><td colspan="4" class="text-center py-4"><div class="placeholder-glow"><span class="placeholder col-8 mb-2"></span></div></td></tr>`;
 
@@ -2255,23 +2257,28 @@
           .from("absensi")
           .select("*")
           .eq("user_id", userObj.id)
-          .order("tanggal", { ascending: false });
+          .order("waktu", { ascending: true }); // Ubah order menjadi waktu agar urut dari masuk hingga pulang
+          // Namun data di-sort juga by tanggal
+          // Untuk sorting global:
+        let allData = [];
+        if (data) {
+           allData = data.sort((a,b) => {
+               if (a.tanggal === b.tanggal) return a.waktu.localeCompare(b.waktu);
+               return b.tanggal.localeCompare(a.tanggal); // tanggal terbaru di atas
+           });
+        }
 
         if (error) {
-          tbody.innerHTML =
-            '<tr><td colspan="4" class="text-danger">Gagal memuat data</td></tr>';
           if (tbodyHariIni) tbodyHariIni.innerHTML = '<tr><td colspan="4" class="text-danger">Gagal memuat data</td></tr>';
           return;
         }
 
-        if (!data || data.length === 0) {
-          tbody.innerHTML =
-            '<tr><td colspan="4" class="text-muted">Belum ada riwayat absensi</td></tr>';
+        if (!allData || allData.length === 0) {
           if (tbodyHariIni) tbodyHariIni.innerHTML = '<tr><td colspan="4" class="text-muted">Belum ada riwayat absensi hari ini</td></tr>';
+          buatKalender([]);
           return;
         }
 
-        tbody.innerHTML = "";
         let dataHariIniHtml = "";
         
         const now = new Date();
@@ -2279,12 +2286,13 @@
         const localDate = new Date(now - offset);
         const tanggalHariIni = localDate.toISOString().split("T")[0];
 
-        data.forEach((absen) => {
+        allData.forEach((absen) => {
           let badgeClass =
             absen.status === "Terlambat"
               ? "warning text-dark"
               : "success text-white";
           if (absen.status === "Alpha") badgeClass = "danger text-white";
+          if (absen.status === "Lembur") badgeClass = "info text-dark";
           
           const trHtml = `
             <tr>
@@ -2295,8 +2303,6 @@
             </tr>
           `;
           
-          tbody.innerHTML += trHtml;
-          
           if (String(absen.tanggal).trim() === String(tanggalHariIni).trim()) {
              dataHariIniHtml += trHtml;
           }
@@ -2306,7 +2312,7 @@
           tbodyHariIni.innerHTML = dataHariIniHtml || '<tr><td colspan="4" class="text-muted">Belum ada riwayat absensi hari ini</td></tr>';
         }
 
-        buatKalender(data);
+        buatKalender(allData);
       }
 
       // Generate kalender saat web dimuat (default kosong)
