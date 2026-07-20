@@ -1429,7 +1429,7 @@
         if (response.error) {
           Swal.fire("Gagal", response.error.message, "error");
         } else {
-          const textMsg = `<b>Laporan Absen (Lokasi)</b>\nNama: ${currentUser.nama}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${localTime}\nLokasi: Jarak ${Math.round(jarakAbsen)}m`;
+          const textMsg = `<b>Laporan Absen (Lokasi)</b>\nNama: ${currentUser.nama}\nCabang: ${currentUser.cabang || '-'}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${localTime}\nLokasi: Jarak ${Math.round(jarakAbsen)}m`;
           await sendTelegramNotification(textMsg);
 
           Swal.fire("Berhasil!", "Absensi berhasil disimpan.", "success").then(
@@ -1577,7 +1577,7 @@
           ]);
           let dbError = res.error;
 
-          const textMsg = `<b>Laporan Absen (Wajah/Selfie)</b>\nNama: ${userObj.nama}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${waktu_sekarang}\nLokasi: ${lokasiTeks}\nFoto: <a href="${publicUrlData.publicUrl}">Lihat Foto</a>`;
+          const textMsg = `<b>Laporan Absen (Wajah/Selfie)</b>\nNama: ${userObj.nama}\nCabang: ${userObj.cabang || '-'}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${waktu_sekarang}\nLokasi: ${lokasiTeks}\nFoto: <a href="${publicUrlData.publicUrl}">Lihat Foto</a>`;
           await sendTelegramNotification(textMsg);
 
           await cekStatusAbsenHariIni();
@@ -2180,7 +2180,7 @@
             tanggal_mulai || new Date().toISOString().split("T")[0];
           const tglSelesai =
             tanggal_selesai || new Date().toISOString().split("T")[0];
-          const textMsg = `<b>Pengajuan Cuti/Izin/Sakit</b>\nNama: ${userObj.nama}\nJenis: ${namaCutiTerpilih || tipe_cuti_izin}\nDurasi: ${diffDays} Hari (${tglMulai} s/d ${tglSelesai})\nAlasan: ${alasan}`;
+          const textMsg = `<b>Pengajuan Cuti/Izin/Sakit</b>\nNama: ${userObj.nama}\nCabang: ${userObj.cabang || '-'}\nJenis: ${namaCutiTerpilih || tipe_cuti_izin}\nDurasi: ${diffDays} Hari (${tglMulai} s/d ${tglSelesai})\nAlasan: ${alasan}`;
           await sendTelegramNotification(textMsg);
 
           Swal.fire({

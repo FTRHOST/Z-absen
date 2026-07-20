@@ -1156,9 +1156,15 @@ let currentDetailCutiRenderCount = 0;
 let observerCuti = null;
 let globalFormConfig = [];
 
+let globalMasterTipeAbsen = [];
+
 async function loadDataAbsensi() {
     const gridContainer = document.getElementById("absensi-grid-container");
     const filterBulan = document.getElementById("filter-bulan-absensi");
+    
+    // Fetch master_tipe_absen untuk detail
+    const { data: tipeData } = await supabaseClient.from('master_tipe_absen').select('*').order('id', { ascending: true });
+    globalMasterTipeAbsen = tipeData || [];
     
     // Set default filter ke bulan ini jika kosong
     if (!filterBulan.value) {
@@ -1329,7 +1335,11 @@ function showDetailAbsensi(tanggal, dateStr) {
 
     // 1. Group records by Employee and get unique tipe_absen
     const grouped = {};
-    const tipeAbsenSet = new Set();
+    
+    let tipeAbsenList = [];
+    if (typeof globalMasterTipeAbsen !== 'undefined') {
+        tipeAbsenList = globalMasterTipeAbsen.filter(t => t.is_aktif).map(t => t.nama_tipe);
+    }
     
     records.forEach(row => {
         const namaUser = row.users?.nama || 'Unknown';
@@ -1340,12 +1350,12 @@ function showDetailAbsensi(tanggal, dateStr) {
         }
         
         const tipe = row.tipe_absen || 'Unknown';
-        tipeAbsenSet.add(tipe);
+        if (!tipeAbsenList.includes(tipe)) {
+            tipeAbsenList.push(tipe);
+        }
         
         grouped[namaUser].absensi[tipe] = row;
     });
-
-    const tipeAbsenList = Array.from(tipeAbsenSet).sort();
     
     // 2. Build Dynamic Header
     let trHead = `<tr><th class="text-start ps-3 align-middle" rowspan="2">Karyawan</th><th class="align-middle" rowspan="2">Kantor</th>`;
@@ -1354,13 +1364,19 @@ function showDetailAbsensi(tanggal, dateStr) {
     trHead += `<th colspan="${tipeAbsenList.length}">Status Kehadiran</th>`;
     trHead += `<th colspan="${tipeAbsenList.length}">Lokasi / Jarak</th>`;
     trHead += `<th colspan="${tipeAbsenList.length}">Foto Muka</th>`;
+    trHead += `<th class="align-middle text-center" rowspan="2">Jam Kerja</th>`;
+    trHead += `<th class="align-middle text-center" rowspan="2">Jam Lembur</th>`;
     trHead += `<th colspan="${tipeAbsenList.length}">Aksi</th>`;
     trHead += `</tr><tr>`;
     // Sub-headers for tipe_absen within categories
-    ['Waktu', 'Status', 'Lokasi', 'Foto', 'Aksi'].forEach(() => {
+    ['Waktu', 'Status', 'Lokasi', 'Foto'].forEach(() => {
         tipeAbsenList.forEach(tipe => {
             trHead += `<th><span class="badge bg-secondary">${tipe}</span></th>`;
         });
+    });
+    // For Aksi
+    tipeAbsenList.forEach(tipe => {
+        trHead += `<th><span class="badge bg-secondary">${tipe}</span></th>`;
     });
     trHead += `</tr>`;
     thead.innerHTML = trHead;
@@ -1418,6 +1434,84 @@ function showDetailAbsensi(tanggal, dateStr) {
                 trHtml += `<td class="align-middle text-muted small fst-italic">-</td>`;
             }
         });
+        
+        // Hitung Jam Kerja & Lembur
+        let jamKerjaStr = '-';
+        let jamLemburStr = '-';
+        let waktuMasuk = null;
+        let waktuPulang = null;
+        let batasPulang = null;
+        let waktuIzinKeluar = null;
+        let waktuIzinMasuk = null;
+        
+        if (typeof globalMasterTipeAbsen !== 'undefined') {
+            globalMasterTipeAbsen.forEach(t => {
+                if (g.absensi[t.nama_tipe]) {
+                    const timeStr = g.absensi[t.nama_tipe].waktu;
+                    if (timeStr && timeStr !== '-') {
+                        const namaTipe = t.nama_tipe.toLowerCase();
+                        if (namaTipe.includes('izin keluar')) {
+                            waktuIzinKeluar = timeStr;
+                        } else if (namaTipe.includes('izin masuk') || namaTipe.includes('izin kembali')) {
+                            waktuIzinMasuk = timeStr;
+                        } else if (t.is_checkout) {
+                            waktuPulang = timeStr;
+                            batasPulang = t.batas_terlambat;
+                        } else {
+                            if (!waktuMasuk) waktuMasuk = timeStr;
+                        }
+                    }
+                }
+            });
+        }
+        
+        const parseT = (tStr) => {
+            if (!tStr) return null;
+            const p = tStr.split(':');
+            if (p.length < 2) return null;
+            return parseInt(p[0]) * 60 + parseInt(p[1]);
+        };
+        const formatM = (m) => {
+            if (m <= 0) return '0j 0m';
+            return `${Math.floor(m/60)}j ${m%60}m`;
+        };
+        
+        let lemburMins = 0;
+        if (waktuPulang && batasPulang) {
+            const pMins = parseT(waktuPulang);
+            const bMins = parseT(batasPulang);
+            if (pMins && bMins && pMins > bMins) {
+                lemburMins = pMins - bMins;
+            }
+        }
+        
+        let izinMins = 0;
+        if (waktuIzinKeluar && waktuIzinMasuk) {
+            const kMins = parseT(waktuIzinKeluar);
+            const mMinsIzin = parseT(waktuIzinMasuk);
+            if (kMins && mMinsIzin && mMinsIzin > kMins) {
+                izinMins = mMinsIzin - kMins;
+            }
+        }
+        
+        if (lemburMins > 0) {
+            jamLemburStr = formatM(lemburMins);
+        } else if (waktuPulang) {
+            jamLemburStr = '0j 0m';
+        }
+        
+        if (waktuMasuk && waktuPulang) {
+            const mMins = parseT(waktuMasuk);
+            const pMins = parseT(waktuPulang);
+            if (mMins && pMins && pMins >= mMins) {
+                let kerjaMins = (pMins - mMins) - lemburMins - izinMins;
+                if (kerjaMins < 0) kerjaMins = 0;
+                jamKerjaStr = formatM(kerjaMins);
+            }
+        }
+
+        trHtml += `<td class="align-middle text-center fw-bold text-success">${jamKerjaStr}</td>`;
+        trHtml += `<td class="align-middle text-center fw-bold text-warning">${jamLemburStr}</td>`;
         
         // Aksi
         tipeAbsenList.forEach(tipe => {
@@ -1487,7 +1581,11 @@ async function exportCsvHarian(tanggal) {
 
         // 1. Group records by Employee
         const grouped = {};
-        const tipeAbsenSet = new Set();
+        
+        let tipeAbsenList = [];
+        if (typeof globalMasterTipeAbsen !== 'undefined') {
+            tipeAbsenList = globalMasterTipeAbsen.filter(t => t.is_aktif).map(t => t.nama_tipe);
+        }
         
         records.forEach(row => {
             const namaUser = row.users?.nama || 'Unknown';
@@ -1502,7 +1600,9 @@ async function exportCsvHarian(tanggal) {
             }
             
             const tipe = row.tipe_absen || 'Unknown';
-            tipeAbsenSet.add(tipe);
+            if (!tipeAbsenList.includes(tipe)) {
+                tipeAbsenList.push(tipe);
+            }
             
             grouped[namaUser].absensi[tipe] = {
                 waktu: row.waktu || '-',
@@ -1511,8 +1611,6 @@ async function exportCsvHarian(tanggal) {
                 foto: row.foto || ''
             };
         });
-
-        const tipeAbsenList = Array.from(tipeAbsenSet).sort();
 
         // 2. Build 2-Tier Header
         const nTypes = tipeAbsenList.length;
@@ -1523,6 +1621,7 @@ async function exportCsvHarian(tanggal) {
         headerRow1 += `,"Status Kehadiran"${emptyCols}`;
         headerRow1 += `,"Lokasi / Jarak"${emptyCols}`;
         if (includeMedia) headerRow1 += `,"Foto Muka"${emptyCols}`;
+        headerRow1 += `,"Jam Kerja","Jam Lembur"`;
         
         let headerRow2 = ",,";
         tipeAbsenList.forEach(t => headerRow2 += `,"${t}"`); // Waktu
@@ -1531,6 +1630,7 @@ async function exportCsvHarian(tanggal) {
         if (includeMedia) {
             tipeAbsenList.forEach(t => headerRow2 += `,"${t}"`); // Foto
         }
+        headerRow2 += `,,`; // for Jam Kerja, Jam Lembur
         
         let csvContent = headerRow1 + "\n" + headerRow2 + "\n";
         
@@ -1568,6 +1668,84 @@ async function exportCsvHarian(tanggal) {
                     cols.push(a ? escapeCSV(a.foto) : "-");
                 });
             }
+            
+            // Hitung Jam Kerja & Lembur
+            let jamKerjaStr = '-';
+            let jamLemburStr = '-';
+            let waktuMasuk = null;
+            let waktuPulang = null;
+            let batasPulang = null;
+            let waktuIzinKeluar = null;
+            let waktuIzinMasuk = null;
+            
+            if (typeof globalMasterTipeAbsen !== 'undefined') {
+                globalMasterTipeAbsen.forEach(t => {
+                    if (g.absensi[t.nama_tipe]) {
+                        const timeStr = g.absensi[t.nama_tipe].waktu;
+                        if (timeStr && timeStr !== '-') {
+                            const namaTipe = t.nama_tipe.toLowerCase();
+                            if (namaTipe.includes('izin keluar')) {
+                                waktuIzinKeluar = timeStr;
+                            } else if (namaTipe.includes('izin masuk') || namaTipe.includes('izin kembali')) {
+                                waktuIzinMasuk = timeStr;
+                            } else if (t.is_checkout) {
+                                waktuPulang = timeStr;
+                                batasPulang = t.batas_terlambat;
+                            } else {
+                                if (!waktuMasuk) waktuMasuk = timeStr;
+                            }
+                        }
+                    }
+                });
+            }
+            
+            const parseT = (tStr) => {
+                if (!tStr) return null;
+                const p = tStr.split(':');
+                if (p.length < 2) return null;
+                return parseInt(p[0]) * 60 + parseInt(p[1]);
+            };
+            const formatM = (m) => {
+                if (m <= 0) return '0j 0m';
+                return `${Math.floor(m/60)}j ${m%60}m`;
+            };
+            
+            let lemburMins = 0;
+            if (waktuPulang && batasPulang) {
+                const pMins = parseT(waktuPulang);
+                const bMins = parseT(batasPulang);
+                if (pMins && bMins && pMins > bMins) {
+                    lemburMins = pMins - bMins;
+                }
+            }
+            
+            let izinMins = 0;
+            if (waktuIzinKeluar && waktuIzinMasuk) {
+                const kMins = parseT(waktuIzinKeluar);
+                const mMinsIzin = parseT(waktuIzinMasuk);
+                if (kMins && mMinsIzin && mMinsIzin > kMins) {
+                    izinMins = mMinsIzin - kMins;
+                }
+            }
+            
+            if (lemburMins > 0) {
+                jamLemburStr = formatM(lemburMins);
+            } else if (waktuPulang) {
+                jamLemburStr = '0j 0m';
+            }
+            
+            if (waktuMasuk && waktuPulang) {
+                const mMins = parseT(waktuMasuk);
+                const pMins = parseT(waktuPulang);
+                if (mMins && pMins && pMins >= mMins) {
+                    let kerjaMins = (pMins - mMins) - lemburMins - izinMins;
+                    if (kerjaMins < 0) kerjaMins = 0;
+                    jamKerjaStr = formatM(kerjaMins);
+                }
+            }
+            
+            cols.push(escapeCSV(jamKerjaStr));
+            cols.push(escapeCSV(jamLemburStr));
             
             csvContent += cols.join(",") + "\n";
             
