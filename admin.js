@@ -21,13 +21,27 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         
         // Cek profil dari backend secara aman
-        const { data: profile, error } = await supabaseClient
+        let { data: profile } = await supabaseClient
             .from('users')
-            .select('role, cabang')
+            .select('id, role, cabang, auth_id')
             .eq('auth_id', session.user.id)
-            .single();
+            .maybeSingle();
             
-        if (error || !profile) throw new Error("Profil tidak valid");
+        if (!profile && currentUser.id) {
+            // Self-repair fallback: perbaiki auth_id jika belum terikat
+            const { data: fallbackUser } = await supabaseClient
+                .from('users')
+                .select('id, role, cabang, auth_id')
+                .eq('id', currentUser.id)
+                .maybeSingle();
+
+            if (fallbackUser) {
+                profile = fallbackUser;
+                await supabaseClient.from('users').update({ auth_id: session.user.id }).eq('id', fallbackUser.id);
+            }
+        }
+        
+        if (!profile) throw new Error("Profil tidak valid");
         
         // Jika ternyata dia bukan Admin/HR, tendang keluar ke halaman absen
         if (profile.role !== 'Super Admin' && profile.role !== 'HR') {

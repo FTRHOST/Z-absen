@@ -24,8 +24,20 @@ END $$;
 CREATE SCHEMA IF NOT EXISTS auth;
 CREATE SCHEMA IF NOT EXISTS storage;
 
-CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql AS $$ SELECT 'authenticated'::text; $$;
-CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT '00000000-0000-0000-0000-000000000000'::uuid; $$;
+CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$
+  SELECT coalesce(
+    nullif(current_setting('request.jwt.claim.role', true), ''),
+    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role'),
+    'anon'
+  )::text;
+$$;
+
+CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$
+  SELECT coalesce(
+    nullif(current_setting('request.jwt.claim.sub', true), ''),
+    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')
+  )::uuid;
+$$;
 
 -- Mengaktifkan ekstensi kriptografi untuk hashing password (wajib untuk Auth)
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -215,34 +227,25 @@ CREATE POLICY "Auth Delete Access" ON storage.objects FOR DELETE USING ( bucket_
 -- ------------------------------------------
 -- 5. FUNGSI PENDAFTARAN OTOMATIS (LINK ACCOUNT)
 -- ------------------------------------------
-CREATE OR REPLACE FUNCTION link_my_account(p_nama text, p_password text)
+CREATE OR REPLACE FUNCTION link_my_account(p_nama text, p_password text, p_auth_id uuid DEFAULT NULL)
 RETURNS json
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
   v_user record;
-  v_auth_exists boolean;
+  v_target_auth_id uuid;
 BEGIN
-  -- Cek apakah nama dan password manual di database cocok (case insensitive)
   SELECT * INTO v_user FROM users WHERE nama ILIKE p_nama AND password = p_password;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Nama Pengguna atau Password salah!';
   END IF;
 
-  -- Kaitkan profil tabel dengan UID Supabase Auth
-  IF v_user.auth_id IS NOT NULL THEN
-    -- Cek apakah auth_id lama sebenarnya masih ada di auth.users (mungkin sudah dihapus manual)
-    SELECT EXISTS(SELECT 1 FROM auth.users WHERE id = v_user.auth_id) INTO v_auth_exists;
-    
-    IF v_auth_exists AND auth.uid() IS NOT NULL AND v_user.auth_id != auth.uid() THEN
-      RAISE EXCEPTION 'Akun ini sudah terhubung ke sesi lain!';
-    END IF;
-  END IF;
-  
-  -- Update hanya jika auth.uid() tersedia
-  IF auth.uid() IS NOT NULL THEN
-      UPDATE users SET auth_id = auth.uid() WHERE id = v_user.id;
+  v_target_auth_id := COALESCE(p_auth_id, auth.uid());
+
+  IF v_target_auth_id IS NOT NULL THEN
+      UPDATE users SET auth_id = v_target_auth_id WHERE id = v_user.id;
+      v_user.auth_id := v_target_auth_id;
   END IF;
   
   RETURN row_to_json(v_user);
