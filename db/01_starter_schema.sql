@@ -227,7 +227,10 @@ CREATE POLICY "Auth Delete Access" ON storage.objects FOR DELETE USING ( bucket_
 -- ------------------------------------------
 -- 5. FUNGSI PENDAFTARAN OTOMATIS (LINK ACCOUNT)
 -- ------------------------------------------
-CREATE OR REPLACE FUNCTION link_my_account(p_nama text, p_password text, p_auth_id uuid DEFAULT NULL)
+DROP FUNCTION IF EXISTS public.link_my_account(text, text);
+DROP FUNCTION IF EXISTS public.link_my_account(text, text, uuid);
+
+CREATE OR REPLACE FUNCTION public.link_my_account(p_nama text, p_password text, p_auth_id uuid DEFAULT NULL)
 RETURNS json
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -251,6 +254,8 @@ BEGIN
   RETURN row_to_json(v_user);
 END;
 $$;
+
+GRANT EXECUTE ON FUNCTION public.link_my_account(text, text, uuid) TO anon, authenticated, service_role, supabase_admin;
 
 -- ------------------------------------------
 -- 6. BUAT AKUN SUPER ADMIN DEFAULT
