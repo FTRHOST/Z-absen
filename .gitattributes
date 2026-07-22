@@ -1,0 +1,2 @@
+# Jaga file config.js di main agar tidak tertimpa saat merge dari branch testing
+config.js merge=ours
