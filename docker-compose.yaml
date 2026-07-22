@@ -26,6 +26,8 @@ services:
       - ./docker/gateway/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - rest
+      - auth
+      - storage
     restart: unless-stopped
 
   # ==========================================
@@ -45,7 +47,52 @@ services:
     restart: unless-stopped
 
   # ==========================================
-  # 4. DATABASE (PostgreSQL Supabase Self-Hosted)
+  # 4. AUTH ENGINE (Supabase GoTrue)
+  # ==========================================
+  auth:
+    image: supabase/gotrue:v2.158.1
+    container_name: zieda-absen-auth
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgresql://supabase_admin:postgres@db:5432/postgres
+      GOTRUE_SITE_URL: http://localhost:8080
+      GOTRUE_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_SMS_AUTOCONFIRM: "true"
+      GOTRUE_DISABLE_SIGNUP: "false"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  # ==========================================
+  # 5. STORAGE ENGINE (Supabase Storage API)
+  # ==========================================
+  storage:
+    image: supabase/storage-api:v1.11.1
+    container_name: zieda-absen-storage
+    environment:
+      ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+      SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+      POSTGREST_URL: http://rest:3000
+      PGRST_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+      DATABASE_URL: postgresql://supabase_admin:postgres@db:5432/postgres
+      FILE_SIZE_LIMIT: 52428800
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+    volumes:
+      - zieda_storage_data:/var/lib/storage
+    depends_on:
+      - db
+      - rest
+    restart: unless-stopped
+
+  # ==========================================
+  # 6. DATABASE (PostgreSQL Supabase Self-Hosted)
   # ==========================================
   db:
     image: supabase/postgres:15.6.1.143
@@ -62,7 +109,7 @@ services:
     restart: unless-stopped
 
   # ==========================================
-  # 5. POSTGRES META (Supabase Studio Metadata API)
+  # 7. POSTGRES META (Supabase Studio Metadata API)
   # ==========================================
   pgmeta:
     image: supabase/postgres-meta:v0.84.2
@@ -72,14 +119,14 @@ services:
       PG_META_DB_HOST: db
       PG_META_DB_PORT: 5432
       PG_META_DB_NAME: postgres
-      PG_META_DB_USER: postgres
+      PG_META_DB_USER: supabase_admin
       PG_META_DB_PASSWORD: postgres
     depends_on:
       - db
     restart: unless-stopped
 
   # ==========================================
-  # 6. SUPABASE STUDIO (Dashboard Web Admin DB)
+  # 8. SUPABASE STUDIO (Dashboard Web Admin DB)
   # ==========================================
   studio:
     image: supabase/studio:latest
@@ -100,3 +147,4 @@ services:
 
 volumes:
   zieda_db_data:
+  zieda_storage_data:
