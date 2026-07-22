@@ -14,6 +14,7 @@ services:
       - rest
       - auth
       - storage
+      - realtime
     restart: unless-stopped
 
   # ==========================================
@@ -30,6 +31,7 @@ services:
       - rest
       - auth
       - storage
+      - realtime
     restart: unless-stopped
 
   # ==========================================
@@ -96,7 +98,33 @@ services:
     restart: unless-stopped
 
   # ==========================================
-  # 6. DATABASE (PostgreSQL Supabase Self-Hosted)
+  # 6. REALTIME ENGINE (Supabase Realtime API)
+  # ==========================================
+  realtime:
+    image: supabase/realtime:v2.25.50
+    container_name: zieda-absen-realtime
+    environment:
+      PORT: 4000
+      FLY_APP_NAME: realtime
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: supabase_admin
+      DB_PASSWORD: postgres
+      DB_NAME: postgres
+      DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
+      DB_ENC_KEY: super-secret-jwt-token-with-at-least-32-characters-long
+      API_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+      METRICS_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+      SECRET_KEY_BASE: Up6D2HVWVvMjjyjtTxayCGyuh6L3ESAi5Y6cHdHAwGivld10aBjg6pRAHAqdEOiJ
+      ERL_AFLAGS: -proto_dist inet_tcp
+      ENABLE_RLS: "false"
+      SEED_SELF_HOST: "true"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  # ==========================================
+  # 7. DATABASE (PostgreSQL Supabase Self-Hosted)
   # ==========================================
   db:
     image: supabase/postgres:15.6.1.143
@@ -113,7 +141,7 @@ services:
     restart: unless-stopped
 
   # ==========================================
-  # 7. POSTGRES META (Supabase Studio Metadata API)
+  # 8. POSTGRES META (Supabase Studio Metadata API)
   # ==========================================
   pgmeta:
     image: supabase/postgres-meta:v0.84.2
@@ -130,7 +158,7 @@ services:
     restart: unless-stopped
 
   # ==========================================
-  # 8. SUPABASE STUDIO (Dashboard Web Admin DB)
+  # 9. SUPABASE STUDIO (Dashboard Web Admin DB)
   # ==========================================
   studio:
     image: supabase/studio:latest
