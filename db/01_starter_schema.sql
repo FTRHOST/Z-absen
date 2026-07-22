@@ -210,7 +210,7 @@ CREATE POLICY "Allow auth all on form_cuti_config" ON form_cuti_config FOR ALL U
 CREATE POLICY "Allow auth all on master_tipe_absen" ON master_tipe_absen FOR ALL USING (auth.role() = 'authenticated');
 
 -- Kebijakan Khusus Tabel Users
-CREATE POLICY "Allow auth select users" ON users FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow public select users" ON users FOR SELECT USING (true);
 CREATE POLICY "Allow auth update users" ON users FOR UPDATE USING (
     auth_id = auth.uid() OR 
     (SELECT role FROM users WHERE auth_id = auth.uid()) IN ('Super Admin', 'HR')
