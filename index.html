@@ -1165,6 +1165,9 @@
       const canvas = document.getElementById("canvas");
       const hasilFoto = document.getElementById("hasil-foto");
       let streamKamera;
+      let faceCountdownTimer = null;
+      let faceCountdownValue = 3;
+      let isCapturing = false;
 
       // Initialize face api models
       let modelsLoaded = false;
@@ -1180,13 +1183,23 @@
         const video = document.getElementById("kamera");
         document.getElementById("kamera").style.display = "block";
         document.getElementById("hasil-foto").style.display = "none";
-        document.getElementById("btn-ambil-foto").style.display =
-          "inline-block";
-        document.getElementById("btn-ambil-foto").disabled = true;
-        document.getElementById("face-status").innerHTML = "Menunggu kamera...";
-        document.getElementById("face-status").className =
+        const btnAmbilFoto = document.getElementById("btn-ambil-foto");
+        btnAmbilFoto.style.display = "inline-block";
+        btnAmbilFoto.disabled = true;
+        btnAmbilFoto.innerHTML = "📸 Memotret Otomatis (3s)";
+
+        isCapturing = false;
+        faceCountdownValue = 3;
+        if (faceCountdownTimer) {
+          clearInterval(faceCountdownTimer);
+          faceCountdownTimer = null;
+        }
+
+        const faceStatus = document.getElementById("face-status");
+        faceStatus.innerHTML = "Menunggu kamera & paskan wajah...";
+        faceStatus.className =
           "badge bg-warning-subtle text-warning-emphasis fs-6 border border-warning-subtle rounded-pill px-3 py-2 mt-2 mb-0 fw-bold";
-        document.getElementById("face-status").style.display = "block";
+        faceStatus.style.display = "block";
 
         navigator.mediaDevices
           .getUserMedia({ video: { facingMode: "user" } })
@@ -1208,7 +1221,7 @@
         const btnAmbilFoto = document.getElementById("btn-ambil-foto");
 
         const detectInterval = setInterval(async () => {
-          if (video.paused || video.ended || !modelsLoaded) {
+          if (video.paused || video.ended || !modelsLoaded || isCapturing) {
             return;
           }
 
@@ -1217,26 +1230,60 @@
               video,
               new faceapi.TinyFaceDetectorOptions(),
             );
+
             if (detections.length > 0) {
-              faceStatus.innerHTML = "✅ Wajah terdeteksi!";
-              faceStatus.className =
-                "badge bg-success-subtle text-success-emphasis fs-6 border border-success-subtle rounded-pill px-3 py-2 mt-2 mb-0 fw-bold";
               btnAmbilFoto.disabled = false;
+
+              if (!faceCountdownTimer && !isCapturing) {
+                faceCountdownValue = 3;
+                faceStatus.innerHTML = `📸 Wajah Pas! Tahan posisi (<b>${faceCountdownValue}s</b>)...`;
+                faceStatus.className =
+                  "badge bg-info-subtle text-info-emphasis fs-6 border border-info-subtle rounded-pill px-3 py-2 mt-2 mb-0 fw-bold";
+
+                faceCountdownTimer = setInterval(() => {
+                  faceCountdownValue -= 1;
+                  if (faceCountdownValue > 0) {
+                    faceStatus.innerHTML = `📸 Wajah Pas! Tahan posisi (<b>${faceCountdownValue}s</b>)...`;
+                  } else {
+                    clearInterval(faceCountdownTimer);
+                    faceCountdownTimer = null;
+                    isCapturing = true;
+
+                    faceStatus.innerHTML = "⚡ Memotret Otomatis...";
+                    faceStatus.className =
+                      "badge bg-success-subtle text-success-emphasis fs-6 border border-success-subtle rounded-pill px-3 py-2 mt-2 mb-0 fw-bold";
+
+                    prosesAbsenFoto();
+                  }
+                }, 1000);
+              }
             } else {
-              faceStatus.innerHTML = "❌ Wajah belum terlihat jelas";
-              faceStatus.className =
-                "badge bg-warning-subtle text-warning-emphasis fs-6 border border-warning-subtle rounded-pill px-3 py-2 mt-2 mb-0 fw-bold";
-              btnAmbilFoto.disabled = true;
+              if (faceCountdownTimer) {
+                clearInterval(faceCountdownTimer);
+                faceCountdownTimer = null;
+              }
+              faceCountdownValue = 3;
+
+              if (!isCapturing) {
+                faceStatus.innerHTML = "❌ Wajah hilang/bergerak! Paskan wajah kembali";
+                faceStatus.className =
+                  "badge bg-warning-subtle text-warning-emphasis fs-6 border border-warning-subtle rounded-pill px-3 py-2 mt-2 mb-0 fw-bold";
+                btnAmbilFoto.disabled = true;
+              }
             }
           } catch (e) {
             // ignore errors during loading
           }
-        }, 500);
+        }, 300);
 
         video.detectInterval = detectInterval;
       });
 
       function stopKamera() {
+        if (faceCountdownTimer) {
+          clearInterval(faceCountdownTimer);
+          faceCountdownTimer = null;
+        }
         if (streamKamera) {
           streamKamera.getTracks().forEach((track) => track.stop());
         }
@@ -1524,6 +1571,12 @@
       }
 
       async function prosesAbsenFoto() {
+        if (faceCountdownTimer) {
+          clearInterval(faceCountdownTimer);
+          faceCountdownTimer = null;
+        }
+        isCapturing = true;
+
         const btnSubmit = document.getElementById("btn-ambil-foto");
         if (btnSubmit.disabled) return;
         btnSubmit.disabled = true;
