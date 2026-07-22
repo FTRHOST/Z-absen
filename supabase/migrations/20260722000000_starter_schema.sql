@@ -2,13 +2,54 @@
 -- SCRIPT SETUP DATABASE ZIE ABSEN (VERSI FINAL & LENGKAP)
 -- ==========================================
 
+-- Pembuatan role & schema dasar Supabase
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'supabase_admin') THEN
+    CREATE ROLE supabase_admin WITH SUPERUSER LOGIN PASSWORD 'postgres';
+  ELSE
+    ALTER ROLE supabase_admin WITH SUPERUSER LOGIN PASSWORD 'postgres';
+  END IF;
+  IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'anon') THEN
+    CREATE ROLE anon NOLOGIN;
+  END IF;
+  IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'authenticated') THEN
+    CREATE ROLE authenticated NOLOGIN;
+  END IF;
+  IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'service_role') THEN
+    CREATE ROLE service_role NOLOGIN BYPASSRLS;
+  END IF;
+END $$;
+
+CREATE SCHEMA IF NOT EXISTS auth;
+CREATE SCHEMA IF NOT EXISTS storage;
+
+CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql AS $$ SELECT 'authenticated'::text; $$;
+CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT '00000000-0000-0000-0000-000000000000'::uuid; $$;
+
 -- Mengaktifkan ekstensi kriptografi untuk hashing password (wajib untuk Auth)
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- ------------------------------------------
 -- 1. PEMBUATAN BUCKET PENYIMPANAN
 -- ------------------------------------------
--- Dibuat otomatis dan langsung disetel sebagai PUBLIC agar link foto bisa dibuka
+CREATE TABLE IF NOT EXISTS storage.buckets (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    public BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+);
+
+CREATE TABLE IF NOT EXISTS storage.objects (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    bucket_id TEXT REFERENCES storage.buckets(id),
+    name TEXT,
+    owner UUID,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+    metadata JSONB
+);
+
 INSERT INTO storage.buckets (id, name, public) 
 VALUES ('absensi-bucket', 'absensi-bucket', true) 
 ON CONFLICT (id) DO UPDATE SET public = true;
@@ -123,6 +164,14 @@ CREATE TABLE IF NOT EXISTS form_cuti_config (
 -- ------------------------------------------
 INSERT INTO app_settings (id, nama_aplikasi) VALUES (1, 'ZIEDA ABSEN') ON CONFLICT (id) DO NOTHING;
 
+-- Hak Akses Schema
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role, supabase_admin;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role, supabase_admin;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role, supabase_admin;
+
+GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role, supabase_admin;
+GRANT ALL ON ALL TABLES IN SCHEMA storage TO anon, authenticated, service_role, supabase_admin;
+
 -- ------------------------------------------
 -- 4. FITUR KEAMANAN (ROW LEVEL SECURITY - RLS)
 -- ------------------------------------------
@@ -212,7 +261,6 @@ WHERE NOT EXISTS (
 -- ------------------------------------------
 -- 7. AKTIFKAN SUPABASE REALTIME
 -- ------------------------------------------
--- Wajib agar dashboard Admin bisa otomatis me-reload data jika ada perubahan
 BEGIN;
   DROP PUBLICATION IF EXISTS supabase_realtime;
   CREATE PUBLICATION supabase_realtime;
