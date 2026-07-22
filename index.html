@@ -721,6 +721,9 @@
       let lonKantor = 106.816666;
       let radiusMaksimal = 100;
       let namaKantor = "Kantor Pusat";
+      let listKantor = [];
+      let isAbsenCabangLain = false;
+      let cabangAbsenSekarang = "";
 
       let map;
       let markerKaryawan;
@@ -741,18 +744,18 @@
 
         isiDataProfil();
 
-        if (userCabang && userCabang !== "-") {
-          const { data, error } = await supabaseClient
-            .from("kantor")
-            .select("*")
-            .eq("nama", userCabang)
-            .single();
+        const { data: dataKantor, error: errKantor } = await supabaseClient
+          .from("kantor")
+          .select("*");
 
-          if (data && !error) {
-            latKantor = data.lat;
-            lonKantor = data.lng;
-            radiusMaksimal = data.radius;
-            namaKantor = data.nama;
+        if (dataKantor && !errKantor) {
+          listKantor = dataKantor;
+          const assignedKantor = listKantor.find((k) => k.nama === userCabang);
+          if (assignedKantor) {
+            latKantor = assignedKantor.lat;
+            lonKantor = assignedKantor.lng;
+            radiusMaksimal = assignedKantor.radius;
+            namaKantor = assignedKantor.nama;
           }
         }
 
@@ -767,17 +770,33 @@
             maxZoom: 19,
           }).addTo(map);
 
-          L.marker([latKantor, lonKantor])
-            .addTo(map)
-            .bindPopup(`<b>${namaKantor}</b>`)
-            .openPopup();
+          if (listKantor.length > 0) {
+            listKantor.forEach((k) => {
+              const isAssigned = (k.nama === namaKantor);
+              L.marker([k.lat, k.lng])
+                .addTo(map)
+                .bindPopup(`<b>${k.nama}</b>${isAssigned ? " (Cabang Utama)" : " (Cabang Lain)"}`);
 
-          L.circle([latKantor, lonKantor], {
-            color: "green",
-            fillColor: "#28a745",
-            fillOpacity: 0.2,
-            radius: radiusMaksimal,
-          }).addTo(map);
+              L.circle([k.lat, k.lng], {
+                color: isAssigned ? "green" : "#007bff",
+                fillColor: isAssigned ? "#28a745" : "#007bff",
+                fillOpacity: isAssigned ? 0.2 : 0.1,
+                radius: k.radius,
+              }).addTo(map);
+            });
+          } else {
+            L.marker([latKantor, lonKantor])
+              .addTo(map)
+              .bindPopup(`<b>${namaKantor}</b>`)
+              .openPopup();
+
+            L.circle([latKantor, lonKantor], {
+              color: "green",
+              fillColor: "#28a745",
+              fillOpacity: 0.2,
+              radius: radiusMaksimal,
+            }).addTo(map);
+          }
         }
       }
 
@@ -1321,27 +1340,78 @@
         document.getElementById("btn-cek-lokasi").disabled = false;
         const latKaryawan = position.coords.latitude;
         const lonKaryawan = position.coords.longitude;
-        const titikKantor = L.latLng(latKantor, lonKantor);
+        const titikAssigned = L.latLng(latKantor, lonKantor);
         const titikKaryawan = L.latLng(latKaryawan, lonKaryawan);
-        const jarak = titikKantor.distanceTo(titikKaryawan);
+        const jarakAssigned = titikAssigned.distanceTo(titikKaryawan);
 
         if (markerKaryawan) map.removeLayer(markerKaryawan);
         markerKaryawan = L.marker([latKaryawan, lonKaryawan])
           .addTo(map)
           .bindPopup("<b>Posisi Anda</b>")
           .openPopup();
-        map.fitBounds(L.latLngBounds([titikKantor, titikKaryawan]), {
-          padding: [20, 20],
-        });
 
-        if (jarak <= radiusMaksimal) {
-          jarakAbsen = Math.round(jarak);
+        // 1. Cek apakah karyawan berada di dalam radius cabang utamanya
+        if (jarakAssigned <= radiusMaksimal) {
+          jarakAbsen = Math.round(jarakAssigned);
+          isAbsenCabangLain = false;
+          cabangAbsenSekarang = namaKantor;
+
+          map.fitBounds(L.latLngBounds([titikAssigned, titikKaryawan]), {
+            padding: [20, 20],
+          });
+
           Swal.close();
           lanjutKeKameraAtauSubmit();
+          return;
+        }
+
+        // 2. Jika di luar cabang utama, cek apakah pengguna berada di dalam radius salah satu cabang lain
+        let cabangLainFound = null;
+        let minJarakLain = Infinity;
+
+        listKantor.forEach((k) => {
+          if (k.nama !== namaKantor) {
+            const d = L.latLng(k.lat, k.lng).distanceTo(titikKaryawan);
+            if (d <= k.radius && d < minJarakLain) {
+              minJarakLain = d;
+              cabangLainFound = k;
+            }
+          }
+        });
+
+        if (cabangLainFound) {
+          jarakAbsen = Math.round(minJarakLain);
+          isAbsenCabangLain = true;
+          cabangAbsenSekarang = cabangLainFound.nama;
+
+          const titikCabangLain = L.latLng(cabangLainFound.lat, cabangLainFound.lng);
+          map.fitBounds(L.latLngBounds([titikCabangLain, titikKaryawan]), {
+            padding: [20, 20],
+          });
+
+          Swal.fire({
+            title: "Absen di Luar Cabang Utama",
+            html: `Anda terdeteksi berada di lokasi cabang <strong>${cabangLainFound.nama}</strong> (${Math.round(minJarakLain)}m).<br><br><span class="text-warning fw-bold">⚠️ Perhatian:</span> Cabang ini berbeda dari cabang yang telah ditentukan untuk Anda (<strong>${namaKantor}</strong>).<br><br>Apakah Anda yakin ingin melanjutkan absensi di luar cabang yang telah ditentukan?`,
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#3085d6",
+            cancelButtonColor: "#6c757d",
+            confirmButtonText: "Ya, Lanjutkan Absen",
+            cancelButtonText: "Batal",
+            allowOutsideClick: false,
+          }).then((result) => {
+            if (result.isConfirmed) {
+              lanjutKeKameraAtauSubmit();
+            }
+          });
         } else {
+          map.fitBounds(L.latLngBounds([titikAssigned, titikKaryawan]), {
+            padding: [20, 20],
+          });
+
           Swal.fire({
             title: "Absen Ditolak!",
-            text: `Anda di luar jangkauan (${Math.round(jarak)} m dari kantor).`,
+            text: `Anda di luar jangkauan (${Math.round(jarakAssigned)} m dari ${namaKantor}) dan tidak berada di lokasi cabang lain.`,
             icon: "error",
           });
         }
@@ -1415,12 +1485,16 @@
           statusKehadiran = "Lembur";
         }
 
+        const lokasiTeks = isAbsenCabangLain
+          ? `Jarak: ${Math.round(jarakAbsen)}m dari ${cabangAbsenSekarang} (Luar Cabang)`
+          : `Jarak: ${Math.round(jarakAbsen)}m`;
+
         let payload = {
           user_id: currentUser.id,
           tanggal: tanggalHariIni,
           waktu: localTime,
           tipe_absen: tipeAbsenSekarang,
-          lokasi: `Jarak: ${Math.round(jarakAbsen)}m`,
+          lokasi: lokasiTeks,
           status: statusKehadiran,
         };
 
@@ -1429,7 +1503,7 @@
         if (response.error) {
           Swal.fire("Gagal", response.error.message, "error");
         } else {
-          const textMsg = `<b>Laporan Absen (Lokasi)</b>\nNama: ${currentUser.nama}\nCabang: ${currentUser.cabang || '-'}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${localTime}\nLokasi: Jarak ${Math.round(jarakAbsen)}m`;
+          const textMsg = `<b>Laporan Absen (Lokasi)</b>\nNama: ${currentUser.nama}\nCabang Utama: ${currentUser.cabang || '-'}\nCabang Absen: ${isAbsenCabangLain ? cabangAbsenSekarang + ' (Luar Cabang)' : (currentUser.cabang || '-')}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${localTime}\nLokasi: ${lokasiTeks}`;
           await sendTelegramNotification(textMsg);
 
           Swal.fire("Berhasil!", "Absensi berhasil disimpan.", "success").then(
@@ -1538,7 +1612,9 @@
           const tanggal = localDate.toISOString().split("T")[0]; // Format YYYY-MM-DD
           const waktu_sekarang = sekarang.toTimeString().split(" ")[0]; // Format HH:MM:SS
           let statusKehadiran = "Hadir";
-          const lokasiTeks = `Jarak: ${Math.round(jarakAbsen)}m`;
+          const lokasiTeks = isAbsenCabangLain
+            ? `Jarak: ${Math.round(jarakAbsen)}m dari ${cabangAbsenSekarang} (Luar Cabang)`
+            : `Jarak: ${Math.round(jarakAbsen)}m`;
           const tipeData =
             masterTipeAbsen.find((m) => m.nama_tipe === tipeAbsenSekarang) ||
             {};
@@ -1577,7 +1653,7 @@
           ]);
           let dbError = res.error;
 
-          const textMsg = `<b>Laporan Absen (Wajah/Selfie)</b>\nNama: ${userObj.nama}\nCabang: ${userObj.cabang || '-'}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${waktu_sekarang}\nLokasi: ${lokasiTeks}\nFoto: <a href="${publicUrlData.publicUrl}">Lihat Foto</a>`;
+          const textMsg = `<b>Laporan Absen (Wajah/Selfie)</b>\nNama: ${userObj.nama}\nCabang Utama: ${userObj.cabang || '-'}\nCabang Absen: ${isAbsenCabangLain ? cabangAbsenSekarang + ' (Luar Cabang)' : (userObj.cabang || '-')}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${waktu_sekarang}\nLokasi: ${lokasiTeks}\nFoto: <a href="${publicUrlData.publicUrl}">Lihat Foto</a>`;
           await sendTelegramNotification(textMsg);
 
           await cekStatusAbsenHariIni();
@@ -2582,10 +2658,15 @@
         }
       }
       async function sendTelegramNotification(message) {
+        const targetChatId =
+          (typeof window !== "undefined" && window.TELEGRAM_CHAT_ID) ||
+          (typeof TELEGRAM_CHAT_ID !== "undefined"
+            ? TELEGRAM_CHAT_ID
+            : "-5585540383");
+
         if (
-          typeof TELEGRAM_CHAT_ID === "undefined" ||
-          !TELEGRAM_CHAT_ID ||
-          TELEGRAM_CHAT_ID === "ISI_DENGAN_CHAT_ID_GRUP_ANDA"
+          !targetChatId ||
+          targetChatId === "ISI_DENGAN_CHAT_ID_GRUP_ANDA"
         ) {
           console.log("Telegram Chat ID not configured");
           return;
@@ -2595,7 +2676,7 @@
           const { data, error } = await supabaseClient.functions.invoke(
             "telegram-notif",
             {
-              body: { message: message, chat_id: TELEGRAM_CHAT_ID },
+              body: { message: message, chat_id: targetChatId },
             },
           );
 
