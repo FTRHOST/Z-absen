@@ -367,7 +367,7 @@
               .maybeSingle();
 
             if (!profile) {
-              // Akun Auth ada, tapi public.users belum terikat (Misal karena bug koneksi sebelumnya). Kita ikat paksa sekarang.
+              // Akun Auth ada, tapi public.users belum terikat atau auth_id usang. Kita ikat sekarang via RPC.
               const { data: linkedData, error: linkError } =
                 await supabaseClient.rpc("link_my_account", {
                   p_nama: namaUser,
@@ -375,19 +375,10 @@
                 });
               if (linkError || !linkedData) {
                 throw new Error(
-                  "Data profil tidak ditemukan atau password salah saat memulihkan koneksi.",
+                  "Data profil tidak ditemukan atau password salah.",
                 );
               }
-
-              // Ambil ulang data profil
-              const { data: retryProfile } = await supabaseClient
-                .from("users")
-                .select("*")
-                .eq("auth_id", authResult.data.user.id)
-                .maybeSingle();
-              if (!retryProfile)
-                throw new Error("Data profil benar-benar tidak ditemukan.");
-              profile = retryProfile;
+              profile = linkedData;
             }
             userData = profile;
           }
