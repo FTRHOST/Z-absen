@@ -3511,9 +3511,51 @@ async function restoreDatabase(event) {
         const parsed = JSON.parse(jsonString);
         const rawDb = parsed.database ? parsed.database : parsed;
         
-        if (rawDb['cabang'] && !rawDb['kantor']) {
-            rawDb['kantor'] = rawDb['cabang'];
+        // ------------------------------------------
+        // Normalisasi & Sanitasi Khusus Tabel 'kantor'
+        // ------------------------------------------
+        let kantorRecords = rawDb['kantor'] || rawDb['cabang'] || [];
+
+        // Jika data kantorRecords kosong di file backup, ekstrak otomatis dari users.cabang agar tidak ada cabang yang hilang
+        if (!Array.isArray(kantorRecords) || kantorRecords.length === 0) {
+            const cabangNames = new Set(['Pusat']);
+            if (Array.isArray(rawDb['users'])) {
+                rawDb['users'].forEach(u => {
+                    if (u.cabang && typeof u.cabang === 'string' && u.cabang.trim() !== '') {
+                        cabangNames.add(u.cabang.trim());
+                    }
+                });
+            }
+            kantorRecords = Array.from(cabangNames).map((nama, idx) => ({
+                id: idx + 1,
+                nama: nama,
+                lat: '-6.2088',
+                lng: '106.8456',
+                radius: 100
+            }));
         }
+
+        // Format ulang setiap record kantor agar persis cocok dengan skema tabel Supabase 'kantor'
+        rawDb['kantor'] = kantorRecords.map((item, idx) => {
+            if (typeof item === 'string') {
+                return {
+                    id: idx + 1,
+                    nama: item,
+                    lat: '-6.2088',
+                    lng: '106.8456',
+                    radius: 100,
+                    created_at: new Date().toISOString()
+                };
+            }
+            return {
+                id: parseInt(item.id || (idx + 1), 10),
+                nama: String(item.nama || item.nama_kantor || item.nama_cabang || item.cabang || `Kantor ${idx + 1}`),
+                lat: String(item.lat || item.latitude || '-6.2088'),
+                lng: String(item.lng || item.longitude || '106.8456'),
+                radius: parseInt(item.radius || item.radius_meter || 100, 10),
+                created_at: item.created_at || new Date().toISOString()
+            };
+        });
 
         // 1. Jika ada media dari paket ZIP, unggah ulang ke storage bucket server baru secara otomatis
         const mediaKeys = Object.keys(mediaFiles);
@@ -3587,19 +3629,37 @@ async function restoreDatabase(event) {
         ];
 
         let restoredCount = 0;
+        const failedTables = [];
+
         for (const table of restoreSequence) {
             const records = rawDb[table];
             if (records && Array.isArray(records) && records.length > 0) {
                 const { error } = await supabaseClient.from(table).upsert(records);
                 if (error) {
-                    console.warn(`Gagal memulihkan tabel ${table}:`, error);
+                    console.warn(`Upsert massal gagal untuk tabel ${table}, mencoba per-baris:`, error);
+                    let tableRestored = 0;
+                    for (const row of records) {
+                        const { error: singleErr } = await supabaseClient.from(table).upsert(row);
+                        if (!singleErr) tableRestored++;
+                        else console.warn(`Gagal upsert row tabel ${table}:`, singleErr, row);
+                    }
+                    if (tableRestored > 0) {
+                        restoredCount += tableRestored;
+                    } else {
+                        failedTables.push(table);
+                    }
                 } else {
                     restoredCount += records.length;
                 }
             }
         }
         
-        Swal.fire("Berhasil", `Database berhasil dipulihkan & seluruh link foto otomatis ditautkan ke server baru! (${restoredCount} record diproses)`, "success").then(() => {
+        let msgSuccess = `Database berhasil dipulihkan & seluruh link foto otomatis ditautkan ke server baru! (${restoredCount} record diproses)`;
+        if (failedTables.length > 0) {
+            msgSuccess += `<br><small class="text-warning">Catatan: Tabel (${failedTables.join(', ')}) gagal dipulihkan sebagian/seluruhnya.</small>`;
+        }
+
+        Swal.fire("Berhasil", msgSuccess, "success").then(() => {
             location.reload();
         });
 
