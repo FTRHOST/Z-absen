@@ -2729,7 +2729,25 @@
           return;
         }
 
-        // 1. Jika TELEGRAM_BOT_TOKEN diisi di .env / Docker, kirim langsung via Direct Telegram Bot API
+        // 1. Coba Vercel Serverless Function (/api/telegram-notif) - Token Rahasia 100% Terjaga di Server
+        try {
+          const vercelResp = await fetch('/api/telegram-notif', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: message, chat_id: targetChatId })
+          });
+          if (vercelResp.ok) {
+            const vData = await vercelResp.json();
+            if (vData.ok) {
+              console.log("Notifikasi Telegram berhasil dikirim via Vercel Serverless Function.");
+              return;
+            }
+          }
+        } catch (vErr) {
+          // Bukan di Vercel, lanjut ke opsi berikutnya
+        }
+
+        // 2. Jika TELEGRAM_BOT_TOKEN diisi di .env lokal / Docker, kirim langsung via Direct Telegram Bot API
         if (botToken && !botToken.includes("YOUR_BOT_TOKEN")) {
           try {
             const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
@@ -2753,7 +2771,7 @@
           }
         }
 
-        // 2. Fallback: Panggil Supabase Edge Function (telegram-notif) jika dipasang di Cloud
+        // 3. Fallback: Panggil Supabase Edge Function (telegram-notif) jika dipasang di Cloud
         try {
           const { data, error } = await supabaseClient.functions.invoke(
             "telegram-notif",
@@ -2769,7 +2787,7 @@
           }
         } catch (error) {
           console.info(
-            "Edge Function (telegram-notif) tidak dipasang pada server ini. Silakan atur TELEGRAM_BOT_TOKEN di file .env."
+            "Edge Function (telegram-notif) tidak dipasang pada server ini."
           );
         }
       }
