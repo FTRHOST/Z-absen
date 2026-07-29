@@ -10,7 +10,7 @@
 *.key
 
 # 2. Dynamic Runtime Files
-env.js
+/env.js
 
 # 3. Node Modules & Dependencies
 node_modules/
