@@ -13,11 +13,14 @@ function getEnv(key) {
 // KONFIGURASI KONEKSI SUPABASE
 // ==========================================
 // Membaca SUPABASE_URL & ANON_KEY dari .env / Docker / window.ENV
-const SUPABASE_URL =
+const rawSupabaseUrl =
   getEnv("SUPABASE_URL") ||
   (typeof window !== "undefined" && window.location.origin
     ? window.location.origin
     : "http://127.0.0.1:54321");
+
+// Hapus trailing slash '/' di akhir URL agar konsisten dan mencegah isu double slash (//) serta logout berulang
+const SUPABASE_URL = rawSupabaseUrl.replace(/\/+$/, "");
 
 const SUPABASE_ANON_KEY =
   getEnv("SUPABASE_ANON_KEY") ||
@@ -31,7 +34,7 @@ const TELEGRAM_CHAT_ID = getEnv("TELEGRAM_CHAT_ID") || "-5585540383";
 (function checkUrlChangeAndAutoLogout() {
   if (typeof window === "undefined" || !window.localStorage) return;
   try {
-    const previousUrl = localStorage.getItem('LAST_SUPABASE_URL');
+    const previousUrl = (localStorage.getItem('LAST_SUPABASE_URL') || '').replace(/\/+$/, "");
     
     if (previousUrl && previousUrl !== SUPABASE_URL) {
       console.info(`🔄 [Zieda Absen] Perubahan URL database terdeteksi (${previousUrl} -> ${SUPABASE_URL}). Membersihkan sesi lama...`);
@@ -67,13 +70,16 @@ function fixStorageUrl(url) {
     if (!url || typeof url !== 'string') return '';
     if (url.startsWith('data:')) return url; // Base64 image
     
+    // Normalisasi double slash opsional
+    const cleanUrl = url.replace(/([^:]\/)\/+/g, "$1");
+    
     // Cari penanda bucket di URL (misal: /absensi-bucket/)
     const bucketMarker = '/absensi-bucket/';
-    const idx = url.indexOf(bucketMarker);
+    const idx = cleanUrl.indexOf(bucketMarker);
     if (idx !== -1) {
-        const pathAfterBucket = url.substring(idx + bucketMarker.length);
+        const pathAfterBucket = cleanUrl.substring(idx + bucketMarker.length).replace(/^\/+/, '');
         return `${SUPABASE_URL}/storage/v1/object/public/absensi-bucket/${pathAfterBucket}`;
     }
     
-    return url;
+    return cleanUrl;
 }
