@@ -2714,18 +2714,45 @@
       async function sendTelegramNotification(message) {
         const targetChatId =
           (typeof window !== "undefined" && window.TELEGRAM_CHAT_ID) ||
-          (typeof TELEGRAM_CHAT_ID !== "undefined"
-            ? TELEGRAM_CHAT_ID
-            : "-5585540383");
+          (typeof TELEGRAM_CHAT_ID !== "undefined" ? TELEGRAM_CHAT_ID : "-5585540383");
+
+        const botToken =
+          (typeof window !== "undefined" && window.TELEGRAM_BOT_TOKEN) ||
+          (typeof TELEGRAM_BOT_TOKEN !== "undefined" ? TELEGRAM_BOT_TOKEN : "") ||
+          (typeof window !== "undefined" && window.ENV && window.ENV.TELEGRAM_BOT_TOKEN) || "";
 
         if (
           !targetChatId ||
           targetChatId === "ISI_DENGAN_CHAT_ID_GRUP_ANDA"
         ) {
-          console.log("Telegram Chat ID not configured");
+          console.log("Telegram Chat ID tidak dikonfigurasi");
           return;
         }
 
+        // 1. Jika TELEGRAM_BOT_TOKEN diisi di .env / Docker, kirim langsung via Direct Telegram Bot API
+        if (botToken && !botToken.includes("YOUR_BOT_TOKEN")) {
+          try {
+            const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: targetChatId,
+                text: message
+              })
+            });
+            const resData = await resp.json();
+            if (resData.ok) {
+              console.log("Notifikasi Telegram berhasil dikirim via Direct Bot API.");
+              return;
+            } else {
+              console.warn("Direct Telegram API response warning:", resData);
+            }
+          } catch(err) {
+            console.warn("Gagal mengirim via Direct Telegram API, mencoba Supabase Edge Function...", err);
+          }
+        }
+
+        // 2. Fallback: Panggil Supabase Edge Function (telegram-notif) jika dipasang di Cloud
         try {
           const { data, error } = await supabaseClient.functions.invoke(
             "telegram-notif",
@@ -2737,12 +2764,11 @@
           if (error) throw error;
 
           if (data && !data.ok) {
-            console.error("Gagal kirim notifikasi Telegram:", data);
+            console.error("Gagal kirim notifikasi Telegram via Edge Function:", data);
           }
         } catch (error) {
-          console.error(
-            "Error memanggil Supabase Edge Function (telegram-notif):",
-            error,
+          console.info(
+            "Edge Function (telegram-notif) tidak dipasang pada server ini. Silakan atur TELEGRAM_BOT_TOKEN di file .env."
           );
         }
       }
