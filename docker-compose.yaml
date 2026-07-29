@@ -86,10 +86,15 @@ services:
       SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
       POSTGREST_URL: http://rest:3000
       PGRST_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
-      DATABASE_URL: postgresql://supabase_admin:postgres@db:5432/postgres?search_path=storage,public
+      DATABASE_URL: "postgresql://supabase_admin:postgres@db:5432/postgres?options=-c%20search_path%3Dstorage,public"
+      DATABASE_SEARCH_PATH: "storage,public"
+      PGOPTIONS: "-c search_path=storage,public"
       FILE_SIZE_LIMIT: 52428800
       STORAGE_BACKEND: file
       FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: stub
+      GLOBAL_S3_BUCKET: stub
     volumes:
       - zieda_storage_data:/var/lib/storage
     depends_on:
@@ -105,6 +110,7 @@ services:
     container_name: zieda-absen-realtime
     environment:
       PORT: 4000
+      APP_NAME: realtime
       FLY_APP_NAME: realtime
       DB_HOST: db
       DB_PORT: 5432
@@ -112,7 +118,7 @@ services:
       DB_PASSWORD: postgres
       DB_NAME: postgres
       DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
-      DB_ENC_KEY: super-secret-jwt-token-with-at-least-32-characters-long
+      DB_ENC_KEY: "1234567890123456"
       API_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
       METRICS_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
       SECRET_KEY_BASE: Up6D2HVWVvMjjyjtTxayCGyuh6L3ESAi5Y6cHdHAwGivld10aBjg6pRAHAqdEOiJ

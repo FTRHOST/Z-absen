@@ -45,26 +45,15 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- ------------------------------------------
 -- 1. PEMBUATAN BUCKET PENYIMPANAN
 -- ------------------------------------------
-CREATE TABLE IF NOT EXISTS storage.buckets (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    public BOOLEAN DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
-);
-
-CREATE TABLE IF NOT EXISTS storage.objects (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    bucket_id TEXT REFERENCES storage.buckets(id),
-    name TEXT,
-    owner UUID,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
-    metadata JSONB
-);
-
-INSERT INTO storage.buckets (id, name, public) 
-VALUES ('absensi-bucket', 'absensi-bucket', true) 
-ON CONFLICT (id) DO UPDATE SET public = true;
+-- Catatan: Tabel storage.buckets & storage.objects dibuat dan dimigrasi secara otomatis oleh Supabase Storage API engine.
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'storage' AND table_name = 'buckets') THEN
+        INSERT INTO storage.buckets (id, name, public) 
+        VALUES ('absensi-bucket', 'absensi-bucket', true) 
+        ON CONFLICT (id) DO UPDATE SET public = true;
+    END IF;
+END $$;
 
 -- ------------------------------------------
 -- 2. PEMBUATAN TABEL-TABEL UTAMA
@@ -176,13 +165,24 @@ CREATE TABLE IF NOT EXISTS form_cuti_config (
 -- ------------------------------------------
 INSERT INTO app_settings (id, nama_aplikasi) VALUES (1, 'ZIEDA ABSEN') ON CONFLICT (id) DO NOTHING;
 
--- Hak Akses Schema
+-- Hak Akses Schema & Roles
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role, supabase_admin;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role, supabase_admin;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role, supabase_admin;
 
-GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role, supabase_admin;
-GRANT ALL ON ALL TABLES IN SCHEMA storage TO anon, authenticated, service_role, supabase_admin;
+GRANT ALL ON SCHEMA storage TO postgres, supabase_admin, anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA storage TO postgres, supabase_admin, anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA storage TO postgres, supabase_admin, anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA storage TO postgres, supabase_admin, anon, authenticated, service_role;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA storage GRANT ALL ON TABLES TO postgres, supabase_admin, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA storage GRANT ALL ON SEQUENCES TO postgres, supabase_admin, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA storage GRANT ALL ON ROUTINES TO postgres, supabase_admin, anon, authenticated, service_role;
+
+ALTER ROLE service_role SET search_path = storage, public;
+ALTER ROLE authenticated SET search_path = storage, public;
+ALTER ROLE anon SET search_path = storage, public;
+ALTER ROLE supabase_admin SET search_path = storage, public;
 
 -- ------------------------------------------
 -- 4. FITUR KEAMANAN (ROW LEVEL SECURITY - RLS)
@@ -219,10 +219,18 @@ CREATE POLICY "Allow auth insert users" ON users FOR INSERT WITH CHECK (auth.rol
 CREATE POLICY "Allow auth delete users" ON users FOR DELETE USING (auth.role() = 'authenticated');
 
 -- Kebijakan Storage Bucket (Upload Foto)
+DROP POLICY IF EXISTS "Public Access" ON storage.objects;
+DROP POLICY IF EXISTS "Auth Upload Access" ON storage.objects;
+DROP POLICY IF EXISTS "Public Upload Access" ON storage.objects;
+DROP POLICY IF EXISTS "Auth Update Access" ON storage.objects;
+DROP POLICY IF EXISTS "Public Update Access" ON storage.objects;
+DROP POLICY IF EXISTS "Auth Delete Access" ON storage.objects;
+DROP POLICY IF EXISTS "Public Delete Access" ON storage.objects;
+
 CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING ( bucket_id = 'absensi-bucket' );
-CREATE POLICY "Auth Upload Access" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'absensi-bucket' AND auth.role() = 'authenticated' );
-CREATE POLICY "Auth Update Access" ON storage.objects FOR UPDATE USING ( bucket_id = 'absensi-bucket' AND auth.role() = 'authenticated' );
-CREATE POLICY "Auth Delete Access" ON storage.objects FOR DELETE USING ( bucket_id = 'absensi-bucket' AND auth.role() = 'authenticated' );
+CREATE POLICY "Public Upload Access" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'absensi-bucket' );
+CREATE POLICY "Public Update Access" ON storage.objects FOR UPDATE USING ( bucket_id = 'absensi-bucket' );
+CREATE POLICY "Public Delete Access" ON storage.objects FOR DELETE USING ( bucket_id = 'absensi-bucket' );
 
 -- ------------------------------------------
 -- 5. FUNGSI PENDAFTARAN OTOMATIS (LINK ACCOUNT)
