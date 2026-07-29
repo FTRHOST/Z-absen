@@ -596,14 +596,54 @@
             </div>
 
             <div class="tab-pane" id="tab-absensi">
-              <div class="d-flex justify-content-between align-items-center mb-3">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                 <h5 class="fw-bold mb-0 text-primary"><i class="fas fa-calendar-alt me-2"></i>Rekap Absensi Harian</h5>
-                <input
-                  type="month"
-                  id="filter-bulan-absensi"
-                  class="form-control form-control-sm w-auto shadow-sm"
-                  onchange="loadDataAbsensi()"
-                />
+                <div class="d-flex align-items-center gap-2">
+                  <input
+                    type="month"
+                    id="filter-bulan-absensi"
+                    class="form-control form-control-sm w-auto shadow-sm"
+                    onchange="loadDataAbsensi()"
+                  />
+                  <button class="btn btn-sm btn-success fw-bold shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#collapseExportAbsensi" aria-expanded="false" aria-controls="collapseExportAbsensi">
+                    <i class="fas fa-file-export me-1"></i> Export Data Absensi
+                  </button>
+                </div>
+              </div>
+
+              <!-- COLLAPSIBLE EXPORT CARD DI REKAP ABSENSI -->
+              <div class="collapse mb-4" id="collapseExportAbsensi">
+                <div class="card shadow-sm border-0 border-start border-4 border-success">
+                  <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-file-excel text-success me-2"></i>Export Data Absensi (CSV / ZIP Foto)</span>
+                    <button type="button" class="btn-close" data-bs-toggle="collapse" data-bs-target="#collapseExportAbsensi" aria-label="Close"></button>
+                  </div>
+                  <div class="card-body">
+                    <form id="form-export" onsubmit="prosesExport(event)">
+                      <div class="row g-3">
+                        <div class="col-md-5">
+                          <label class="form-label small text-muted">Tanggal Mulai</label>
+                          <input type="date" class="form-control form-control-sm" id="export_mulai" required>
+                        </div>
+                        <div class="col-md-5">
+                          <label class="form-label small text-muted">Tanggal Selesai</label>
+                          <input type="date" class="form-control form-control-sm" id="export_selesai" required>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                          <button type="submit" class="btn btn-sm btn-success w-100 fw-bold shadow-sm" id="btn-export">
+                            <i class="fas fa-download me-1"></i> Export
+                          </button>
+                        </div>
+                        <div class="col-md-12">
+                          <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="export_media">
+                            <label class="form-check-label text-muted small" for="export_media">Sertakan foto absensi (Download format ZIP + folder media foto)</label>
+                          </div>
+                        </div>
+                      </div>
+                    </form>
+                  </div>
+                </div>
               </div>
 
               <!-- Kontainer Grid Card Absensi -->
@@ -848,16 +888,16 @@ Besok **17 Agustus** kita libur ya!"></textarea>
               </div>
 
               <div class="card shadow-sm border-0 mb-4 border-danger">
-                <div class="card-header bg-danger text-white fw-bold"><i class="fas fa-database me-2"></i>Backup & Restore Database</div>
+                <div class="card-header bg-danger text-white fw-bold"><i class="fas fa-database me-2"></i>Backup & Restore Database Enterprise</div>
                 <div class="card-body">
-                  <p class="text-muted small mb-2">Backup seluruh tabel database ke dalam format JSON <strong>(Khusus IT/Developer)</strong>. Sangat berguna untuk migrasi atau pencadangan data mentah.</p>
+                  <p class="text-muted small mb-2">Backup seluruh database ke format JSON Standar Enterprise <strong>(Kantor, Karyawan, Tipe Absen, Jenis Cuti, Config Form Cuti, Settings, Absensi & Cuti)</strong>. Format ini terstruktur lengkap dengan metadata & audit log.</p>
                   <div class="form-check mb-3">
                     <input class="form-check-input" type="checkbox" id="backup_media">
-                    <label class="form-check-label text-muted small" for="backup_media">Sertakan media (foto absensi & dokumen cuti). Backup akan berupa file ZIP berukuran besar.</label>
+                    <label class="form-check-label text-muted small" for="backup_media">Sertakan media (foto absensi & dokumen lampiran cuti). Backup akan di-compress berupa file ZIP Enterprise.</label>
                   </div>
                   <div class="d-flex gap-2">
-                    <button class="btn btn-outline-danger fw-bold flex-grow-1" onclick="backupDatabase()"><i class="fas fa-cloud-download-alt me-2"></i>Backup Semua Data (Khusus IT)</button>
-                    <button class="btn btn-danger fw-bold flex-grow-1" onclick="document.getElementById('file-restore-db').click()"><i class="fas fa-cloud-upload-alt me-2"></i>Restore Data (Bahaya!)</button>
+                    <button class="btn btn-outline-danger fw-bold flex-grow-1" onclick="backupDatabase()"><i class="fas fa-cloud-download-alt me-2"></i>Backup Full Enterprise Data</button>
+                    <button class="btn btn-danger fw-bold flex-grow-1" onclick="document.getElementById('file-restore-db').click()"><i class="fas fa-cloud-upload-alt me-2"></i>Restore Database Enterprise</button>
                     <input type="file" id="file-restore-db" accept=".json" class="d-none" onchange="restoreDatabase(event)">
                   </div>
                 </div>
@@ -1022,30 +1062,6 @@ Besok **17 Agustus** kita libur ya!"></textarea>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="config.js"></script>
-    <script src="admin.js?v=35"></script>
-    
-    <script>
-      if (userData) {
-        const userObj = JSON.parse(userData);
-        document.getElementById("navbar-role-text").innerText = `Login sebagai: ${userObj.nama} (${userObj.role})`;
-      }
-
-      function logout() {
-        localStorage.removeItem('userLogin');
-        window.location.href = 'login.html';
-      }
-
-      function logout() {
-        localStorage.removeItem('userLogin');
-        window.location.href = 'login.html';
-      }
-    </script>
-    
     <!-- Modal Preview File Cuti -->
     <div class="modal fade" id="modalPreviewFile" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -1065,5 +1081,23 @@ Besok **17 Agustus** kita libur ya!"></textarea>
         </div>
       </div>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="env.js"></script>
+    <script src="config.js"></script>
+    <script src="admin.js?v=36"></script>
+    
+    <script>
+      if (typeof userData !== 'undefined' && userData) {
+        try {
+          const userObj = JSON.parse(userData);
+          const roleEl = document.getElementById("navbar-role-text");
+          if (roleEl) roleEl.innerText = `Login sebagai: ${userObj.nama || 'Admin'} (${userObj.role || 'Super Admin'})`;
+        } catch(e) {}
+      }
+    </script>
   </body>
 </html>

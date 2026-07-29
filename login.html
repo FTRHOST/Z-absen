@@ -173,6 +173,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- Konfigurasi Global -->
+    <script src="env.js"></script>
     <script src="config.js"></script>
 
     <script>
@@ -245,6 +246,10 @@
           document.getElementById('logo-skeleton').classList.add('d-none');
           document.getElementById('login-body-skeleton').classList.add('d-none');
           document.getElementById('login-body-real').classList.remove('d-none');
+        }
+
+        if (window.location.search.includes('env_changed=true')) {
+          Swal.fire("Konfigurasi Diperbarui", "Perubahan lingkungan database terdeteksi. Sesi lama telah dibersihkan otomatis, silakan login kembali ke sistem.", "info");
         }
       });
 

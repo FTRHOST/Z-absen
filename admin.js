@@ -61,11 +61,22 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
     } catch (e) {
-        await supabaseClient.auth.signOut();
-        localStorage.removeItem('userLogin');
-        window.location.href = "login.html";
+        await logout();
         return;
     }
+
+// Global logout function
+window.logout = async function() {
+    try {
+        if (typeof supabaseClient !== 'undefined' && supabaseClient.auth) {
+            await supabaseClient.auth.signOut();
+        }
+    } catch (err) {
+        console.warn("SignOut error:", err);
+    }
+    localStorage.removeItem('userLogin');
+    window.location.href = "login.html";
+};
 
     // Handle Tab Routing
     let hash = window.location.hash || '#tab-dashboard';
@@ -332,14 +343,18 @@ async function loadDashboardStats() {
     
     // 4. Render Pengumuman Markdown
     const pengumumanContainer = document.getElementById("dashboard-pengumuman-container");
-    if (pengumumanContainer && window.marked) {
-        const { data: settingData } = await supabaseClient.from('app_settings').select('pengumuman, pengumuman_warna').eq('id', 1).single();
-        if (settingData && settingData.pengumuman) {
-            const htmlContent = marked.parse(settingData.pengumuman);
-            const colorClass = settingData.pengumuman_warna || 'alert-info';
-            pengumumanContainer.innerHTML = `<div class="alert ${colorClass} shadow-sm">${htmlContent}</div>`;
-        } else {
-            pengumumanContainer.innerHTML = '<div class="text-muted text-center"><small>Belum ada pengumuman.</small></div>';
+    if (pengumumanContainer) {
+        try {
+            const { data: settingData } = await supabaseClient.from('app_settings').select('pengumuman, pengumuman_warna').eq('id', 1).maybeSingle();
+            if (settingData && settingData.pengumuman) {
+                const htmlContent = window.marked ? marked.parse(settingData.pengumuman) : settingData.pengumuman;
+                const colorClass = settingData.pengumuman_warna || 'alert-info';
+                pengumumanContainer.innerHTML = `<div class="alert ${colorClass} shadow-sm">${htmlContent}</div>`;
+            } else {
+                pengumumanContainer.innerHTML = '<div class="text-muted text-center"><small>Belum ada pengumuman.</small></div>';
+            }
+        } catch(err) {
+            console.warn("Gagal memuat pengumuman dashboard:", err);
         }
     }
 
@@ -1191,6 +1206,11 @@ async function loadDataAbsensi() {
     const [year, month] = filterBulan.value.split('-');
     const startDate = `${year}-${month}-01`;
     const endDate = new Date(year, month, 0).toISOString().split('T')[0];
+
+    const expMulai = document.getElementById("export_mulai");
+    const expSelesai = document.getElementById("export_selesai");
+    if (expMulai && !expMulai.value) expMulai.value = startDate;
+    if (expSelesai && !expSelesai.value) expSelesai.value = endDate;
 
     const getSkeletonCardHTML = () => `
         <div class="col-12 col-md-6 col-lg-4">
@@ -2678,7 +2698,10 @@ async function prosesExport(event) {
         
         // 1. Group Data & Get Unique Tipe Absen
         const grouped = {};
-        const tipeAbsenSet = new Set();
+        let tipeAbsenList = [];
+        if (typeof globalMasterTipeAbsen !== 'undefined' && globalMasterTipeAbsen.length > 0) {
+            tipeAbsenList = globalMasterTipeAbsen.filter(t => t.is_aktif).map(t => t.nama_tipe);
+        }
 
         data.forEach(row => {
             const namaUser = row.users ? row.users.nama : 'Unknown';
@@ -2695,7 +2718,9 @@ async function prosesExport(event) {
             }
             
             const tipe = row.tipe_absen || 'Unknown';
-            tipeAbsenSet.add(tipe);
+            if (!tipeAbsenList.includes(tipe)) {
+                tipeAbsenList.push(tipe);
+            }
             
             grouped[key].absensi[tipe] = {
                 waktu: row.waktu || '-',
@@ -3006,6 +3031,7 @@ async function hapusPermanenInternal(row) {
         // Hapus file storage
         const files = [];
         const extractFilename = (url) => url ? url.split('/').pop() : null;
+        if (row.foto) files.push(extractFilename(row.foto));
         if (row.foto_masuk) files.push(extractFilename(row.foto_masuk));
         if (row.foto_istirahat_keluar) files.push(extractFilename(row.foto_istirahat_keluar));
         if (row.foto_istirahat_masuk) files.push(extractFilename(row.foto_istirahat_masuk));
@@ -3293,25 +3319,61 @@ async function importKaryawan(event) {
 async function backupDatabase() {
     const includeMedia = document.getElementById('backup_media')?.checked;
     
-    Swal.fire({ title: includeMedia ? 'Membackup Database & Media...' : 'Membackup Database...', html: 'Proses ini mungkin memakan waktu agak lama.', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    Swal.fire({
+        title: includeMedia ? 'Membackup Database Enterprise & Media...' : 'Membackup Database Enterprise...',
+        html: 'Mengumpulkan seluruh data master (kantor, karyawan, tipe absen, jenis cuti, form config) & transaksi absensi/cuti...',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+    });
+
     try {
-        const dbBackup = {};
-        const tables = ['users', 'cabang', 'absensi', 'cuti', 'form_cuti_config', 'app_settings'];
-        
-        for (const table of tables) {
+        // List seluruh tabel resmi database Zieda Absen
+        const targetTables = [
+            'users',
+            'kantor',
+            'master_tipe_absen',
+            'master_jenis_cuti',
+            'form_cuti_config',
+            'app_settings',
+            'absensi',
+            'cuti'
+        ];
+
+        const dbTablesData = {};
+        const tablesSummary = {};
+        let totalRecordsCount = 0;
+
+        for (const table of targetTables) {
             try {
                 const { data, error } = await supabaseClient.from(table).select('*');
                 if (error) console.warn(`Supabase error for table ${table}:`, error);
-                dbBackup[table] = data || [];
+                const records = data || [];
+                dbTablesData[table] = records;
+                tablesSummary[table] = records.length;
+                totalRecordsCount += records.length;
             } catch (e) {
-                console.warn(`Failed to fetch table ${table}`, e);
-                dbBackup[table] = [];
+                console.warn(`Gagal mengambil data tabel ${table}:`, e);
+                dbTablesData[table] = [];
+                tablesSummary[table] = 0;
             }
         }
-        
-        const json = JSON.stringify(dbBackup, null, 2);
+
+        // Format Standar Profesional Enterprise
+        const enterpriseBackupObj = {
+            system_info: {
+                app_name: "Zieda Absen Enterprise System",
+                schema_version: "3.5",
+                export_timestamp: new Date().toISOString(),
+                environment: typeof ACTIVE_ENVIRONMENT !== 'undefined' ? ACTIVE_ENVIRONMENT : 'UNKNOWN',
+                total_records: totalRecordsCount
+            },
+            tables_summary: tablesSummary,
+            database: dbTablesData
+        };
+
+        const json = JSON.stringify(enterpriseBackupObj, null, 2);
         const d = new Date();
-        const dateStr = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+        const dateStr = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
         
         if (includeMedia) {
             const zip = new JSZip();
@@ -3320,35 +3382,36 @@ async function backupDatabase() {
             
             const mediaTasks = [];
 
-            // Collect media from absensi
-            for (const a of dbBackup['absensi'] || []) {
-                const userName = dbBackup['users']?.find(u => u.id === a.user_id)?.nama || 'Unknown';
+            // 1. Collect media dari absensi
+            for (const a of dbTablesData['absensi'] || []) {
+                const userName = dbTablesData['users']?.find(u => u.id === a.user_id)?.nama || 'Unknown';
                 const fName = `${userName}_${a.tanggal}`.replace(/[^a-z0-9]/gi, '_');
                 
                 const addMediaTask = (url, suffix) => {
-                    if (!url) return;
+                    if (!url || typeof url !== 'string' || !url.startsWith('http')) return;
                     mediaTasks.push(async () => {
                         try {
                             const res = await fetch(url);
                             if(res.ok) {
                                 const blob = await res.blob();
-                                const ext = url.split('?')[0].split('.').pop() || 'jpg';
+                                const ext = url.split('?')[0].split('.').pop() || 'png';
                                 mediaFolder.file(`absensi/${fName}_${suffix}.${ext}`, blob);
                             }
                         } catch(e) {}
                     });
                 };
                 
+                addMediaTask(a.foto, "Foto");
                 addMediaTask(a.foto_masuk, "Masuk");
-                addMediaTask(a.foto_pulang, "Pulang");
-                addMediaTask(a.foto_istirahat_keluar, "istKeluar");
-                addMediaTask(a.foto_istirahat_masuk, "ist_mask");
+                addMediaTask(a.foto_keluar, "Keluar");
+                addMediaTask(a.foto_istirahat_keluar, "IstirahatKeluar");
+                addMediaTask(a.foto_istirahat_masuk, "IstirahatMasuk");
             }
             
-            // Collect media from cuti
-            for (const c of dbBackup['cuti'] || []) {
-                if (c.data_tambahan) {
-                    const userName = dbBackup['users']?.find(u => u.id === c.user_id)?.nama || 'Unknown';
+            // 2. Collect media dari cuti (lampiran)
+            for (const c of dbTablesData['cuti'] || []) {
+                if (c.data_tambahan && typeof c.data_tambahan === 'object') {
+                    const userName = dbTablesData['users']?.find(u => u.id === c.user_id)?.nama || 'Unknown';
                     const fName = `${userName}_${c.tanggal_mulai}`.replace(/[^a-z0-9]/gi, '_');
                     
                     for (const [key, url] of Object.entries(c.data_tambahan)) {
@@ -3358,7 +3421,7 @@ async function backupDatabase() {
                                     const res = await fetch(url);
                                     if(res.ok) {
                                         const blob = await res.blob();
-                                        const ext = url.split('?')[0].split('.').pop() || 'jpg';
+                                        const ext = url.split('?')[0].split('.').pop() || 'png';
                                         mediaFolder.file(`cuti/${fName}_${key.replace(/[^a-z0-9]/gi,'_')}.${ext}`, blob);
                                     }
                                 } catch(e) {}
@@ -3368,40 +3431,28 @@ async function backupDatabase() {
                 }
             }
             
-            // Execute fetching in batches to avoid hanging the browser
+            // Execute batch fetching
             let completed = 0;
             const batchSize = 10;
             for (let i = 0; i < mediaTasks.length; i += batchSize) {
                 const batch = mediaTasks.slice(i, i + batchSize);
                 await Promise.all(batch.map(task => task()));
                 completed += batch.length;
-                Swal.update({ html: `Mendownload media... (${Math.min(completed, mediaTasks.length)} / ${mediaTasks.length})` });
+                Swal.update({ html: `Mendownload foto & lampiran... (${Math.min(completed, mediaTasks.length)} / ${mediaTasks.length})` });
             }
             
-            Swal.update({ html: `Membuat file ZIP, mohon tunggu...` });
+            Swal.update({ html: `Membuat file ZIP Enterprise...` });
             const zipContent = await zip.generateAsync({ type: "blob" });
-            const url = URL.createObjectURL(zipContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", `Backup_Full_Absensi_${dateStr}.zip`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            saveAs(zipContent, `Backup_Enterprise_Absensi_${dateStr}.zip`);
             
         } else {
             const blob = new Blob([json], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", `Backup_DB_Absensi_${dateStr}.json`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            saveAs(blob, `Backup_Enterprise_Absensi_${dateStr}.json`);
         }
         
-        Swal.fire("Berhasil", "Backup berhasil diunduh!", "success");
+        Swal.fire("Berhasil", `Backup Enterprise berhasil diunduh! (${totalRecordsCount} data record tersimpan)`, "success");
     } catch(err) {
-        Swal.fire("Error", "Gagal membackup: " + err.message, "error");
+        Swal.fire("Error", "Gagal membackup database: " + err.message, "error");
     }
 }
 
@@ -3409,13 +3460,17 @@ async function restoreDatabase(event) {
     const file = event.target.files[0];
     if (!file) return;
     
+    const isZip = file.name.endsWith('.zip');
+    
     const result = await Swal.fire({
-        title: "Peringatan Berbahaya!",
-        text: "Restore akan MENIMPA dan MENGHAPUS seluruh data Anda saat ini. Lanjutkan?",
+        title: "Peringatan Pemulihan Data!",
+        text: isZip 
+            ? "Restore file ZIP akan mengunggah ulang seluruh foto & memulihkan database ke server aktif ini. Lanjutkan?"
+            : "Restore file JSON akan memulihkan data & menyesuaikan seluruh link gambar dari server lama ke server aktif. Lanjutkan?",
         icon: "warning",
         showCancelButton: true,
         confirmButtonColor: "#d33",
-        confirmButtonText: "Ya, Timpa Semua Data!"
+        confirmButtonText: "Ya, Mulai Restore Data!"
     });
     
     if (!result.isConfirmed) {
@@ -3423,40 +3478,136 @@ async function restoreDatabase(event) {
         return;
     }
     
-    Swal.fire({ title: 'Memulihkan Database...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    Swal.fire({ title: 'Memulihkan Database...', html: 'Menguraikan paket backup & menyiapkan data...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
     
-    const reader = new FileReader();
-    reader.onload = async function(e) {
-        try {
-            const data = JSON.parse(e.target.result);
-            // Reverse order to handle foreign keys
-            const tables = ['absensi', 'cuti', 'form_cuti_config', 'cabang']; 
+    try {
+        let jsonString = '';
+        let mediaFiles = {};
+
+        if (isZip) {
+            const zip = await JSZip.loadAsync(file);
+            const backupJsonFile = zip.file("database_backup.json");
+            if (!backupJsonFile) {
+                throw new Error("File 'database_backup.json' tidak ditemukan di dalam paket ZIP!");
+            }
+            jsonString = await backupJsonFile.async("text");
             
-            for (const table of tables) {
-                if (data[table] && data[table].length > 0) {
-                    // Karena Supabase API tidak memperbolehkan truncate langsung tanpa RLS/RPC khusus dari Client,
-                    // Kita akan mencoba upsert.
-                    await supabaseClient.from(table).upsert(data[table]);
+            // Kumpulkan file media dari folder media/ di ZIP
+            const relativePaths = Object.keys(zip.files).filter(p => p.startsWith("media/") && !zip.files[p].dir);
+            for (const path of relativePaths) {
+                const blob = await zip.file(path).async("blob");
+                const targetBucketPath = path.replace(/^media\//, '');
+                mediaFiles[targetBucketPath] = blob;
+            }
+        } else {
+            jsonString = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = (err) => reject(err);
+                reader.readAsText(file);
+            });
+        }
+
+        const parsed = JSON.parse(jsonString);
+        const rawDb = parsed.database ? parsed.database : parsed;
+        
+        if (rawDb['cabang'] && !rawDb['kantor']) {
+            rawDb['kantor'] = rawDb['cabang'];
+        }
+
+        // 1. Jika ada media dari paket ZIP, unggah ulang ke storage bucket server baru secara otomatis
+        const mediaKeys = Object.keys(mediaFiles);
+        if (mediaKeys.length > 0) {
+            let uploadedMediaCount = 0;
+            for (const bucketPath of mediaKeys) {
+                try {
+                    const blob = mediaFiles[bucketPath];
+                    await supabaseClient.storage.from('absensi-bucket').upload(bucketPath, blob, { upsert: true });
+                    uploadedMediaCount++;
+                    Swal.update({ html: `Mengunggah foto & media ke server baru... (${uploadedMediaCount} / ${mediaKeys.length})` });
+                } catch (e) {
+                    console.warn("Gagal re-upload media:", bucketPath, e);
                 }
             }
-            // Khusus Users dan AppSettings
-            if (data['users'] && data['users'].length > 0) {
-                await supabaseClient.from('users').upsert(data['users']);
-            }
-            if (data['app_settings'] && data['app_settings'].length > 0) {
-                await supabaseClient.from('app_settings').upsert(data['app_settings']);
-            }
-            
-            Swal.fire("Berhasil", "Data berhasil dipulihkan! Halaman akan dimuat ulang.", "success").then(() => {
-                location.reload();
-            });
-        } catch(err) {
-            Swal.fire("Error", "Format JSON tidak valid atau gagal restore: " + err.message, "error");
-        } finally {
-            event.target.value = '';
         }
-    };
-    reader.readAsText(file);
+
+        // 2. Auto Rewriter: Normalisasi seluruh URL Gambar di database agar menunjuk ke SUPABASE_URL server aktif
+        const normalizeUrl = (url) => {
+            if (!url || typeof url !== 'string') return url;
+            if (url.startsWith('data:')) return url;
+            const idx = url.indexOf('/absensi-bucket/');
+            if (idx !== -1) {
+                const pathAfterBucket = url.substring(idx + '/absensi-bucket/'.length);
+                return `${SUPABASE_URL}/storage/v1/object/public/absensi-bucket/${pathAfterBucket}`;
+            }
+            return url;
+        };
+
+        if (Array.isArray(rawDb['users'])) {
+            rawDb['users'].forEach(u => {
+                if (u.foto_wajah) u.foto_wajah = normalizeUrl(u.foto_wajah);
+            });
+        }
+        if (Array.isArray(rawDb['app_settings'])) {
+            rawDb['app_settings'].forEach(s => {
+                if (s.logo_url) s.logo_url = normalizeUrl(s.logo_url);
+            });
+        }
+        if (Array.isArray(rawDb['absensi'])) {
+            rawDb['absensi'].forEach(a => {
+                if (a.foto) a.foto = normalizeUrl(a.foto);
+                if (a.foto_masuk) a.foto_masuk = normalizeUrl(a.foto_masuk);
+                if (a.foto_keluar) a.foto_keluar = normalizeUrl(a.foto_keluar);
+                if (a.foto_istirahat_keluar) a.foto_istirahat_keluar = normalizeUrl(a.foto_istirahat_keluar);
+                if (a.foto_istirahat_masuk) a.foto_istirahat_masuk = normalizeUrl(a.foto_istirahat_masuk);
+            });
+        }
+        if (Array.isArray(rawDb['cuti'])) {
+            rawDb['cuti'].forEach(c => {
+                if (c.data_tambahan && typeof c.data_tambahan === 'object') {
+                    for (const k in c.data_tambahan) {
+                        if (typeof c.data_tambahan[k] === 'string') {
+                            c.data_tambahan[k] = normalizeUrl(c.data_tambahan[k]);
+                        }
+                    }
+                }
+            });
+        }
+
+        // 3. Masukkan data ke database baru sesuai urutan relasi
+        const restoreSequence = [
+            'kantor',
+            'master_tipe_absen',
+            'master_jenis_cuti',
+            'form_cuti_config',
+            'app_settings',
+            'users',
+            'cuti',
+            'absensi'
+        ];
+
+        let restoredCount = 0;
+        for (const table of restoreSequence) {
+            const records = rawDb[table];
+            if (records && Array.isArray(records) && records.length > 0) {
+                const { error } = await supabaseClient.from(table).upsert(records);
+                if (error) {
+                    console.warn(`Gagal memulihkan tabel ${table}:`, error);
+                } else {
+                    restoredCount += records.length;
+                }
+            }
+        }
+        
+        Swal.fire("Berhasil", `Database berhasil dipulihkan & seluruh link foto otomatis ditautkan ke server baru! (${restoredCount} record diproses)`, "success").then(() => {
+            location.reload();
+        });
+
+    } catch(err) {
+        Swal.fire("Error", "Gagal memulihkan data: " + err.message, "error");
+    } finally {
+        event.target.value = '';
+    }
 }
 
 async function resetWajahKaryawan() {
@@ -3508,6 +3659,7 @@ async function hapusDataAbsen(absenId, tanggal) {
     const { data: absenData } = await supabaseClient.from('absensi').select('*').eq('id', absenId).maybeSingle();
     if (absenData) {
         const fotoFiles = [
+            absenData.foto,
             absenData.foto_masuk,
             absenData.foto_istirahat_keluar,
             absenData.foto_istirahat_masuk,
@@ -3567,7 +3719,7 @@ async function factoryResetDatabase() {
 
     try {
         // Hapus isi tabel
-        const tablesToClear = ['absensi', 'cuti', 'form_cuti_config', 'cabang'];
+        const tablesToClear = ['absensi', 'cuti', 'form_cuti_config', 'kantor', 'master_jenis_cuti', 'master_tipe_absen'];
         
         for (const table of tablesToClear) {
             try {
