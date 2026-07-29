@@ -2737,7 +2737,8 @@
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 chat_id: targetChatId,
-                text: message
+                text: message,
+                parse_mode: 'HTML'
               })
             });
             const resData = await resp.json();
