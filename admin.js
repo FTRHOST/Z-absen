@@ -4188,18 +4188,13 @@ async function jalankanMigrasiDataShift() {
                     if (currMin > jamTutupMin) {
                         status = "Lembur";
                         const totalLemburKotor = currMin - jamTutupMin;
-                        let potonganIstirahat = 0;
-                        const potonganDef = masterTarget.potongan_lembur_menit !== undefined && masterTarget.potongan_lembur_menit !== null 
-                            ? parseInt(masterTarget.potongan_lembur_menit, 10) : 60;
-
-                        if (currMin >= 1140 && jamTutupMin <= 1080 && totalLemburKotor >= 120) {
-                            potonganIstirahat = potonganDef;
-                        }
+                        const potonganIstirahat = masterTarget.potongan_lembur_menit !== undefined && masterTarget.potongan_lembur_menit !== null 
+                            ? parseInt(masterTarget.potongan_lembur_menit, 10) : 0;
 
                         menitLembur = Math.max(0, totalLemburKotor - potonganIstirahat);
                         const jamLembur = Math.floor(menitLembur / 60);
                         const mLembur = menitLembur % 60;
-                        keteranganWaktu = `Lembur ${jamLembur > 0 ? jamLembur + "j " : ""}${mLembur}m` + (potonganIstirahat > 0 ? ` (Potongan Solat ${potonganIstirahat}m)` : "");
+                        keteranganWaktu = `Lembur ${jamLembur > 0 ? jamLembur + "j " : ""}${mLembur}m` + (potonganIstirahat > 0 ? ` (Potongan Istirahat ${potonganIstirahat}m)` : "");
                     } else {
                         status = "Hadir";
                         menitLembur = 0;
@@ -4219,11 +4214,12 @@ async function jalankanMigrasiDataShift() {
                     } else if (masterTarget.is_checkout && masterTarget.jam_tutup && currMin > timeToMinutes(masterTarget.jam_tutup)) {
                         status = "Lembur";
                         const totalKotor = currMin - timeToMinutes(masterTarget.jam_tutup);
-                        let pot = (currMin >= 1140 && timeToMinutes(masterTarget.jam_tutup) <= 1080) ? 60 : 0;
+                        const pot = masterTarget.potongan_lembur_menit !== undefined && masterTarget.potongan_lembur_menit !== null 
+                            ? parseInt(masterTarget.potongan_lembur_menit, 10) : 0;
                         menitLembur = Math.max(0, totalKotor - pot);
                         const jamLembur = Math.floor(menitLembur / 60);
                         const mLembur = menitLembur % 60;
-                        keteranganWaktu = `Lembur ${jamLembur > 0 ? jamLembur + "j " : ""}${mLembur}m` + (pot > 0 ? ` (Potongan Solat ${pot}m)` : "");
+                        keteranganWaktu = `Lembur ${jamLembur > 0 ? jamLembur + "j " : ""}${mLembur}m` + (pot > 0 ? ` (Potongan Istirahat ${pot}m)` : "");
                     } else {
                         keteranganWaktu = "Normal";
                     }

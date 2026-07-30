@@ -971,16 +971,11 @@
             status = "Lembur";
             const totalLemburKotor = currMin - jamTutupMin;
 
-            let potonganIstirahat = 0;
-            const potonganDef =
+            const potonganIstirahat =
               tData.potongan_lembur_menit !== undefined &&
               tData.potongan_lembur_menit !== null
                 ? parseInt(tData.potongan_lembur_menit, 10)
-                : 60;
-
-            if (currMin >= 1140 && jamTutupMin <= 1080 && totalLemburKotor >= 120) {
-              potonganIstirahat = potonganDef;
-            }
+                : 0;
 
             menitLembur = Math.max(0, totalLemburKotor - potonganIstirahat);
             const jamLembur = Math.floor(menitLembur / 60);
@@ -989,7 +984,7 @@
             keteranganWaktu =
               `Lembur ${jamLembur > 0 ? jamLembur + "j " : ""}${mLembur}m` +
               (potonganIstirahat > 0
-                ? ` (Potongan Solat ${potonganIstirahat}m)`
+                ? ` (Potongan Istirahat ${potonganIstirahat}m)`
                 : "");
           } else {
             keteranganWaktu = "Pulang Normal";
