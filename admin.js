@@ -4572,3 +4572,185 @@ async function simpanEditAbsensi() {
     }
 }
 window.simpanEditAbsensi = simpanEditAbsensi;
+
+// ==========================================
+// BACKUP & RESTORE MODULAR PER SECTION
+// ==========================================
+function toggleSelectAllBackup(btn) {
+    const chks = document.querySelectorAll('.check-backup-section');
+    const allChecked = Array.from(chks).every(c => c.checked);
+    chks.forEach(c => c.checked = !allChecked);
+    btn.textContent = allChecked ? 'Pilih Semua' : 'Batal Pilih Semua';
+}
+window.toggleSelectAllBackup = toggleSelectAllBackup;
+
+async function downloadBackupModular() {
+    const selectedTables = Array.from(document.querySelectorAll('.check-backup-section:checked')).map(c => c.value);
+    
+    if (selectedTables.length === 0) {
+        Swal.fire('Peringatan', 'Pilih minimal satu section data yang ingin dibackup!', 'warning');
+        return;
+    }
+
+    try {
+        Swal.fire({ title: 'Memproses Backup...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+        const backupData = {
+            version: '2.0-modular',
+            created_at: new Date().toISOString(),
+            sections_included: selectedTables,
+            data: {}
+        };
+
+        for (const tableName of selectedTables) {
+            const { data, error } = await supabaseClient.from(tableName).select('*');
+            if (error) {
+                console.warn(`Gagal membaca tabel ${tableName}:`, error);
+                backupData.data[tableName] = [];
+            } else {
+                backupData.data[tableName] = data || [];
+            }
+        }
+
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+        const downloadAnchor = document.createElement('a');
+        const filename = `backup_absensi_modular_${new Date().toISOString().split('T')[0]}_${Date.now()}.json`;
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", filename);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+
+        Swal.fire('Berhasil', `Backup ${selectedTables.length} section berhasil diunduh!`, 'success');
+    } catch (err) {
+        console.error(err);
+        Swal.fire('Error', err.message || 'Gagal membuat backup', 'error');
+    }
+}
+window.downloadBackupModular = downloadBackupModular;
+
+let currentRestoreBackupObj = null;
+
+function previewRestoreModular(event) {
+    const file = event.target.files[0];
+    const previewContainer = document.getElementById('container-preview-restore');
+    const listContainer = document.getElementById('list-restore-sections');
+    const btnRestore = document.getElementById('btn-do-restore');
+
+    if (!file) {
+        if (previewContainer) previewContainer.classList.add('d-none');
+        if (btnRestore) btnRestore.disabled = true;
+        currentRestoreBackupObj = null;
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const backupObj = JSON.parse(e.target.result);
+            if (!backupObj || (!backupObj.data && !backupObj.users)) {
+                throw new Error("Format file JSON backup tidak valid.");
+            }
+
+            // Standardize format
+            currentRestoreBackupObj = backupObj.data ? backupObj : { data: backupObj };
+
+            const dataMap = currentRestoreBackupObj.data;
+            const availableTables = Object.keys(dataMap);
+
+            if (availableTables.length === 0) {
+                throw new Error("File backup tidak memiliki data section.");
+            }
+
+            const labelNames = {
+                users: '👤 Data Karyawan & Admin',
+                master_tipe_absen: '⏰ Master Tipe Absen / Shift',
+                app_settings: '⚙️ Pengaturan Aplikasi',
+                master_cabang: '🏢 Master Kantor Cabang',
+                absensi: '📅 Transaksi Absensi',
+                cuti: '🏖️ Data Pengajuan Cuti'
+            };
+
+            let html = '';
+            availableTables.forEach(table => {
+                const count = Array.isArray(dataMap[table]) ? dataMap[table].length : 0;
+                const nameLabel = labelNames[table] || `📁 Tabel ${table}`;
+                html += `
+                    <div class="form-check mb-1">
+                        <input class="form-check-input check-restore-section" type="checkbox" id="chk_r_${table}" value="${table}" checked>
+                        <label class="form-check-label small" for="chk_r_${table}">
+                            <strong>${nameLabel}</strong> (${count} data)
+                        </label>
+                    </div>
+                `;
+            });
+
+            if (listContainer) listContainer.innerHTML = html;
+            if (previewContainer) previewContainer.classList.remove('d-none');
+            if (btnRestore) btnRestore.disabled = false;
+
+        } catch (err) {
+            console.error(err);
+            Swal.fire("File Tidak Valid", err.message || "Gagal membaca file JSON.", "error");
+            if (previewContainer) previewContainer.classList.add('d-none');
+            if (btnRestore) btnRestore.disabled = true;
+            currentRestoreBackupObj = null;
+        }
+    };
+    reader.readAsText(file);
+}
+window.previewRestoreModular = previewRestoreModular;
+
+async function prosesRestoreModular() {
+    if (!currentRestoreBackupObj || !currentRestoreBackupObj.data) {
+        Swal.fire("Peringatan", "Pilih file backup terlebih dahulu.", "warning");
+        return;
+    }
+
+    const selectedTables = Array.from(document.querySelectorAll('.check-restore-section:checked')).map(c => c.value);
+
+    if (selectedTables.length === 0) {
+        Swal.fire("Peringatan", "Pilih minimal satu section yang ingin di-restore!", "warning");
+        return;
+    }
+
+    const confirmRes = await Swal.fire({
+        title: 'Konfirmasi Restore Data',
+        html: `Apakah Anda yakin ingin mengembalikan <strong>${selectedTables.length} section data</strong> ke database?<br><small class="text-danger">Data yang cocok akan di-update/diterapkan ke sistem.</small>`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Ya, Jalankan Restore',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#198754'
+    });
+
+    if (!confirmRes.isConfirmed) return;
+
+    try {
+        Swal.fire({ title: 'Proses Restore Data...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+        const dataMap = currentRestoreBackupObj.data;
+        let totalRestoredCount = 0;
+
+        for (const tableName of selectedTables) {
+            const rows = dataMap[tableName];
+            if (Array.isArray(rows) && rows.length > 0) {
+                const { error } = await supabaseClient.from(tableName).upsert(rows, { onConflict: 'id' });
+                if (error) {
+                    console.error(`Gagal restore section ${tableName}:`, error);
+                } else {
+                    totalRestoredCount += rows.length;
+                }
+            }
+        }
+
+        Swal.fire('Restore Berhasil!', `Sebanyak ${totalRestoredCount} data dari ${selectedTables.length} section telah berhasil dipulihkan!`, 'success').then(() => {
+            location.reload();
+        });
+
+    } catch (err) {
+        console.error(err);
+        Swal.fire('Error Restore', err.message || 'Gagal menjalankan restore.', 'error');
+    }
+}
+window.prosesRestoreModular = prosesRestoreModular;

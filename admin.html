@@ -974,8 +974,79 @@ Besok **17 Agustus** kita libur ya!"></textarea>
                 </div>
               </div>
 
+              <!-- CARD BACKUP & RESTORE MODULAR PER SECTION -->
+              <div class="card shadow-sm border-0 mb-4 border-warning">
+                <div class="card-header bg-warning text-dark fw-bold d-flex justify-content-between align-items-center">
+                  <span><i class="fas fa-boxes me-2"></i>Backup & Restore Database Modular (Per Section)</span>
+                  <span class="badge bg-dark text-white fw-bold">Flexi-Backup</span>
+                </div>
+                <div class="card-body">
+                  <p class="text-muted small mb-3">
+                    Pilih section data tertentu yang ingin Anda unduh (backup) atau kembalikan (restore). Anda dapat mencentang hanya section yang dibutuhkan.
+                  </p>
+
+                  <div class="row g-3 mb-3">
+                    <div class="col-md-6 border-end">
+                      <h6 class="fw-bold text-primary mb-2"><i class="fas fa-download me-1"></i> 1. Unduh Backup (Pilih Section):</h6>
+                      
+                      <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom">
+                        <small class="fw-bold text-muted">Section Data Database</small>
+                        <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 fw-bold" onclick="toggleSelectAllBackup(this)">Batal Pilih Semua</button>
+                      </div>
+
+                      <div class="form-check mb-2">
+                        <input class="form-check-input check-backup-section" type="checkbox" id="chk_b_users" value="users" checked>
+                        <label class="form-check-label fw-bold small" for="chk_b_users">👤 Data Karyawan & User Admin</label>
+                      </div>
+                      <div class="form-check mb-2">
+                        <input class="form-check-input check-backup-section" type="checkbox" id="chk_b_master_tipe" value="master_tipe_absen" checked>
+                        <label class="form-check-label fw-bold small" for="chk_b_master_tipe">⏰ Master Tipe Absen / Shift Kerja</label>
+                      </div>
+                      <div class="form-check mb-2">
+                        <input class="form-check-input check-backup-section" type="checkbox" id="chk_b_settings" value="app_settings" checked>
+                        <label class="form-check-label fw-bold small" for="chk_b_settings">⚙️ Pengaturan Aplikasi Global</label>
+                      </div>
+                      <div class="form-check mb-2">
+                        <input class="form-check-input check-backup-section" type="checkbox" id="chk_b_cabang" value="master_cabang" checked>
+                        <label class="form-check-label fw-bold small" for="chk_b_cabang">🏢 Master Kantor Cabang / Lokasi</label>
+                      </div>
+                      <div class="form-check mb-2">
+                        <input class="form-check-input check-backup-section" type="checkbox" id="chk_b_absensi" value="absensi">
+                        <label class="form-check-label fw-bold small" for="chk_b_absensi">📅 Transaksi Absensi (Riwayat Presence)</label>
+                      </div>
+                      <div class="form-check mb-2">
+                        <input class="form-check-input check-backup-section" type="checkbox" id="chk_b_cuti" value="cuti">
+                        <label class="form-check-label fw-bold small" for="chk_b_cuti">🏖️ Data Pengajuan Cuti & Approval</label>
+                      </div>
+
+                      <button class="btn btn-warning fw-bold w-100 mt-3 shadow-sm text-dark" onclick="downloadBackupModular()">
+                        <i class="fas fa-file-download me-1"></i> Unduh Backup Modular (.JSON)
+                      </button>
+                    </div>
+
+                    <div class="col-md-6">
+                      <h6 class="fw-bold text-success mb-2"><i class="fas fa-upload me-1"></i> 2. Restore Backup (Upload File JSON):</h6>
+                      <p class="small text-muted mb-2">Upload file JSON backup yang Anda miliki. Sistem akan membaca isinya dan memberi Anda opsi section mana yang ingin di-restore.</p>
+                      
+                      <div class="mb-3">
+                        <input type="file" id="file_restore_modular" class="form-control form-control-sm" accept=".json" onchange="previewRestoreModular(event)">
+                      </div>
+
+                      <div id="container-preview-restore" class="d-none border rounded p-2 bg-light mb-3">
+                        <small class="fw-bold d-block text-dark mb-1">📋 Section Terdeteksi di File Backup:</small>
+                        <div id="list-restore-sections"></div>
+                      </div>
+
+                      <button class="btn btn-success fw-bold w-100 shadow-sm" id="btn-do-restore" onclick="prosesRestoreModular()" disabled>
+                        <i class="fas fa-cloud-upload-alt me-1"></i> Jalankan Restore Data Selected
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div class="card shadow-sm border-0 mb-4 border-danger">
-                <div class="card-header bg-danger text-white fw-bold"><i class="fas fa-database me-2"></i>Backup & Restore Database Enterprise</div>
+                <div class="card-header bg-danger text-white fw-bold"><i class="fas fa-database me-2"></i>Backup & Restore Database Full Enterprise</div>
                 <div class="card-body">
                   <p class="text-muted small mb-2">Backup seluruh database ke format JSON Standar Enterprise <strong>(Kantor, Karyawan, Tipe Absen, Jenis Cuti, Config Form Cuti, Settings, Absensi & Cuti)</strong>. Format ini terstruktur lengkap dengan metadata & audit log.</p>
                   <div class="form-check mb-3">
