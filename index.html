@@ -923,16 +923,23 @@
 
         const tData = tipeData || {};
         const nTipe = (namaTipe || "").toLowerCase();
+
+        const isIzinAtauIstirahat =
+          nTipe.includes("izin") || nTipe.includes("istirahat");
+
         const isMasuk =
-          nTipe === "masuk" ||
-          nTipe === "absen masuk" ||
-          (!nTipe.includes("pulang") &&
-            !nTipe.includes("checkout") &&
-            !tData.is_checkout);
+          !isIzinAtauIstirahat &&
+          (nTipe.includes("masuk") ||
+            nTipe === "masuk" ||
+            (!nTipe.includes("pulang") &&
+              !nTipe.includes("checkout") &&
+              !tData.is_checkout));
+
         const isPulang =
-          nTipe.includes("pulang") ||
-          nTipe.includes("checkout") ||
-          tData.is_checkout;
+          !isIzinAtauIstirahat &&
+          (nTipe.includes("pulang") ||
+            nTipe.includes("checkout") ||
+            tData.is_checkout);
 
         const timeToMinutes = (tStr) => {
           if (!tStr) return 0;
@@ -942,7 +949,12 @@
 
         const currMin = timeToMinutes(waktuSekarang);
 
-        if (isMasuk && tData.batas_terlambat) {
+        if (isIzinAtauIstirahat) {
+          status = nTipe.includes("izin") ? "Izin" : "Istirahat";
+          keteranganWaktu = nTipe.includes("masuk")
+            ? "Kembali ke Kantor"
+            : "Meninggalkan Kantor";
+        } else if (isMasuk && tData.batas_terlambat) {
           const limitMin = timeToMinutes(tData.batas_terlambat);
           if (currMin > limitMin) {
             status = "Terlambat";
