@@ -82,12 +82,14 @@ window.logout = async function() {
     window.location.href = "login.html";
 };
 
+    // Load Global App Settings (Format Waktu, Brand, dll)
+    await loadSettings();
+
     // Handle Tab Routing
     let hash = window.location.hash || '#tab-dashboard';
     const targetTab = document.querySelector(`[data-bs-target="${hash}"]`);
     if (targetTab) {
         new bootstrap.Tab(targetTab).show();
-        if (hash === '#tab-pengaturan') loadSettings();
         if (hash === '#tab-danger') loadTrash();
     } else {
         // Fallback jika hash tidak valid
@@ -1450,7 +1452,7 @@ function showDetailAbsensi(tanggal, dateStr) {
         tipeAbsenList.forEach(tipe => {
             const list = g.absensi[tipe] || [];
             if (list.length > 0) {
-                const timeBadges = list.map(a => `<span class="badge bg-light text-dark border d-block mb-1">${a.waktu || '-'}</span>`).join('');
+                const timeBadges = list.map(a => `<span class="badge bg-light text-dark border d-block mb-1">${formatWaktuGlobal(a.waktu)}</span>`).join('');
                 trHtml += `<td class="align-middle">${timeBadges}</td>`;
             } else {
                 trHtml += `<td class="align-middle text-muted">-</td>`;
@@ -3225,6 +3227,7 @@ async function saveSettings() {
         if (error) throw error;
         
         window.currentFormatWaktu = format_waktu;
+        if (typeof renderTipeAbsen === 'function') renderTipeAbsen();
         Swal.fire('Berhasil', 'Pengaturan berhasil disimpan!', 'success');
     } catch (err) {
         console.error(err);
@@ -4079,8 +4082,8 @@ async function loadTipeAbsenAdmin() {
         <tr>
             <td>${index + 1}</td>
             <td class="fw-bold">${item.nama_tipe}</td>
-            <td><small>${item.jam_mulai || '-'} s/d ${item.jam_tutup || '-'}</small></td>
-            <td><small>${item.batas_terlambat || '-'}</small></td>
+            <td><small>${formatWaktuGlobal(item.jam_mulai)} s/d ${formatWaktuGlobal(item.jam_tutup)}</small></td>
+            <td><small>${formatWaktuGlobal(item.batas_terlambat)}</small></td>
             <td>${item.is_checkout ? '<span class="badge bg-success">Ya</span>' : '<span class="badge bg-secondary">Tidak</span>'}</td>
             <td>
                 <div class="form-check form-switch d-flex justify-content-center">
