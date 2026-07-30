@@ -4582,9 +4582,9 @@ async function simpanEditAbsensi() {
 
         let { error } = await supabaseClient.from("absensi").update(payload).eq("id", id);
 
-        if (error && (error.code === 'PGRST204' || (error.message && error.message.includes('keterangan_waktu')))) {
-            console.warn("Kolom keterangan_waktu belum ada di Supabase Cloud absensi table. Fallback update tanpa keterangan_waktu...");
-            const fallbackPayload = { tipe_absen, waktu, status, menit_terlambat, menit_lembur };
+        if (error && (error.code === 'PGRST204' || (error.message && (error.message.includes('menit_lembur') || error.message.includes('menit_terlambat') || error.message.includes('keterangan_waktu'))))) {
+            console.warn("Beberapa kolom fitur presisi absensi belum ada di Supabase Cloud. Fallback update data dasar...");
+            const fallbackPayload = { tipe_absen, waktu, status };
             const fallbackRes = await supabaseClient.from("absensi").update(fallbackPayload).eq("id", id);
             
             if (!fallbackRes.error) {
@@ -4595,7 +4595,7 @@ async function simpanEditAbsensi() {
                 }
                 Swal.fire({
                     title: "Berhasil Diperbarui",
-                    html: `Data absensi berhasil diperbarui.<br><br><small class="text-warning"><strong>⚠️ Catatan Tambahan:</strong> Database Supabase Cloud Anda belum memiliki kolom <code>keterangan_waktu</code>.<br><br>Jalankan perintah SQL berikut di <strong>Supabase Dashboard (SQL Editor)</strong>:<br><code class="bg-dark text-white p-2 rounded d-block mt-2 text-start">ALTER TABLE absensi ADD COLUMN IF NOT EXISTS keterangan_waktu TEXT;</code></small>`,
+                    html: `Data absensi berhasil diperbarui.<br><br><small class="text-warning"><strong>⚠️ Catatan Tambahan:</strong> Database Supabase Cloud Anda belum memiliki kolom kalkulasi presisi.<br><br>Silakan jalankan SQL berikut di <strong>Supabase Dashboard (SQL Editor)</strong>:<br><code class="bg-dark text-white p-2 rounded d-block mt-2 text-start">ALTER TABLE absensi ADD COLUMN IF NOT EXISTS menit_terlambat INTEGER DEFAULT 0;<br>ALTER TABLE absensi ADD COLUMN IF NOT EXISTS menit_lembur INTEGER DEFAULT 0;<br>ALTER TABLE absensi ADD COLUMN IF NOT EXISTS keterangan_waktu TEXT;</code></small>`,
                     icon: "warning"
                 }).then(() => {
                     if (typeof showDetailAbsensi === "function" && tanggal) showDetailAbsensi(tanggal);
