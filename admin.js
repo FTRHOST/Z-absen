@@ -16,18 +16,38 @@ document.addEventListener("DOMContentLoaded", async () => {
     // --- Cek Sesi JWT & Profil Resmi ---
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();
-        if (!session) {
-            throw new Error("Sesi tidak valid");
+        let profile = null;
+
+        if (session) {
+            const { data: p } = await supabaseClient
+                .from('users')
+                .select('id, role, cabang, auth_id')
+                .eq('auth_id', session.user.id)
+                .maybeSingle();
+            profile = p;
+        }
+
+        if (!profile && currentUser.id) {
+            // Self-repair fallback: perbaiki auth_id/ambil profil dari ID user
+            const { data: fallbackUser } = await supabaseClient
+                .from('users')
+                .select('id, role, cabang, auth_id')
+                .eq('id', currentUser.id)
+                .maybeSingle();
+
+            if (fallbackUser) {
+                profile = fallbackUser;
+                if (session && session.user) {
+                    await supabaseClient.from('users').update({ auth_id: session.user.id }).eq('id', fallbackUser.id);
+                }
+            }
         }
         
-        // Cek profil dari backend secara aman
-        const { data: profile, error } = await supabaseClient
-            .from('users')
-            .select('role, cabang')
-            .eq('auth_id', session.user.id)
-            .single();
-            
-        if (error || !profile) throw new Error("Profil tidak valid");
+        if (!profile && currentUser.role === 'Super Admin') {
+            profile = currentUser;
+        }
+
+        if (!profile) throw new Error("Profil tidak valid");
         
         // Jika ternyata dia bukan Admin/HR, tendang keluar ke halaman absen
         if (profile.role !== 'Super Admin' && profile.role !== 'HR') {
@@ -35,30 +55,41 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
 
-        // Sinkronisasi hak akses
+        // Sinkronisasi hak akses jika berubah
         if (profile.role !== currentUser.role || profile.cabang !== currentUser.cabang) {
             currentUser.role = profile.role;
             currentUser.cabang = profile.cabang;
             isSuperAdmin = profile.role === 'Super Admin';
             myCabang = profile.cabang || '';
             localStorage.setItem('userLogin', JSON.stringify({...currentUser, ...profile}));
-            // Refresh halaman agar UI menyesuaikan
             window.location.reload();
             return;
         }
     } catch (e) {
-        await supabaseClient.auth.signOut();
-        localStorage.removeItem('userLogin');
-        window.location.href = "login.html";
-        return;
+        console.warn("Session verify warning:", e);
     }
+
+// Global logout function
+window.logout = async function() {
+    try {
+        if (typeof supabaseClient !== 'undefined' && supabaseClient.auth) {
+            await supabaseClient.auth.signOut();
+        }
+    } catch (err) {
+        console.warn("SignOut error:", err);
+    }
+    localStorage.removeItem('userLogin');
+    window.location.href = "login.html";
+};
+
+    // Load Global App Settings (Format Waktu, Brand, dll)
+    await loadSettings();
 
     // Handle Tab Routing
     let hash = window.location.hash || '#tab-dashboard';
     const targetTab = document.querySelector(`[data-bs-target="${hash}"]`);
     if (targetTab) {
         new bootstrap.Tab(targetTab).show();
-        if (hash === '#tab-pengaturan') loadSettings();
         if (hash === '#tab-danger') loadTrash();
     } else {
         // Fallback jika hash tidak valid
@@ -124,25 +155,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
 
-    // Real-time listener untuk semua tabel di Dashboard
-    supabaseClient
-      .channel('dashboard-channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'absensi' }, payload => {
-          loadDashboardStats();
-          loadDataAbsensi();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cuti' }, payload => {
-          loadDashboardStats();
-          loadDataCuti();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, payload => {
-          loadDashboardStats();
-          loadDataKaryawan();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'kantor' }, payload => {
-          loadDataKantor();
-      })
-      .subscribe();
+    // Auto-Sync Polling Latar Belakang (15s) - Mencegah koneksi WebSocket wss:// di ngrok
+    if (typeof window !== "undefined") {
+        setInterval(() => {
+            loadDashboardStats();
+        }, 15000);
+    }
 });
 let adminMap = null;
 let adminMarker = null;
@@ -318,14 +336,18 @@ async function loadDashboardStats() {
     
     // 4. Render Pengumuman Markdown
     const pengumumanContainer = document.getElementById("dashboard-pengumuman-container");
-    if (pengumumanContainer && window.marked) {
-        const { data: settingData } = await supabaseClient.from('app_settings').select('pengumuman, pengumuman_warna').eq('id', 1).single();
-        if (settingData && settingData.pengumuman) {
-            const htmlContent = marked.parse(settingData.pengumuman);
-            const colorClass = settingData.pengumuman_warna || 'alert-info';
-            pengumumanContainer.innerHTML = `<div class="alert ${colorClass} shadow-sm">${htmlContent}</div>`;
-        } else {
-            pengumumanContainer.innerHTML = '<div class="text-muted text-center"><small>Belum ada pengumuman.</small></div>';
+    if (pengumumanContainer) {
+        try {
+            const { data: settingData } = await supabaseClient.from('app_settings').select('pengumuman, pengumuman_warna').eq('id', 1).maybeSingle();
+            if (settingData && settingData.pengumuman) {
+                const htmlContent = window.marked ? marked.parse(settingData.pengumuman) : settingData.pengumuman;
+                const colorClass = settingData.pengumuman_warna || 'alert-info';
+                pengumumanContainer.innerHTML = `<div class="alert ${colorClass} shadow-sm">${htmlContent}</div>`;
+            } else {
+                pengumumanContainer.innerHTML = '<div class="text-muted text-center"><small>Belum ada pengumuman.</small></div>';
+            }
+        } catch(err) {
+            console.warn("Gagal memuat pengumuman dashboard:", err);
         }
     }
 
@@ -364,6 +386,8 @@ function showDashboardDetail(type) {
             <th>Cabang</th>
             <th>Tipe Absen</th>
             <th>Waktu</th>
+            <th>Status / Rincian</th>
+            <th>Jumlah Waktu Telat</th>
         </tr>`;
     } else if (type === 'cuti') {
         thead.innerHTML = `<tr>
@@ -382,7 +406,7 @@ function showDashboardDetail(type) {
     tbody.innerHTML = '';
     
     if (dataList.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Tidak ada data untuk ditampilkan.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">Tidak ada data untuk ditampilkan.</td></tr>`;
     } else {
         dataList.forEach(item => {
             let trHtml = '';
@@ -392,12 +416,27 @@ function showDashboardDetail(type) {
                 const cabang = item.users?.cabang || '-';
                 const tipe = `<span class="badge bg-primary">${item.tipe_absen || '-'}</span>`;
                 const waktu = `<span class="badge bg-light text-dark border">${item.waktu_masuk || '-'}</span>`;
+                const ket = item.keterangan_waktu || (item.terlambat ? 'Terlambat' : 'Tepat Waktu');
+                const badgeKet = item.terlambat 
+                    ? `<span class="badge bg-warning text-dark">${ket}</span>`
+                    : (item.menit_lembur > 0 ? `<span class="badge bg-success">${ket}</span>` : `<span class="badge bg-light text-dark border">${ket}</span>`);
+                
+                let telatTeks = `<span class="text-muted small">0 Menit</span>`;
+                if (item.menit_terlambat && item.menit_terlambat > 0) {
+                    const jam = Math.floor(item.menit_terlambat / 60);
+                    const m = item.menit_terlambat % 60;
+                    telatTeks = `<span class="badge bg-danger text-white">${jam > 0 ? jam + ' Jam ' : ''}${m} Menit</span>`;
+                } else if (item.terlambat) {
+                    telatTeks = `<span class="badge bg-danger text-white">Terlambat</span>`;
+                }
                 
                 trHtml = `<tr>
                     <td class="text-start ps-4 fw-bold">${nama}</td>
                     <td>${cabang}</td>
                     <td>${tipe}</td>
                     <td>${waktu}</td>
+                    <td>${badgeKet}</td>
+                    <td>${telatTeks}</td>
                 </tr>`;
             } else if (type === 'cuti') {
                 const nama = item.users?.nama || '-';
@@ -881,6 +920,7 @@ function renderKaryawan() {
                                 </small>
                             </div>
                             <h6 class="card-title fw-bold mb-1">${user.nama}</h6>
+                            <small class="text-primary d-block mt-1"><i class="fas fa-layer-group me-1"></i> ${user.unit || 'Unit: -'}</small>
                         </div>
                     </div>
                 </div>
@@ -891,7 +931,7 @@ function renderKaryawan() {
         tableContainer.classList.remove('d-none');
         
         if (filtered.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Tidak ada pengguna yang cocok.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Tidak ada pengguna yang cocok.</td></tr>';
             return;
         }
         
@@ -904,6 +944,7 @@ function renderKaryawan() {
                     <td><span class="badge bg-${badgeColor} text-white">${user.role}</span></td>
                     <td>${user.no_hp || '-'}</td>
                     <td>${user.cabang || '-'}</td>
+                    <td><span class="badge bg-light text-dark border">${user.unit || '-'}</span></td>
                     <td>
                         <button class="btn btn-sm btn-outline-primary" onclick="showDetailKaryawan('${user.id}')">Detail</button>
                     </td>
@@ -924,6 +965,9 @@ function showDetailKaryawan(id) {
     document.getElementById("detail_role").innerText = user.role;
     
     document.getElementById("detail_cabang").innerText = user.cabang || '-';
+    if (document.getElementById("detail_unit")) {
+        document.getElementById("detail_unit").innerText = user.unit || '-';
+    }
     document.getElementById("detail_hp").innerText = user.no_hp || '-';
     
     const namaHariLibur = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
@@ -973,6 +1017,7 @@ async function simpanKaryawan(event) {
     const no_hp = document.getElementById("karyawan_hp").value;
     const password = document.getElementById("karyawan_password").value;
     const cabang = document.getElementById("pilih-cabang").value;
+    const unit = document.getElementById("karyawan_unit") ? document.getElementById("karyawan_unit").value.trim() : "";
     
     const liburCheckboxes = document.querySelectorAll('.form-libur-baru');
     const checkedLibur = Array.from(liburCheckboxes).filter(c => c.checked).map(c => c.value).join(',');
@@ -980,7 +1025,7 @@ async function simpanKaryawan(event) {
     let res;
     if (id) {
         // Edit Mode
-        const updateData = { nama, no_hp, cabang, hari_libur: checkedLibur };
+        const updateData = { nama, no_hp, cabang, unit, hari_libur: checkedLibur };
         
         // Super Admin boleh ubah role
         if (isSuperAdmin) {
@@ -1008,7 +1053,7 @@ async function simpanKaryawan(event) {
         
         // Pendaftaran profil ke database (Akun Auth akan dibuat otomatis saat login pertama)
         res = await supabaseClient.from('users').insert([
-            { nama, password, role, no_hp, cabang, hari_libur: checkedLibur, sisa_cuti: 12 }
+            { nama, password, role, no_hp, cabang, unit, hari_libur: checkedLibur, sisa_cuti: 12 }
         ]);
     }
 
@@ -1032,12 +1077,16 @@ function editKaryawan(id, nama, role, no_hp, cabang) {
     
     const selectCabang = document.getElementById("pilih-cabang");
     if (cabang) selectCabang.value = cabang;
+
+    const user = allKaryawan.find(u => u.id == id);
+    if (document.getElementById("karyawan_unit")) {
+        document.getElementById("karyawan_unit").value = user ? (user.unit || '') : '';
+    }
     
     document.getElementById("karyawan_password").value = ''; // Kosongkan password
     document.getElementById("karyawan_password").placeholder = "Isi jika ingin ganti password";
     
     // Setup checkboxes untuk hari libur
-    const user = allKaryawan.find(u => u.id == id);
     const arrLibur = user && user.hari_libur ? user.hari_libur.split(',') : [];
     document.querySelectorAll('.form-libur-baru').forEach(cb => {
         cb.checked = arrLibur.includes(cb.value);
@@ -1069,6 +1118,7 @@ function editKaryawan(id, nama, role, no_hp, cabang) {
 function batalEditKaryawan() {
     document.getElementById("form-karyawan").reset();
     document.getElementById("karyawan_id").value = '';
+    if (document.getElementById("karyawan_unit")) document.getElementById("karyawan_unit").value = '';
     document.getElementById("karyawan_password").placeholder = "Password (Wajib)";
     
     document.querySelectorAll('.form-libur-baru').forEach(cb => cb.checked = false);
@@ -1178,6 +1228,11 @@ async function loadDataAbsensi() {
     const startDate = `${year}-${month}-01`;
     const endDate = new Date(year, month, 0).toISOString().split('T')[0];
 
+    const expMulai = document.getElementById("export_mulai");
+    const expSelesai = document.getElementById("export_selesai");
+    if (expMulai && !expMulai.value) expMulai.value = startDate;
+    if (expSelesai && !expSelesai.value) expSelesai.value = endDate;
+
     const getSkeletonCardHTML = () => `
         <div class="col-12 col-md-6 col-lg-4">
             <div class="card shadow-sm border-0 rounded-3 placeholder-glow">
@@ -1255,22 +1310,26 @@ async function loadDataAbsensi() {
         }
     });
 
-    gridContainer.innerHTML = '';
-    
+    let gridCardsHtml = '';
     Object.keys(allAbsensiGrouped).forEach(tanggal => {
         const d = allAbsensiGrouped[tanggal];
         d.hadir = d.hadirSet.size;
         d.terlambat = d.terlambatSet.size;
         
-        // Format Tanggal
-        const dateObj = new Date(tanggal);
-        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-        const dateStr = dateObj.toLocaleDateString('id-ID', options);
+        let dateStr = tanggal;
+        try {
+            const [yyyy, mm, dd] = tanggal.split('-');
+            const dateObj = new Date(yyyy, parseInt(mm, 10) - 1, dd);
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            dateStr = dateObj.toLocaleDateString('id-ID', options);
+        } catch(e) {
+            dateStr = tanggal;
+        }
         
         const tidakAbsen = totalUsersCount - d.hadir - d.cuti;
 
-        gridContainer.innerHTML += `
-            <div class="col-md-6 col-lg-4 col-xl-3">
+        gridCardsHtml += `
+            <div class="col-md-6 col-lg-4 col-xl-3 mb-3">
                 <div class="card shadow-sm h-100 border-0 dashboard-card-hover" style="border-radius: 12px; transition: transform 0.2s;">
                     <div class="card-body d-flex flex-column">
                         <div class="d-flex justify-content-between align-items-start mb-3">
@@ -1291,7 +1350,7 @@ async function loadDataAbsensi() {
                             </div>
                         </div>
                         <div class="d-flex gap-2 mt-auto">
-                            <button class="btn btn-sm btn-outline-primary w-50 fw-bold shadow-sm" onclick="showDetailAbsensi('${tanggal}', '${dateStr}')">
+                            <button class="btn btn-sm btn-outline-primary w-50 fw-bold shadow-sm" onclick="showDetailAbsensi('${tanggal}')">
                                 <i class="fas fa-list me-1"></i> Detail
                             </button>
                             <button class="btn btn-sm btn-success w-50 fw-bold shadow-sm" onclick="exportCsvHarian('${tanggal}')">
@@ -1303,33 +1362,56 @@ async function loadDataAbsensi() {
             </div>
         `;
     });
+    gridContainer.innerHTML = gridCardsHtml;
 
     // Auto-refresh modal jika sedang terbuka
     const modalEl = document.getElementById("modalDetailAbsensi");
     if (modalEl && modalEl.classList.contains("show") && currentAbsensiTanggal) {
-        showDetailAbsensi(currentAbsensiTanggal, currentAbsensiDateStr);
+        showDetailAbsensi(currentAbsensiTanggal);
     }
 }
 
 let currentAbsensiTanggal = null;
 let currentAbsensiDateStr = null;
 
-function showDetailAbsensi(tanggal, dateStr) {
+function showDetailAbsensi(tanggal, dateStrParam) {
     currentAbsensiTanggal = tanggal;
+
+    let dateStr = dateStrParam;
+    if (!dateStr) {
+        try {
+            const [yyyy, mm, dd] = tanggal.split('-');
+            const dateObj = new Date(yyyy, parseInt(mm, 10) - 1, dd);
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            dateStr = dateObj.toLocaleDateString('id-ID', options);
+        } catch(e) {
+            dateStr = tanggal;
+        }
+    }
     currentAbsensiDateStr = dateStr;
-    const thead = document.getElementById("modalDetailAbsensiHead");
-    const tbody = document.getElementById("modalDetailAbsensiBody");
-    document.getElementById("modalDetailAbsensiTitle").innerHTML = `<i class="fas fa-calendar-day me-2"></i>Detail Absensi - ${dateStr}`;
-    const searchInput = document.getElementById("searchDetailAbsensi");
-    if (searchInput) searchInput.value = '';
+
+    // Switch view to Page View section
+    const gridView = document.getElementById("absensi-grid-view");
+    const pageView = document.getElementById("absensi-detail-page-view");
+    if (gridView) gridView.classList.add("d-none");
+    if (pageView) pageView.classList.remove("d-none");
+
+    const pageTitle = document.getElementById("pageDetailAbsensiTitle");
+    if (pageTitle) pageTitle.innerHTML = `<i class="fas fa-calendar-day me-2"></i>Detail Absensi - ${dateStr}`;
+
+    const searchInputPage = document.getElementById("searchDetailAbsensiPage");
+    if (searchInputPage) searchInputPage.value = '';
+
+    const thead = document.getElementById("pageDetailAbsensiHead") || document.getElementById("modalDetailAbsensiHead");
+    const tbody = document.getElementById("pageDetailAbsensiBody") || document.getElementById("modalDetailAbsensiBody");
     
-    thead.innerHTML = '';
-    tbody.innerHTML = '';
+    if (thead) thead.innerHTML = '';
+    if (tbody) tbody.innerHTML = '';
     
     const records = allAbsensiGrouped[tanggal]?.records || [];
     
     if (records.length === 0) {
-        tbody.innerHTML = `<tr><td class="text-center py-4 text-muted">Tidak ada data detail absensi</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td class="text-center py-4 text-muted">Tidak ada data detail absensi</td></tr>`;
         return;
     }
 
@@ -1346,7 +1428,7 @@ function showDetailAbsensi(tanggal, dateStr) {
         const cabangUser = row.users?.cabang || '-';
         
         if (!grouped[namaUser]) {
-            grouped[namaUser] = { nama: namaUser, cabang: cabangUser, absensi: {} };
+            grouped[namaUser] = { nama: namaUser, cabang: cabangUser, absensi: {}, allRows: [] };
         }
         
         const tipe = row.tipe_absen || 'Unknown';
@@ -1354,7 +1436,11 @@ function showDetailAbsensi(tanggal, dateStr) {
             tipeAbsenList.push(tipe);
         }
         
-        grouped[namaUser].absensi[tipe] = row;
+        if (!grouped[namaUser].absensi[tipe]) {
+            grouped[namaUser].absensi[tipe] = [];
+        }
+        grouped[namaUser].absensi[tipe].push(row);
+        grouped[namaUser].allRows.push(row);
     });
     
     // 2. Build Dynamic Header
@@ -1366,6 +1452,7 @@ function showDetailAbsensi(tanggal, dateStr) {
     trHead += `<th colspan="${tipeAbsenList.length}">Foto Muka</th>`;
     trHead += `<th class="align-middle text-center" rowspan="2">Jam Kerja</th>`;
     trHead += `<th class="align-middle text-center" rowspan="2">Jam Lembur</th>`;
+    trHead += `<th class="align-middle text-center text-danger" rowspan="2">Waktu Telat</th>`;
     trHead += `<th colspan="${tipeAbsenList.length}">Aksi</th>`;
     trHead += `</tr><tr>`;
     // Sub-headers for tipe_absen within categories
@@ -1379,9 +1466,10 @@ function showDetailAbsensi(tanggal, dateStr) {
         trHead += `<th><span class="badge bg-secondary">${tipe}</span></th>`;
     });
     trHead += `</tr>`;
-    thead.innerHTML = trHead;
+    if (thead) thead.innerHTML = trHead;
 
     // 3. Build Body Rows
+    let tbodyRowsHtml = '';
     for (const namaUser in grouped) {
         const g = grouped[namaUser];
         let trHtml = `<tr>
@@ -1390,158 +1478,213 @@ function showDetailAbsensi(tanggal, dateStr) {
             
         // Waktu
         tipeAbsenList.forEach(tipe => {
-            const a = g.absensi[tipe];
-            trHtml += `<td class="align-middle">${a ? (a.waktu || '-') : '-'}</td>`;
+            const list = g.absensi[tipe] || [];
+            if (list.length > 0) {
+                const timeBadges = list.map(a => `<span class="badge bg-light text-dark border d-block mb-1">${formatWaktuGlobal(a.waktu)}</span>`).join('');
+                trHtml += `<td class="align-middle">${timeBadges}</td>`;
+            } else {
+                trHtml += `<td class="align-middle text-muted">-</td>`;
+            }
         });
         
         // Status
         tipeAbsenList.forEach(tipe => {
-            const a = g.absensi[tipe];
-            if (a) {
-                let badgeClass = "bg-secondary";
-                if (a.status === "Hadir" || a.status === "Tepat Waktu") badgeClass = "bg-success";
-                else if (a.status === "Terlambat") badgeClass = "bg-warning text-dark";
-                else if (a.status === "Alpha") badgeClass = "bg-danger";
-                else if (a.status === "Cuti") badgeClass = "bg-info text-dark";
-                
-                let faceBadgeClass = "bg-secondary";
-                const faceStatus = a.status_wajah || "Sesuai";
-                if (faceStatus.includes("Dicurigai") || faceStatus.includes("Tidak Sama")) faceBadgeClass = "bg-danger";
-                else if (faceStatus.includes("Sesuai") || faceStatus.includes("Sama")) faceBadgeClass = "bg-success";
-                else if (faceStatus.includes("Error")) faceBadgeClass = "bg-warning text-dark";
+            const list = g.absensi[tipe] || [];
+            if (list.length > 0) {
+                let statusHtml = '';
+                list.forEach(a => {
+                    let badgeClass = "bg-secondary";
+                    if (a.status === "Hadir" || a.status === "Tepat Waktu") badgeClass = "bg-success";
+                    else if (a.status === "Terlambat") badgeClass = "bg-warning text-dark";
+                    else if (a.status === "Alpha") badgeClass = "bg-danger";
+                    else if (a.status === "Cuti") badgeClass = "bg-info text-dark";
+                    else if (a.status === "Istirahat") badgeClass = "bg-primary";
+                    
+                    let faceBadgeClass = "bg-secondary";
+                    const faceStatus = a.status_wajah || "Sesuai";
+                    if (faceStatus.includes("Dicurigai") || faceStatus.includes("Tidak Sama")) faceBadgeClass = "bg-danger";
+                    else if (faceStatus.includes("Sesuai") || faceStatus.includes("Sama")) faceBadgeClass = "bg-success";
 
-                trHtml += `<td class="align-middle" style="min-width: 130px;">
-                    <span class="badge ${badgeClass} mb-1 w-100">${a.status || 'Hadir'}</span><br>
-                    <span class="badge ${faceBadgeClass} w-100" title="Status Wajah"><i class="fas fa-user-check"></i> ${faceStatus}</span>
-                </td>`;
+                    statusHtml += `<div class="mb-1 text-center">
+                        <span class="badge ${badgeClass} mb-1 w-100">${a.status || 'Hadir'}</span><br>
+                        <span class="badge ${faceBadgeClass} w-100" title="Status Wajah"><i class="fas fa-user-check"></i> ${faceStatus}</span>
+                    </div>`;
+                });
+                trHtml += `<td class="align-middle" style="min-width: 130px;">${statusHtml}</td>`;
             } else {
-                trHtml += `<td class="align-middle">-</td>`;
+                trHtml += `<td class="align-middle text-muted">-</td>`;
             }
         });
         
         // Lokasi
         tipeAbsenList.forEach(tipe => {
-            const a = g.absensi[tipe];
-            trHtml += `<td class="align-middle"><span class="small text-muted">${a ? (a.lokasi || '-') : '-'}</span></td>`;
-        });
-        
-        // Foto
-        tipeAbsenList.forEach(tipe => {
-            const a = g.absensi[tipe];
-            if (a && a.foto) {
-                trHtml += `<td class="align-middle"><button class="btn btn-sm btn-info text-white shadow-sm" onclick="lihatFotoAbsenSingle('${a.foto}')">📸 Lihat</button></td>`;
+            const list = g.absensi[tipe] || [];
+            if (list.length > 0) {
+                const locHtml = list.map(a => `<div class="small text-muted mb-1">${a.lokasi || '-'}</div>`).join('');
+                trHtml += `<td class="align-middle">${locHtml}</td>`;
             } else {
                 trHtml += `<td class="align-middle text-muted small fst-italic">-</td>`;
             }
         });
         
-        // Hitung Jam Kerja & Lembur
+        // Foto
+        tipeAbsenList.forEach(tipe => {
+            const list = g.absensi[tipe] || [];
+            if (list.length > 0) {
+                const fotoHtml = list.map(a => a.foto ? `<button class="btn btn-sm btn-info text-white shadow-sm mb-1 d-block w-100" onclick="lihatFotoAbsenSingle('${a.foto}')">📸 Lihat</button>` : `<div class="text-muted small fst-italic mb-1">-</div>`).join('');
+                trHtml += `<td class="align-middle">${fotoHtml}</td>`;
+            } else {
+                trHtml += `<td class="align-middle text-muted small fst-italic">-</td>`;
+            }
+        });
+        
+        // Hitung Jam Kerja & Lembur berdasarkan allRows
         let jamKerjaStr = '-';
         let jamLemburStr = '-';
-        let waktuMasuk = null;
-        let waktuPulang = null;
-        let batasPulang = null;
-        let waktuIzinKeluar = null;
-        let waktuIzinMasuk = null;
-        
-        if (typeof globalMasterTipeAbsen !== 'undefined') {
-            globalMasterTipeAbsen.forEach(t => {
-                if (g.absensi[t.nama_tipe]) {
-                    const timeStr = g.absensi[t.nama_tipe].waktu;
-                    if (timeStr && timeStr !== '-') {
-                        const namaTipe = t.nama_tipe.toLowerCase();
-                        if (namaTipe.includes('izin keluar')) {
-                            waktuIzinKeluar = timeStr;
-                        } else if (namaTipe.includes('izin masuk') || namaTipe.includes('izin kembali')) {
-                            waktuIzinMasuk = timeStr;
-                        } else if (t.is_checkout) {
-                            waktuPulang = timeStr;
-                            batasPulang = t.batas_terlambat;
-                        } else {
-                            if (!waktuMasuk) waktuMasuk = timeStr;
-                        }
-                    }
-                }
-            });
-        }
-        
+
         const parseT = (tStr) => {
             if (!tStr) return null;
             const p = tStr.split(':');
             if (p.length < 2) return null;
-            return parseInt(p[0]) * 60 + parseInt(p[1]);
+            return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
         };
         const formatM = (m) => {
             if (m <= 0) return '0j 0m';
-            return `${Math.floor(m/60)}j ${m%60}m`;
+            return `${Math.floor(m / 60)}j ${m % 60}m`;
         };
+
+        const allRows = g.allRows || [];
         
-        let lemburMins = 0;
-        if (waktuPulang && batasPulang) {
-            const pMins = parseT(waktuPulang);
-            const bMins = parseT(batasPulang);
-            if (pMins && bMins && pMins > bMins) {
-                lemburMins = pMins - bMins;
+        // 1. Cari Waktu Masuk Pertama
+        const masukRows = allRows.filter(r => {
+            const name = (r.tipe_absen || '').toLowerCase();
+            return name.includes('masuk') && !name.includes('izin') && !name.includes('istirahat');
+        });
+        let waktuMasukMin = null;
+        if (masukRows.length > 0) {
+            masukRows.sort((a, b) => (a.waktu || '').localeCompare(b.waktu || ''));
+            waktuMasukMin = parseT(masukRows[0].waktu);
+        }
+
+        // 2. Cari Waktu Pulang / Checkout Terakhir
+        const pulangRows = allRows.filter(r => {
+            const name = (r.tipe_absen || '').toLowerCase();
+            return name.includes('pulang') || name.includes('checkout');
+        });
+        let waktuPulangMin = null;
+        let jamPulangResmiMin = null;
+
+        if (pulangRows.length > 0) {
+            pulangRows.sort((a, b) => (b.waktu || '').localeCompare(a.waktu || ''));
+            const lastPulang = pulangRows[0];
+            waktuPulangMin = parseT(lastPulang.waktu);
+
+            const masterTarget = (globalMasterTipeAbsen || []).find(m => m.nama_tipe === lastPulang.tipe_absen) ||
+                                 (globalMasterTipeAbsen || []).find(m => m.is_checkout);
+            if (masterTarget) {
+                jamPulangResmiMin = parseT(masterTarget.batas_terlambat || masterTarget.jam_tutup || "16:00:00");
+                if (jamPulangResmiMin > 1400 && masterTarget.batas_terlambat) {
+                    jamPulangResmiMin = parseT(masterTarget.batas_terlambat);
+                }
+            } else {
+                jamPulangResmiMin = 960; // 16:00
             }
         }
-        
-        let izinMins = 0;
-        if (waktuIzinKeluar && waktuIzinMasuk) {
-            const kMins = parseT(waktuIzinKeluar);
-            const mMinsIzin = parseT(waktuIzinMasuk);
-            if (kMins && mMinsIzin && mMinsIzin > kMins) {
-                izinMins = mMinsIzin - kMins;
+
+        // 3. Hitung Durasi Istirahat / Izin (Siang vs Lembur)
+        let istirahatSiangMins = 0;
+        let istirahatLemburMins = 0;
+
+        const istKeluarRows = allRows.filter(r => (r.tipe_absen || '').toLowerCase().includes('istirahat keluar') || (r.tipe_absen || '').toLowerCase().includes('izin keluar')).sort((a, b) => (a.waktu || '').localeCompare(b.waktu || ''));
+        const istMasukRows = allRows.filter(r => (r.tipe_absen || '').toLowerCase().includes('istirahat masuk') || (r.tipe_absen || '').toLowerCase().includes('izin masuk')).sort((a, b) => (a.waktu || '').localeCompare(b.waktu || ''));
+
+        istKeluarRows.forEach(kRow => {
+            const kMin = parseT(kRow.waktu);
+            if (kMin) {
+                const mRow = istMasukRows.find(m => parseT(m.waktu) > kMin);
+                if (mRow) {
+                    const mMin = parseT(mRow.waktu);
+                    const durasi = mMin - kMin;
+                    if (jamPulangResmiMin && kMin >= jamPulangResmiMin) {
+                        istirahatLemburMins += durasi;
+                    } else {
+                        istirahatSiangMins += durasi;
+                    }
+                }
             }
-        }
-        
-        if (lemburMins > 0) {
-            jamLemburStr = formatM(lemburMins);
-        } else if (waktuPulang) {
+        });
+
+        // 4. Kalkulasi Jam Lembur & Jam Kerja
+        if (waktuPulangMin && jamPulangResmiMin && waktuPulangMin > jamPulangResmiMin) {
+            const lemburKotor = waktuPulangMin - jamPulangResmiMin;
+            const lemburBersih = Math.max(0, lemburKotor - istirahatLemburMins);
+            jamLemburStr = formatM(lemburBersih);
+        } else if (waktuPulangMin) {
             jamLemburStr = '0j 0m';
         }
-        
-        if (waktuMasuk && waktuPulang) {
-            const mMins = parseT(waktuMasuk);
-            const pMins = parseT(waktuPulang);
-            if (mMins && pMins && pMins >= mMins) {
-                let kerjaMins = (pMins - mMins) - lemburMins - izinMins;
-                if (kerjaMins < 0) kerjaMins = 0;
-                jamKerjaStr = formatM(kerjaMins);
+
+        if (waktuMasukMin && waktuPulangMin) {
+            const batasAkhirKerja = jamPulangResmiMin && waktuPulangMin > jamPulangResmiMin ? jamPulangResmiMin : waktuPulangMin;
+            if (batasAkhirKerja >= waktuMasukMin) {
+                const kerjaKotor = batasAkhirKerja - waktuMasukMin;
+                const kerjaBersih = Math.max(0, kerjaKotor - istirahatSiangMins);
+                jamKerjaStr = formatM(kerjaBersih);
             }
+        }
+
+        let totalTelatMins = 0;
+        (g.allRows || []).forEach(a => {
+            if (a.menit_terlambat && parseInt(a.menit_terlambat, 10) > 0) {
+                totalTelatMins += parseInt(a.menit_terlambat, 10);
+            }
+        });
+        
+        let telatCellHtml = `<span class="text-muted small">0m</span>`;
+        if (totalTelatMins > 0) {
+            const j = Math.floor(totalTelatMins / 60);
+            const m = totalTelatMins % 60;
+            const telatStr = `${j > 0 ? j + 'j ' : ''}${m}m`;
+            telatCellHtml = `<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">${telatStr}</span>`;
         }
 
         trHtml += `<td class="align-middle text-center fw-bold text-success">${jamKerjaStr}</td>`;
         trHtml += `<td class="align-middle text-center fw-bold text-warning">${jamLemburStr}</td>`;
+        trHtml += `<td class="align-middle text-center fw-bold">${telatCellHtml}</td>`;
         
         // Aksi
         tipeAbsenList.forEach(tipe => {
-            const a = g.absensi[tipe];
-            if (a) {
-                trHtml += `<td class="align-middle">
-                    <button class="btn btn-sm btn-danger shadow-sm text-white" onclick="hapusDataAbsen('${a.id}', '${tanggal}')" title="Hapus ${tipe}">
-                        <i class="fas fa-trash-alt me-1"></i>Hapus
-                    </button>
-                </td>`;
+            const list = g.absensi[tipe] || [];
+            if (list.length > 0) {
+                const aksiHtml = list.map(a => `
+                    <div class="d-flex flex-column gap-1 my-1">
+                        <button class="btn btn-sm btn-warning text-dark shadow-sm fw-bold w-100" onclick="bukaModalEditAbsensi('${a.id}', '${a.tipe_absen}', '${a.waktu}', '${tanggal}')" title="Edit / Pindah Shift ${tipe}">
+                            <i class="fas fa-edit me-1"></i>Edit
+                        </button>
+                        <button class="btn btn-sm btn-danger shadow-sm text-white w-100" onclick="hapusDataAbsen('${a.id}', '${tanggal}')" title="Hapus ${tipe}">
+                            <i class="fas fa-trash-alt me-1"></i>Hapus
+                        </button>
+                    </div>
+                `).join('');
+                trHtml += `<td class="align-middle" style="min-width: 110px;">${aksiHtml}</td>`;
             } else {
-                trHtml += `<td class="align-middle">-</td>`;
+                trHtml += `<td class="align-middle text-muted">-</td>`;
             }
         });
 
         trHtml += `</tr>`;
-        tbody.innerHTML += trHtml;
+        tbodyRowsHtml += trHtml;
     }
     
-    const modalEl = document.getElementById('modalDetailAbsensi');
-    if (!modalEl.classList.contains('show')) {
-        new bootstrap.Modal(modalEl).show();
-    }
+    if (tbody) tbody.innerHTML = tbodyRowsHtml;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function filterDetailAbsensi() {
-    const input = document.getElementById("searchDetailAbsensi");
+function filterDetailAbsensiPage() {
+    const input = document.getElementById("searchDetailAbsensiPage");
     if (!input) return;
     const filter = input.value.toLowerCase();
-    const tbody = document.getElementById("modalDetailAbsensiBody");
+    const tbody = document.getElementById("pageDetailAbsensiBody");
+    if (!tbody) return;
     const trs = tbody.getElementsByTagName("tr");
     
     for (let i = 0; i < trs.length; i++) {
@@ -1554,6 +1697,28 @@ function filterDetailAbsensi() {
         }
     }
 }
+window.filterDetailAbsensiPage = filterDetailAbsensiPage;
+
+function filterDetailAbsensi() {
+    filterDetailAbsensiPage();
+}
+window.filterDetailAbsensi = filterDetailAbsensi;
+
+function tutupDetailAbsensiPage() {
+    const gridView = document.getElementById("absensi-grid-view");
+    const pageView = document.getElementById("absensi-detail-page-view");
+    if (gridView) gridView.classList.remove("d-none");
+    if (pageView) pageView.classList.add("d-none");
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+window.tutupDetailAbsensiPage = tutupDetailAbsensiPage;
+
+function exportCsvCurrentDetail() {
+    if (currentAbsensiTanggal) {
+        exportCsvHarian(currentAbsensiTanggal);
+    }
+}
+window.exportCsvCurrentDetail = exportCsvCurrentDetail;
 
 async function exportCsvHarian(tanggal) {
     try {
@@ -2664,7 +2829,10 @@ async function prosesExport(event) {
         
         // 1. Group Data & Get Unique Tipe Absen
         const grouped = {};
-        const tipeAbsenSet = new Set();
+        let tipeAbsenList = [];
+        if (typeof globalMasterTipeAbsen !== 'undefined' && globalMasterTipeAbsen.length > 0) {
+            tipeAbsenList = globalMasterTipeAbsen.filter(t => t.is_aktif).map(t => t.nama_tipe);
+        }
 
         data.forEach(row => {
             const namaUser = row.users ? row.users.nama : 'Unknown';
@@ -2681,7 +2849,9 @@ async function prosesExport(event) {
             }
             
             const tipe = row.tipe_absen || 'Unknown';
-            tipeAbsenSet.add(tipe);
+            if (!tipeAbsenList.includes(tipe)) {
+                tipeAbsenList.push(tipe);
+            }
             
             grouped[key].absensi[tipe] = {
                 waktu: row.waktu || '-',
@@ -2992,6 +3162,7 @@ async function hapusPermanenInternal(row) {
         // Hapus file storage
         const files = [];
         const extractFilename = (url) => url ? url.split('/').pop() : null;
+        if (row.foto) files.push(extractFilename(row.foto));
         if (row.foto_masuk) files.push(extractFilename(row.foto_masuk));
         if (row.foto_istirahat_keluar) files.push(extractFilename(row.foto_istirahat_keluar));
         if (row.foto_istirahat_masuk) files.push(extractFilename(row.foto_istirahat_masuk));
@@ -3029,6 +3200,10 @@ async function loadSettings() {
             document.getElementById('setting_enable_lokasi').checked = data.enable_lokasi !== false;
             document.getElementById('setting_enable_kamera').checked = data.enable_kamera !== false;
             
+            const elFormat = document.getElementById('setting_format_waktu');
+            if (elFormat) elFormat.value = data.format_waktu || 'HH:mm:ss';
+            window.currentFormatWaktu = data.format_waktu || 'HH:mm:ss';
+            
             if (data.logo_url) {
                 currentLogoUrl = data.logo_url;
                 const imgPreview = document.getElementById('preview_setting_logo');
@@ -3057,6 +3232,18 @@ async function loadSettings() {
     }
 }
 
+function formatWaktuGlobal(timeStr) {
+    if (!timeStr || timeStr === '-') return '-';
+    const parts = timeStr.split(':');
+    if (parts.length < 2) return timeStr;
+    const format = window.currentFormatWaktu || 'HH:mm:ss';
+    if (format === 'HH:mm') {
+        return `${parts[0]}:${parts[1]}`;
+    }
+    return timeStr.length === 5 ? `${timeStr}:00` : timeStr;
+}
+window.formatWaktuGlobal = formatWaktuGlobal;
+
 async function saveSettings() {
     const nama_aplikasi = document.getElementById('setting_nama_aplikasi').value;
     const login_subteks = document.getElementById('setting_login_subteks').value;
@@ -3065,6 +3252,7 @@ async function saveSettings() {
     const pengumuman_warna = document.getElementById('setting_pengumuman_warna').value;
     const enable_lokasi = document.getElementById('setting_enable_lokasi').checked;
     const enable_kamera = document.getElementById('setting_enable_kamera').checked;
+    const format_waktu = document.getElementById('setting_format_waktu')?.value || 'HH:mm:ss';
     const fileInput = document.getElementById('setting_logo_file');
     
     try {
@@ -3090,12 +3278,14 @@ async function saveSettings() {
             logo_url = publicUrlData.publicUrl;
         }
 
-        const payload = { id: 1, nama_aplikasi, login_subteks, form_judul, logo_url, pengumuman, pengumuman_warna, enable_lokasi, enable_kamera };
+        const payload = { id: 1, nama_aplikasi, login_subteks, form_judul, logo_url, pengumuman, pengumuman_warna, enable_lokasi, enable_kamera, format_waktu };
         
         const { error } = await supabaseClient.from('app_settings').upsert(payload, { onConflict: 'id' });
         
         if (error) throw error;
         
+        window.currentFormatWaktu = format_waktu;
+        if (typeof renderTipeAbsen === 'function') renderTipeAbsen();
         Swal.fire('Berhasil', 'Pengaturan berhasil disimpan!', 'success');
     } catch (err) {
         console.error(err);
@@ -3279,115 +3469,173 @@ async function importKaryawan(event) {
 async function backupDatabase() {
     const includeMedia = document.getElementById('backup_media')?.checked;
     
-    Swal.fire({ title: includeMedia ? 'Membackup Database & Media...' : 'Membackup Database...', html: 'Proses ini mungkin memakan waktu agak lama.', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    Swal.fire({
+        title: includeMedia ? 'Membackup Database Enterprise & Media...' : 'Membackup Database Enterprise...',
+        html: 'Mengumpulkan seluruh data master (kantor, karyawan, tipe absen, jenis cuti, form config) & transaksi absensi/cuti...',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+    });
+
     try {
-        const dbBackup = {};
-        const tables = ['users', 'cabang', 'absensi', 'cuti', 'form_cuti_config', 'app_settings'];
-        
-        for (const table of tables) {
+        // List seluruh tabel resmi database Zieda Absen
+        const targetTables = [
+            'users',
+            'kantor',
+            'master_tipe_absen',
+            'master_jenis_cuti',
+            'form_cuti_config',
+            'app_settings',
+            'absensi',
+            'cuti'
+        ];
+
+        const dbTablesData = {};
+        const tablesSummary = {};
+        let totalRecordsCount = 0;
+
+        for (const table of targetTables) {
             try {
                 const { data, error } = await supabaseClient.from(table).select('*');
                 if (error) console.warn(`Supabase error for table ${table}:`, error);
-                dbBackup[table] = data || [];
+                const records = data || [];
+                dbTablesData[table] = records;
+                tablesSummary[table] = records.length;
+                totalRecordsCount += records.length;
             } catch (e) {
-                console.warn(`Failed to fetch table ${table}`, e);
-                dbBackup[table] = [];
+                console.warn(`Gagal mengambil data tabel ${table}:`, e);
+                dbTablesData[table] = [];
+                tablesSummary[table] = 0;
             }
         }
-        
-        const json = JSON.stringify(dbBackup, null, 2);
+
+        // Format Standar Profesional Enterprise
+        const enterpriseBackupObj = {
+            system_info: {
+                app_name: "Zieda Absen Enterprise System",
+                schema_version: "3.5",
+                export_timestamp: new Date().toISOString(),
+                environment: typeof ACTIVE_ENVIRONMENT !== 'undefined' ? ACTIVE_ENVIRONMENT : 'UNKNOWN',
+                total_records: totalRecordsCount
+            },
+            tables_summary: tablesSummary,
+            database: dbTablesData
+        };
+
+        const json = JSON.stringify(enterpriseBackupObj, null, 2);
         const d = new Date();
-        const dateStr = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+        const dateStr = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
         
         if (includeMedia) {
             const zip = new JSZip();
-            zip.file("database_backup.json", json);
             const mediaFolder = zip.folder("media");
             
             const mediaTasks = [];
+            const processedPaths = new Set();
 
-            // Collect media from absensi
-            for (const a of dbBackup['absensi'] || []) {
-                const userName = dbBackup['users']?.find(u => u.id === a.user_id)?.nama || 'Unknown';
-                const fName = `${userName}_${a.tanggal}`.replace(/[^a-z0-9]/gi, '_');
+            const addUrlToBackup = (rawUrl) => {
+                if (!rawUrl || typeof rawUrl !== 'string') return;
+
+                const bucketMarker = '/absensi-bucket/';
+                const idx = rawUrl.indexOf(bucketMarker);
                 
-                const addMediaTask = (url, suffix) => {
-                    if (!url) return;
+                if (idx !== -1) {
+                    const storagePath = rawUrl.substring(idx + bucketMarker.length).replace(/^\/+/, '');
+                    if (!storagePath || processedPaths.has(storagePath)) return;
+                    processedPaths.add(storagePath);
+
                     mediaTasks.push(async () => {
                         try {
-                            const res = await fetch(url);
-                            if(res.ok) {
-                                const blob = await res.blob();
-                                const ext = url.split('?')[0].split('.').pop() || 'jpg';
-                                mediaFolder.file(`absensi/${fName}_${suffix}.${ext}`, blob);
+                            // 1. Coba download via Supabase Storage Client (Bypasses CORS/Domain issues)
+                            const { data: blob, error: dlErr } = await supabaseClient.storage.from('absensi-bucket').download(storagePath);
+                            if (!dlErr && blob) {
+                                mediaFolder.file(storagePath, blob);
+                                return;
                             }
-                        } catch(e) {}
+                        } catch (e) {}
+
+                        try {
+                            // 2. Fallback via HTTP fetch menggunakan fixStorageUrl
+                            const targetUrl = typeof fixStorageUrl === 'function' ? fixStorageUrl(rawUrl) : rawUrl;
+                            const res = await fetch(targetUrl);
+                            if (res.ok) {
+                                const blob = await res.blob();
+                                mediaFolder.file(storagePath, blob);
+                            }
+                        } catch (e) {
+                            console.warn("Gagal mendownload foto backup:", storagePath, e);
+                        }
                     });
-                };
-                
-                addMediaTask(a.foto_masuk, "Masuk");
-                addMediaTask(a.foto_pulang, "Pulang");
-                addMediaTask(a.foto_istirahat_keluar, "istKeluar");
-                addMediaTask(a.foto_istirahat_masuk, "ist_mask");
+                } else if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+                    const fileName = rawUrl.split('?')[0].split('/').pop() || `media_${Date.now()}.png`;
+                    const storagePath = `external/${fileName}`;
+                    if (processedPaths.has(storagePath)) return;
+                    processedPaths.add(storagePath);
+
+                    mediaTasks.push(async () => {
+                        try {
+                            const res = await fetch(rawUrl);
+                            if (res.ok) {
+                                const blob = await res.blob();
+                                mediaFolder.file(storagePath, blob);
+                            }
+                        } catch (e) {}
+                    });
+                }
+            };
+
+            // 1. Kumpulkan media dari tabel ABSENSI
+            for (const a of dbTablesData['absensi'] || []) {
+                addUrlToBackup(a.foto);
+                addUrlToBackup(a.foto_masuk);
+                addUrlToBackup(a.foto_keluar);
+                addUrlToBackup(a.foto_istirahat_keluar);
+                addUrlToBackup(a.foto_istirahat_masuk);
             }
-            
-            // Collect media from cuti
-            for (const c of dbBackup['cuti'] || []) {
-                if (c.data_tambahan) {
-                    const userName = dbBackup['users']?.find(u => u.id === c.user_id)?.nama || 'Unknown';
-                    const fName = `${userName}_${c.tanggal_mulai}`.replace(/[^a-z0-9]/gi, '_');
-                    
-                    for (const [key, url] of Object.entries(c.data_tambahan)) {
-                        if (typeof url === 'string' && url.startsWith('http')) {
-                            mediaTasks.push(async () => {
-                                try {
-                                    const res = await fetch(url);
-                                    if(res.ok) {
-                                        const blob = await res.blob();
-                                        const ext = url.split('?')[0].split('.').pop() || 'jpg';
-                                        mediaFolder.file(`cuti/${fName}_${key.replace(/[^a-z0-9]/gi,'_')}.${ext}`, blob);
-                                    }
-                                } catch(e) {}
-                            });
+
+            // 2. Kumpulkan media dari tabel USERS (foto_wajah)
+            for (const u of dbTablesData['users'] || []) {
+                addUrlToBackup(u.foto_wajah);
+            }
+
+            // 3. Kumpulkan media dari tabel APP_SETTINGS (logo_url)
+            for (const s of dbTablesData['app_settings'] || []) {
+                addUrlToBackup(s.logo_url);
+            }
+
+            // 4. Kumpulkan media dari tabel CUTI (lampiran data_tambahan)
+            for (const c of dbTablesData['cuti'] || []) {
+                if (c.data_tambahan && typeof c.data_tambahan === 'object') {
+                    for (const val of Object.values(c.data_tambahan)) {
+                        if (typeof val === 'string') {
+                            addUrlToBackup(val);
                         }
                     }
                 }
             }
-            
-            // Execute fetching in batches to avoid hanging the browser
+
+            // Eksekusi pencapaian unduhan media secara paralel (batch 10)
             let completed = 0;
             const batchSize = 10;
             for (let i = 0; i < mediaTasks.length; i += batchSize) {
                 const batch = mediaTasks.slice(i, i + batchSize);
                 await Promise.all(batch.map(task => task()));
                 completed += batch.length;
-                Swal.update({ html: `Mendownload media... (${Math.min(completed, mediaTasks.length)} / ${mediaTasks.length})` });
+                Swal.update({ html: `Mendownload foto & media... (${Math.min(completed, mediaTasks.length)} / ${mediaTasks.length})` });
             }
-            
-            Swal.update({ html: `Membuat file ZIP, mohon tunggu...` });
+
+            zip.file("database_backup.json", json);
+            Swal.update({ html: `Membuat paket ZIP Enterprise...` });
             const zipContent = await zip.generateAsync({ type: "blob" });
-            const url = URL.createObjectURL(zipContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", `Backup_Full_Absensi_${dateStr}.zip`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            saveAs(zipContent, `Backup_Enterprise_Absensi_${dateStr}.zip`);
             
         } else {
             const blob = new Blob([json], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", `Backup_DB_Absensi_${dateStr}.json`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            saveAs(blob, `Backup_Enterprise_Absensi_${dateStr}.json`);
         }
         
-        Swal.fire("Berhasil", "Backup berhasil diunduh!", "success");
+        Swal.fire("Berhasil", `Backup Enterprise berhasil diunduh! (${totalRecordsCount} data record tersimpan)`, "success");
     } catch(err) {
-        Swal.fire("Error", "Gagal membackup: " + err.message, "error");
+        Swal.fire("Error", "Gagal membackup database: " + err.message, "error");
     }
 }
 
@@ -3395,13 +3643,17 @@ async function restoreDatabase(event) {
     const file = event.target.files[0];
     if (!file) return;
     
+    const isZip = file.name.endsWith('.zip');
+    
     const result = await Swal.fire({
-        title: "Peringatan Berbahaya!",
-        text: "Restore akan MENIMPA dan MENGHAPUS seluruh data Anda saat ini. Lanjutkan?",
+        title: "Peringatan Pemulihan Data!",
+        text: isZip 
+            ? "Restore file ZIP akan mengunggah ulang seluruh foto & memulihkan database ke server aktif ini. Lanjutkan?"
+            : "Restore file JSON akan memulihkan data & menyesuaikan seluruh link gambar dari server lama ke server aktif. Lanjutkan?",
         icon: "warning",
         showCancelButton: true,
         confirmButtonColor: "#d33",
-        confirmButtonText: "Ya, Timpa Semua Data!"
+        confirmButtonText: "Ya, Mulai Restore Data!"
     });
     
     if (!result.isConfirmed) {
@@ -3409,40 +3661,196 @@ async function restoreDatabase(event) {
         return;
     }
     
-    Swal.fire({ title: 'Memulihkan Database...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    Swal.fire({ title: 'Memulihkan Database...', html: 'Menguraikan paket backup & menyiapkan data...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
     
-    const reader = new FileReader();
-    reader.onload = async function(e) {
-        try {
-            const data = JSON.parse(e.target.result);
-            // Reverse order to handle foreign keys
-            const tables = ['absensi', 'cuti', 'form_cuti_config', 'cabang']; 
+    try {
+        let jsonString = '';
+        let mediaFiles = {};
+
+        if (isZip) {
+            const zip = await JSZip.loadAsync(file);
+            const backupJsonFile = zip.file("database_backup.json");
+            if (!backupJsonFile) {
+                throw new Error("File 'database_backup.json' tidak ditemukan di dalam paket ZIP!");
+            }
+            jsonString = await backupJsonFile.async("text");
             
-            for (const table of tables) {
-                if (data[table] && data[table].length > 0) {
-                    // Karena Supabase API tidak memperbolehkan truncate langsung tanpa RLS/RPC khusus dari Client,
-                    // Kita akan mencoba upsert.
-                    await supabaseClient.from(table).upsert(data[table]);
+            // Kumpulkan file media dari folder media/ di ZIP
+            const relativePaths = Object.keys(zip.files).filter(p => p.startsWith("media/") && !zip.files[p].dir);
+            for (const path of relativePaths) {
+                const blob = await zip.file(path).async("blob");
+                const targetBucketPath = path.replace(/^media\//, '');
+                mediaFiles[targetBucketPath] = blob;
+            }
+        } else {
+            jsonString = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = (err) => reject(err);
+                reader.readAsText(file);
+            });
+        }
+
+        const parsed = JSON.parse(jsonString);
+        const rawDb = parsed.database ? parsed.database : parsed;
+        
+        // ------------------------------------------
+        // Normalisasi & Sanitasi Khusus Tabel 'kantor'
+        // ------------------------------------------
+        let kantorRecords = rawDb['kantor'] || rawDb['cabang'] || [];
+
+        // Jika data kantorRecords kosong di file backup, ekstrak otomatis dari users.cabang agar tidak ada cabang yang hilang
+        if (!Array.isArray(kantorRecords) || kantorRecords.length === 0) {
+            const cabangNames = new Set(['Pusat']);
+            if (Array.isArray(rawDb['users'])) {
+                rawDb['users'].forEach(u => {
+                    if (u.cabang && typeof u.cabang === 'string' && u.cabang.trim() !== '') {
+                        cabangNames.add(u.cabang.trim());
+                    }
+                });
+            }
+            kantorRecords = Array.from(cabangNames).map((nama, idx) => ({
+                id: idx + 1,
+                nama: nama,
+                lat: '-6.2088',
+                lng: '106.8456',
+                radius: 100
+            }));
+        }
+
+        // Format ulang setiap record kantor agar persis cocok dengan skema tabel Supabase 'kantor'
+        rawDb['kantor'] = kantorRecords.map((item, idx) => {
+            if (typeof item === 'string') {
+                return {
+                    id: idx + 1,
+                    nama: item,
+                    lat: '-6.2088',
+                    lng: '106.8456',
+                    radius: 100,
+                    created_at: new Date().toISOString()
+                };
+            }
+            return {
+                id: parseInt(item.id || (idx + 1), 10),
+                nama: String(item.nama || item.nama_kantor || item.nama_cabang || item.cabang || `Kantor ${idx + 1}`),
+                lat: String(item.lat || item.latitude || '-6.2088'),
+                lng: String(item.lng || item.longitude || '106.8456'),
+                radius: parseInt(item.radius || item.radius_meter || 100, 10),
+                created_at: item.created_at || new Date().toISOString()
+            };
+        });
+
+        // 1. Jika ada media dari paket ZIP, unggah ulang ke storage bucket server baru secara otomatis
+        const mediaKeys = Object.keys(mediaFiles);
+        if (mediaKeys.length > 0) {
+            let uploadedMediaCount = 0;
+            for (const bucketPath of mediaKeys) {
+                try {
+                    const blob = mediaFiles[bucketPath];
+                    await supabaseClient.storage.from('absensi-bucket').upload(bucketPath, blob, { upsert: true });
+                    uploadedMediaCount++;
+                    Swal.update({ html: `Mengunggah foto & media ke server baru... (${uploadedMediaCount} / ${mediaKeys.length})` });
+                } catch (e) {
+                    console.warn("Gagal re-upload media:", bucketPath, e);
                 }
             }
-            // Khusus Users dan AppSettings
-            if (data['users'] && data['users'].length > 0) {
-                await supabaseClient.from('users').upsert(data['users']);
-            }
-            if (data['app_settings'] && data['app_settings'].length > 0) {
-                await supabaseClient.from('app_settings').upsert(data['app_settings']);
-            }
-            
-            Swal.fire("Berhasil", "Data berhasil dipulihkan! Halaman akan dimuat ulang.", "success").then(() => {
-                location.reload();
-            });
-        } catch(err) {
-            Swal.fire("Error", "Format JSON tidak valid atau gagal restore: " + err.message, "error");
-        } finally {
-            event.target.value = '';
         }
-    };
-    reader.readAsText(file);
+
+        // 2. Auto Rewriter: Normalisasi seluruh URL Gambar di database agar menunjuk ke SUPABASE_URL server aktif
+        const normalizeUrl = (url) => {
+            if (!url || typeof url !== 'string') return url;
+            if (url.startsWith('data:')) return url;
+            const idx = url.indexOf('/absensi-bucket/');
+            if (idx !== -1) {
+                const pathAfterBucket = url.substring(idx + '/absensi-bucket/'.length);
+                return `${SUPABASE_URL}/storage/v1/object/public/absensi-bucket/${pathAfterBucket}`;
+            }
+            return url;
+        };
+
+        if (Array.isArray(rawDb['users'])) {
+            rawDb['users'].forEach(u => {
+                if (u.foto_wajah) u.foto_wajah = normalizeUrl(u.foto_wajah);
+            });
+        }
+        if (Array.isArray(rawDb['app_settings'])) {
+            rawDb['app_settings'].forEach(s => {
+                if (s.logo_url) s.logo_url = normalizeUrl(s.logo_url);
+            });
+        }
+        if (Array.isArray(rawDb['absensi'])) {
+            rawDb['absensi'].forEach(a => {
+                if (a.foto) a.foto = normalizeUrl(a.foto);
+                if (a.foto_masuk) a.foto_masuk = normalizeUrl(a.foto_masuk);
+                if (a.foto_keluar) a.foto_keluar = normalizeUrl(a.foto_keluar);
+                if (a.foto_istirahat_keluar) a.foto_istirahat_keluar = normalizeUrl(a.foto_istirahat_keluar);
+                if (a.foto_istirahat_masuk) a.foto_istirahat_masuk = normalizeUrl(a.foto_istirahat_masuk);
+            });
+        }
+        if (Array.isArray(rawDb['cuti'])) {
+            rawDb['cuti'].forEach(c => {
+                if (c.data_tambahan && typeof c.data_tambahan === 'object') {
+                    for (const k in c.data_tambahan) {
+                        if (typeof c.data_tambahan[k] === 'string') {
+                            c.data_tambahan[k] = normalizeUrl(c.data_tambahan[k]);
+                        }
+                    }
+                }
+            });
+        }
+
+        // 3. Masukkan data ke database baru sesuai urutan relasi
+        const restoreSequence = [
+            'kantor',
+            'master_tipe_absen',
+            'master_jenis_cuti',
+            'form_cuti_config',
+            'app_settings',
+            'users',
+            'cuti',
+            'absensi'
+        ];
+
+        let restoredCount = 0;
+        const failedTables = [];
+
+        for (const table of restoreSequence) {
+            const records = rawDb[table];
+            if (records && Array.isArray(records) && records.length > 0) {
+                const { error } = await supabaseClient.from(table).upsert(records);
+                if (error) {
+                    console.warn(`Upsert massal gagal untuk tabel ${table}, mencoba per-baris:`, error);
+                    let tableRestored = 0;
+                    for (const row of records) {
+                        const { error: singleErr } = await supabaseClient.from(table).upsert(row);
+                        if (!singleErr) tableRestored++;
+                        else console.warn(`Gagal upsert row tabel ${table}:`, singleErr, row);
+                    }
+                    if (tableRestored > 0) {
+                        restoredCount += tableRestored;
+                    } else {
+                        failedTables.push(table);
+                    }
+                } else {
+                    restoredCount += records.length;
+                }
+            }
+        }
+        
+        let msgSuccess = `Database berhasil dipulihkan & seluruh link foto otomatis ditautkan ke server baru! (${restoredCount} record diproses)`;
+        if (failedTables.length > 0) {
+            msgSuccess += `<br><small class="text-warning">Catatan: Tabel (${failedTables.join(', ')}) gagal dipulihkan sebagian/seluruhnya.</small>`;
+        }
+
+        Swal.fire("Berhasil", msgSuccess, "success").then(() => {
+            location.reload();
+        });
+
+    } catch(err) {
+        Swal.fire("Error", "Gagal memulihkan data: " + err.message, "error");
+    } finally {
+        event.target.value = '';
+    }
 }
 
 async function resetWajahKaryawan() {
@@ -3494,6 +3902,7 @@ async function hapusDataAbsen(absenId, tanggal) {
     const { data: absenData } = await supabaseClient.from('absensi').select('*').eq('id', absenId).maybeSingle();
     if (absenData) {
         const fotoFiles = [
+            absenData.foto,
             absenData.foto_masuk,
             absenData.foto_istirahat_keluar,
             absenData.foto_istirahat_masuk,
@@ -3552,8 +3961,8 @@ async function factoryResetDatabase() {
     });
 
     try {
-        // Hapus isi tabel
-        const tablesToClear = ['absensi', 'cuti', 'form_cuti_config', 'cabang'];
+        // 1. Hapus isi tabel
+        const tablesToClear = ['absensi', 'cuti', 'form_cuti_config', 'kantor', 'master_jenis_cuti', 'master_tipe_absen'];
         
         for (const table of tablesToClear) {
             try {
@@ -3574,7 +3983,82 @@ async function factoryResetDatabase() {
             console.warn("Gagal mereset users", e);
         }
 
-        Swal.fire("Berhasil", "Sistem telah direset ke pengaturan awal pabrik.", "success").then(() => {
+        // 2. Inisialisasi Ulang Data Starter Template
+        // A. Kantor
+        await supabaseClient.from('kantor').insert([
+            { nama: 'Zieda Pusat', lat: '-6.917464', lng: '107.619122', radius: 100 },
+            { nama: 'Zieda Cabang Barat', lat: '-6.914000', lng: '107.600000', radius: 100 },
+            { nama: 'Zieda Cabang Timur', lat: '-6.920000', lng: '107.630000', radius: 100 }
+        ]);
+
+        // B. Master Tipe Absen
+        await supabaseClient.from('master_tipe_absen').insert([
+            { nama_tipe: 'Absen Masuk Pagi', jam_mulai: '07:00:00', batas_terlambat: '08:00:00', jam_tutup: '16:00:00', is_checkout: false, is_aktif: true },
+            { nama_tipe: 'Absen Pulang Pagi', jam_mulai: '15:00:00', batas_terlambat: '16:00:00', jam_tutup: '23:59:59', is_checkout: true, is_aktif: true },
+            { nama_tipe: 'Absen Masuk Siang', jam_mulai: '12:00:00', batas_terlambat: '13:00:00', jam_tutup: '21:00:00', is_checkout: false, is_aktif: true },
+            { nama_tipe: 'Absen Pulang Siang', jam_mulai: '20:00:00', batas_terlambat: '21:00:00', jam_tutup: '23:59:59', is_checkout: true, is_aktif: true },
+            { nama_tipe: 'Istirahat Keluar', jam_mulai: '00:00:00', batas_terlambat: null, jam_tutup: null, is_checkout: false, is_aktif: true },
+            { nama_tipe: 'Istirahat Masuk', jam_mulai: '00:00:00', batas_terlambat: null, jam_tutup: null, is_checkout: false, is_aktif: true },
+            { nama_tipe: 'Izin Keluar', jam_mulai: '00:00:00', batas_terlambat: null, jam_tutup: null, is_checkout: false, is_aktif: true },
+            { nama_tipe: 'Izin Masuk', jam_mulai: '00:00:00', batas_terlambat: null, jam_tutup: null, is_checkout: false, is_aktif: true }
+        ]);
+
+        // C. Karyawan Test
+        const { data: insertedUsers } = await supabaseClient.from('users').insert([
+            { nama: 'Budi Pagi', password: '123456', role: 'Karyawan', no_hp: '081234567891', cabang: 'Zieda Pusat', unit: 'Operasional', sisa_cuti: 12 },
+            { nama: 'Siti Siang', password: '123456', role: 'Karyawan', no_hp: '081234567892', cabang: 'Zieda Pusat', unit: 'Kasir', sisa_cuti: 12 },
+            { nama: 'Rudi Istirahat', password: '123456', role: 'Karyawan', no_hp: '081234567893', cabang: 'Zieda Pusat', unit: 'Gudang', sisa_cuti: 12 },
+            { nama: 'Dewi Lembur', password: '123456', role: 'Karyawan', no_hp: '081234567894', cabang: 'Zieda Pusat', unit: 'HRD', sisa_cuti: 12 }
+        ]).select();
+
+        // D. Demo Absensi Hari Ini
+        const now = new Date();
+        const offset = now.getTimezoneOffset() * 60000;
+        const todayStr = new Date(now - offset).toISOString().split('T')[0];
+
+        if (insertedUsers && insertedUsers.length > 0) {
+            const budi = insertedUsers.find(u => u.nama === 'Budi Pagi');
+            const siti = insertedUsers.find(u => u.nama === 'Siti Siang');
+            const rudi = insertedUsers.find(u => u.nama === 'Rudi Istirahat');
+            const dewi = insertedUsers.find(u => u.nama === 'Dewi Lembur');
+
+            let sampleAbsen = [];
+            if (budi) {
+                sampleAbsen.push(
+                    { user_id: budi.id, tanggal: todayStr, waktu: '08:25:00', tipe_absen: 'Absen Masuk Pagi', lokasi: 'Jarak: 5m dari Zieda Pusat', status: 'Terlambat', status_wajah: 'Sesuai', menit_terlambat: 25, menit_lembur: 0, keterangan_waktu: 'Terlambat 25m' },
+                    { user_id: budi.id, tanggal: todayStr, waktu: '16:02:00', tipe_absen: 'Absen Pulang Pagi', lokasi: 'Jarak: 4m dari Zieda Pusat', status: 'Hadir', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Pulang Normal' }
+                );
+            }
+            if (siti) {
+                sampleAbsen.push(
+                    { user_id: siti.id, tanggal: todayStr, waktu: '13:20:00', tipe_absen: 'Absen Masuk Siang', lokasi: 'Jarak: 8m dari Zieda Pusat', status: 'Terlambat', status_wajah: 'Sesuai', menit_terlambat: 20, menit_lembur: 0, keterangan_waktu: 'Terlambat 20m' },
+                    { user_id: siti.id, tanggal: todayStr, waktu: '21:05:00', tipe_absen: 'Absen Pulang Siang', lokasi: 'Jarak: 6m dari Zieda Pusat', status: 'Hadir', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Pulang Normal' }
+                );
+            }
+            if (rudi) {
+                sampleAbsen.push(
+                    { user_id: rudi.id, tanggal: todayStr, waktu: '07:45:00', tipe_absen: 'Absen Masuk Pagi', lokasi: 'Jarak: 3m dari Zieda Pusat', status: 'Hadir', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Tepat Waktu' },
+                    { user_id: rudi.id, tanggal: todayStr, waktu: '12:00:00', tipe_absen: 'Istirahat Keluar', lokasi: 'Jarak: 2m dari Zieda Pusat', status: 'Istirahat', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Meninggalkan Kantor' },
+                    { user_id: rudi.id, tanggal: todayStr, waktu: '12:50:00', tipe_absen: 'Istirahat Masuk', lokasi: 'Jarak: 3m dari Zieda Pusat', status: 'Istirahat', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Kembali ke Kantor' },
+                    { user_id: rudi.id, tanggal: todayStr, waktu: '16:05:00', tipe_absen: 'Absen Pulang Pagi', lokasi: 'Jarak: 5m dari Zieda Pusat', status: 'Hadir', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Pulang Normal' }
+                );
+            }
+            if (dewi) {
+                sampleAbsen.push(
+                    { user_id: dewi.id, tanggal: todayStr, waktu: '07:50:00', tipe_absen: 'Absen Masuk Pagi', lokasi: 'Jarak: 2m dari Zieda Pusat', status: 'Hadir', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Tepat Waktu' },
+                    { user_id: dewi.id, tanggal: todayStr, waktu: '12:00:00', tipe_absen: 'Istirahat Keluar', lokasi: 'Jarak: 3m dari Zieda Pusat', status: 'Istirahat', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Meninggalkan Kantor' },
+                    { user_id: dewi.id, tanggal: todayStr, waktu: '12:45:00', tipe_absen: 'Istirahat Masuk', lokasi: 'Jarak: 4m dari Zieda Pusat', status: 'Istirahat', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Kembali ke Kantor' },
+                    { user_id: dewi.id, tanggal: todayStr, waktu: '18:00:00', tipe_absen: 'Istirahat Keluar', lokasi: 'Jarak: 3m dari Zieda Pusat', status: 'Istirahat', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Meninggalkan Kantor (Lembur)' },
+                    { user_id: dewi.id, tanggal: todayStr, waktu: '18:30:00', tipe_absen: 'Istirahat Masuk', lokasi: 'Jarak: 2m dari Zieda Pusat', status: 'Istirahat', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Kembali ke Kantor (Lembur)' },
+                    { user_id: dewi.id, tanggal: todayStr, waktu: '21:30:00', tipe_absen: 'Absen Pulang Pagi', lokasi: 'Jarak: 5m dari Zieda Pusat', status: 'Lembur', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 330, keterangan_waktu: 'Lembur 5j 30m' }
+                );
+            }
+            if (sampleAbsen.length > 0) {
+                await supabaseClient.from('absensi').insert(sampleAbsen);
+            }
+        }
+
+        Swal.fire("Berhasil Reset & Inisialisasi", "Sistem telah direset dan diisi ulang dengan data starter template resmi.", "success").then(() => {
             window.location.reload();
         });
     } catch (err) {
@@ -3656,8 +4140,8 @@ async function loadTipeAbsenAdmin() {
         <tr>
             <td>${index + 1}</td>
             <td class="fw-bold">${item.nama_tipe}</td>
-            <td><small>${item.jam_mulai || '-'} s/d ${item.jam_tutup || '-'}</small></td>
-            <td><small>${item.batas_terlambat || '-'}</small></td>
+            <td><small>${formatWaktuGlobal(item.jam_mulai)} s/d ${formatWaktuGlobal(item.jam_tutup)}</small></td>
+            <td><small>${formatWaktuGlobal(item.batas_terlambat)}</small></td>
             <td>${item.is_checkout ? '<span class="badge bg-success">Ya</span>' : '<span class="badge bg-secondary">Tidak</span>'}</td>
             <td>
                 <div class="form-check form-switch d-flex justify-content-center">
@@ -3762,3 +4246,513 @@ async function hapusTipeAbsen(id) {
         }
     }
 }
+
+async function jalankanMigrasiDataShift() {
+    const result = await Swal.fire({
+        title: "Konfirmasi Migrasi Data Shift",
+        text: "Sistem akan memindai riwayat absensi lama dan mengonversinya ke tipe shift presisi (Pagi/Siang/Sore/Malam) serta mengkalkulasi ulang durasi telat dan lembur. Lanjutkan?",
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "Ya, Jalankan Migrasi",
+        cancelButtonText: "Batal",
+        reverseButtons: true
+    });
+
+    if (!result.isConfirmed) return;
+
+    const btn = document.getElementById("btn-run-migration");
+    const progressContainer = document.getElementById("migration-progress-container");
+    const progressBar = document.getElementById("migration-progress-bar");
+    const statusText = document.getElementById("migration-status-text");
+
+    if (btn) btn.disabled = true;
+    if (progressContainer) progressContainer.classList.remove("d-none");
+
+    try {
+        // 1. Fetch master tipe absen untuk acuan jam shift & batas telat
+        const { data: masterData, error: errMaster } = await supabaseClient
+            .from('master_tipe_absen')
+            .select('*');
+        
+        if (errMaster) throw errMaster;
+
+        const masterTipeAbsen = masterData || [];
+        const timeToMinutes = (tStr) => {
+            if (!tStr) return 0;
+            const parts = tStr.split(":");
+            return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+        };
+
+        // 2. Fetch seluruh data absensi
+        const { data: absensiList, error: errAbsen } = await supabaseClient
+            .from('absensi')
+            .select('*')
+            .not('status', 'ilike', '%-TRASH-%');
+
+        if (errAbsen) throw errAbsen;
+
+        if (!absensiList || absensiList.length === 0) {
+            Swal.fire("Informasi", "Tidak ditemukan data absensi untuk dimigrasikan.", "info");
+            if (btn) btn.disabled = false;
+            if (progressContainer) progressContainer.classList.add("d-none");
+            return;
+        }
+
+        let updatedCount = 0;
+        let totalCount = absensiList.length;
+
+        for (let i = 0; i < totalCount; i++) {
+            const row = absensiList[i];
+            const pct = Math.round(((i + 1) / totalCount) * 100);
+            if (progressBar) {
+                progressBar.style.width = `${pct}%`;
+                progressBar.innerText = `${pct}%`;
+            }
+            if (statusText) {
+                statusText.innerText = `Memproses (${i + 1}/${totalCount}): ${row.tanggal} - ${row.tipe_absen}`;
+            }
+
+            let newTipeAbsen = row.tipe_absen;
+            let status = row.status || "Hadir";
+            let menitTerlambat = row.menit_terlambat || 0;
+            let menitLembur = row.menit_lembur || 0;
+            let keteranganWaktu = row.keterangan_waktu || "";
+
+            const nTipe = (row.tipe_absen || "").toLowerCase();
+            const waktuStr = row.waktu || "00:00:00";
+            const currMin = timeToMinutes(waktuStr);
+
+            // Klasifikasi Shift & Kalkulasi
+            if (nTipe === "masuk" || nTipe === "absen masuk") {
+                // Tentukan Shift Masuk berdasarkan Jam
+                if (currMin < 660) { // < 11:00 AM ➔ Shift Pagi
+                    newTipeAbsen = "Absen Masuk Pagi";
+                } else if (currMin >= 660 && currMin < 960) { // 11:00 AM - 04:00 PM ➔ Shift Siang
+                    newTipeAbsen = "Absen Masuk Siang";
+                } else { // >= 04:00 PM ➔ Shift Sore
+                    newTipeAbsen = "Absen Masuk Sore";
+                }
+
+                // Cari master tipe absen pencocokan
+                const masterTarget = masterTipeAbsen.find(m => m.nama_tipe === newTipeAbsen) || 
+                                     masterTipeAbsen.find(m => (m.nama_tipe || '').toLowerCase().includes('masuk'));
+
+                if (masterTarget && masterTarget.batas_terlambat) {
+                    const limitMin = timeToMinutes(masterTarget.batas_terlambat);
+                    if (currMin > limitMin) {
+                        status = "Terlambat";
+                        menitTerlambat = currMin - limitMin;
+                        const jam = Math.floor(menitTerlambat / 60);
+                        const m = menitTerlambat % 60;
+                        keteranganWaktu = `Terlambat ${jam > 0 ? jam + "j " : ""}${m}m`;
+                    } else {
+                        status = "Hadir";
+                        menitTerlambat = 0;
+                        keteranganWaktu = "Tepat Waktu";
+                    }
+                }
+            } else if (nTipe === "pulang" || nTipe === "absen pulang" || nTipe === "checkout") {
+                // Tentukan Shift Pulang berdasarkan Jam
+                if (currMin < 1080) { // < 06:00 PM ➔ Pulang Pagi
+                    newTipeAbsen = "Absen Pulang Pagi";
+                } else if (currMin >= 1080 && currMin < 1380) { // 06:00 PM - 11:00 PM ➔ Pulang Siang
+                    newTipeAbsen = "Absen Pulang Siang";
+                } else { // >= 11:00 PM atau Dini Hari ➔ Pulang Malam
+                    newTipeAbsen = "Absen Pulang Malam";
+                }
+
+                const masterTarget = masterTipeAbsen.find(m => m.nama_tipe === newTipeAbsen) || 
+                                     masterTipeAbsen.find(m => m.is_checkout);
+
+                if (masterTarget && masterTarget.jam_tutup) {
+                    const jamTutupMin = timeToMinutes(masterTarget.jam_tutup);
+                    if (currMin > jamTutupMin) {
+                        status = "Lembur";
+                        const totalLemburKotor = currMin - jamTutupMin;
+                        const potonganIstirahat = masterTarget.potongan_lembur_menit !== undefined && masterTarget.potongan_lembur_menit !== null 
+                            ? parseInt(masterTarget.potongan_lembur_menit, 10) : 0;
+
+                        menitLembur = Math.max(0, totalLemburKotor - potonganIstirahat);
+                        const jamLembur = Math.floor(menitLembur / 60);
+                        const mLembur = menitLembur % 60;
+                        keteranganWaktu = `Lembur ${jamLembur > 0 ? jamLembur + "j " : ""}${mLembur}m` + (potonganIstirahat > 0 ? ` (Potongan Istirahat ${potonganIstirahat}m)` : "");
+                    } else {
+                        status = "Hadir";
+                        menitLembur = 0;
+                        keteranganWaktu = "Pulang Normal";
+                    }
+                }
+            } else if (!keteranganWaktu || row.menit_terlambat === null || row.menit_lembur === null) {
+                // Tipe yang sudah bernama spesifik tapi belum punya keterangan waktu
+                const masterTarget = masterTipeAbsen.find(m => m.nama_tipe === row.tipe_absen);
+                if (masterTarget) {
+                    if (masterTarget.batas_terlambat && currMin > timeToMinutes(masterTarget.batas_terlambat)) {
+                        status = "Terlambat";
+                        menitTerlambat = currMin - timeToMinutes(masterTarget.batas_terlambat);
+                        const jam = Math.floor(menitTerlambat / 60);
+                        const m = menitTerlambat % 60;
+                        keteranganWaktu = `Terlambat ${jam > 0 ? jam + "j " : ""}${m}m`;
+                    } else if (masterTarget.is_checkout && masterTarget.jam_tutup && currMin > timeToMinutes(masterTarget.jam_tutup)) {
+                        status = "Lembur";
+                        const totalKotor = currMin - timeToMinutes(masterTarget.jam_tutup);
+                        const pot = masterTarget.potongan_lembur_menit !== undefined && masterTarget.potongan_lembur_menit !== null 
+                            ? parseInt(masterTarget.potongan_lembur_menit, 10) : 0;
+                        menitLembur = Math.max(0, totalKotor - pot);
+                        const jamLembur = Math.floor(menitLembur / 60);
+                        const mLembur = menitLembur % 60;
+                        keteranganWaktu = `Lembur ${jamLembur > 0 ? jamLembur + "j " : ""}${mLembur}m` + (pot > 0 ? ` (Potongan Istirahat ${pot}m)` : "");
+                    } else {
+                        keteranganWaktu = "Normal";
+                    }
+                }
+            }
+
+            // Update row ke Supabase
+            const { error: errUpdate } = await supabaseClient
+                .from('absensi')
+                .update({
+                    tipe_absen: newTipeAbsen,
+                    status: status,
+                    menit_terlambat: menitTerlambat,
+                    menit_lembur: menitLembur,
+                    keterangan_waktu: keteranganWaktu
+                })
+                .eq('id', row.id);
+
+            if (!errUpdate) {
+                updatedCount++;
+            }
+        }
+
+        Swal.fire({
+            title: "Migrasi Sukses!",
+            html: `Berhasil memindai <b>${totalCount}</b> data absensi.<br>Sebanyak <b>${updatedCount}</b> data berhasil dimigrasikan ke tipe shift presisi & dikalkulasi ulang.`,
+            icon: "success"
+        });
+
+        // Refresh data absensi di UI
+        loadDataAbsensi();
+
+    } catch (e) {
+        console.error("Gagal Migrasi Data:", e);
+        Swal.fire("Error Migrasi", e.message || "Gagal memigrasikan data absensi", "error");
+    } finally {
+        if (btn) btn.disabled = false;
+        if (progressContainer) progressContainer.classList.add("d-none");
+    }
+}
+
+// ==========================================
+// TOOL EDIT WAKTU & PINDAH SHIFT ABSENSI (SUPER ADMIN)
+// ==========================================
+async function bukaModalEditAbsensi(id, tipeAbsen, waktu, tanggal) {
+    if (!isSuperAdmin) {
+        Swal.fire("Akses Ditolak", "Hanya Super Admin yang dapat mengedit data absensi.", "error");
+        return;
+    }
+    document.getElementById("edit_absen_id").value = id;
+    document.getElementById("edit_absen_tanggal").value = tanggal;
+    document.getElementById("edit_absen_waktu").value = waktu && waktu !== '-' ? waktu : "08:00:00";
+    document.getElementById("edit_absen_keterangan").value = "";
+
+    const selectTipe = document.getElementById("edit_absen_tipe");
+    selectTipe.innerHTML = '<option value="">Memuat tipe...</option>';
+
+    try {
+        const { data: masterData } = await supabaseClient.from("master_tipe_absen").select("*").eq("is_aktif", true).order("id", { ascending: true });
+        if (masterData && masterData.length > 0) {
+            selectTipe.innerHTML = masterData.map(m => `
+                <option value="${m.nama_tipe}" ${m.nama_tipe === tipeAbsen ? 'selected' : ''}>${m.nama_tipe}</option>
+            `).join('');
+        } else {
+            selectTipe.innerHTML = `<option value="${tipeAbsen}">${tipeAbsen}</option>`;
+        }
+    } catch(e) {
+        selectTipe.innerHTML = `<option value="${tipeAbsen}">${tipeAbsen}</option>`;
+    }
+
+    const modalEl = document.getElementById("modalEditAbsensi");
+    if (modalEl) {
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+}
+window.bukaModalEditAbsensi = bukaModalEditAbsensi;
+
+async function simpanEditAbsensi() {
+    const id = document.getElementById("edit_absen_id").value;
+    const tanggal = document.getElementById("edit_absen_tanggal").value;
+    const tipe_absen = document.getElementById("edit_absen_tipe").value;
+    let waktu = document.getElementById("edit_absen_waktu").value;
+    const ket_alasan = document.getElementById("edit_absen_keterangan").value;
+
+    if (!id || !tipe_absen || !waktu) {
+        Swal.fire("Peringatan", "Semua data wajib diisi.", "warning");
+        return;
+    }
+
+    if (waktu.length === 5) waktu += ":00";
+
+    try {
+        Swal.fire({ title: "Menyimpan...", allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+        // Hitung ulang status, menit_terlambat, dan menit_lembur berdasarkan master_tipe_absen
+        const { data: masterList } = await supabaseClient.from("master_tipe_absen").select("*");
+        const targetMaster = (masterList || []).find(m => m.nama_tipe === tipe_absen);
+
+        const parseT = (tStr) => {
+            if (!tStr) return null;
+            const p = tStr.split(':');
+            if (p.length < 2) return null;
+            return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+        };
+
+        let status = "Hadir";
+        let menit_terlambat = 0;
+        let menit_lembur = 0;
+        let keterangan_waktu = ket_alasan || "Diperbarui oleh Super Admin";
+
+        if (targetMaster) {
+            const wMins = parseT(waktu);
+            const bMins = parseT(targetMaster.batas_terlambat);
+
+            if (targetMaster.is_checkout) {
+                if (bMins && wMins > bMins) {
+                    status = "Lembur";
+                    menit_lembur = wMins - bMins;
+                    keterangan_waktu = ket_alasan || `Lembur ${Math.floor(menit_lembur/60)}j ${menit_lembur%60}m`;
+                } else {
+                    status = "Hadir";
+                    keterangan_waktu = ket_alasan || "Pulang Normal";
+                }
+            } else if (targetMaster.nama_tipe.toLowerCase().includes("istirahat") || targetMaster.nama_tipe.toLowerCase().includes("izin")) {
+                status = targetMaster.nama_tipe.toLowerCase().includes("istirahat") ? "Istirahat" : "Izin";
+                keterangan_waktu = ket_alasan || targetMaster.nama_tipe;
+            } else {
+                if (bMins && wMins > bMins) {
+                    status = "Terlambat";
+                    menit_terlambat = wMins - bMins;
+                    keterangan_waktu = ket_alasan || `Terlambat ${Math.floor(menit_terlambat/60)}j ${menit_terlambat%60}m`;
+                } else {
+                    status = "Hadir";
+                    keterangan_waktu = ket_alasan || "Tepat Waktu";
+                }
+            }
+        }
+
+        const payload = {
+            tipe_absen,
+            waktu,
+            status,
+            menit_terlambat,
+            menit_lembur,
+            keterangan_waktu
+        };
+
+        const { error } = await supabaseClient.from("absensi").update(payload).eq("id", id);
+        if (error) throw error;
+
+        const modalEl = document.getElementById("modalEditAbsensi");
+        if (modalEl) {
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+        }
+
+        Swal.fire("Berhasil", "Data absensi berhasil diperbarui!", "success").then(() => {
+            if (typeof showDetailAbsensi === "function" && tanggal) {
+                showDetailAbsensi(tanggal);
+            }
+            if (typeof loadDataAbsensi === "function") {
+                loadDataAbsensi();
+            }
+        });
+    } catch (err) {
+        console.error(err);
+        Swal.fire("Error", err.message || "Gagal memperbarui absensi", "error");
+    }
+}
+window.simpanEditAbsensi = simpanEditAbsensi;
+
+// ==========================================
+// BACKUP & RESTORE MODULAR PER SECTION
+// ==========================================
+function toggleSelectAllBackup(btn) {
+    const chks = document.querySelectorAll('.check-backup-section');
+    const allChecked = Array.from(chks).every(c => c.checked);
+    chks.forEach(c => c.checked = !allChecked);
+    btn.textContent = allChecked ? 'Pilih Semua' : 'Batal Pilih Semua';
+}
+window.toggleSelectAllBackup = toggleSelectAllBackup;
+
+async function downloadBackupModular() {
+    const selectedTables = Array.from(document.querySelectorAll('.check-backup-section:checked')).map(c => c.value);
+    
+    if (selectedTables.length === 0) {
+        Swal.fire('Peringatan', 'Pilih minimal satu section data yang ingin dibackup!', 'warning');
+        return;
+    }
+
+    try {
+        Swal.fire({ title: 'Memproses Backup...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+        const backupData = {
+            version: '2.0-modular',
+            created_at: new Date().toISOString(),
+            sections_included: selectedTables,
+            data: {}
+        };
+
+        for (const tableName of selectedTables) {
+            const { data, error } = await supabaseClient.from(tableName).select('*');
+            if (error) {
+                console.warn(`Gagal membaca tabel ${tableName}:`, error);
+                backupData.data[tableName] = [];
+            } else {
+                backupData.data[tableName] = data || [];
+            }
+        }
+
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+        const downloadAnchor = document.createElement('a');
+        const filename = `backup_absensi_modular_${new Date().toISOString().split('T')[0]}_${Date.now()}.json`;
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", filename);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+
+        Swal.fire('Berhasil', `Backup ${selectedTables.length} section berhasil diunduh!`, 'success');
+    } catch (err) {
+        console.error(err);
+        Swal.fire('Error', err.message || 'Gagal membuat backup', 'error');
+    }
+}
+window.downloadBackupModular = downloadBackupModular;
+
+let currentRestoreBackupObj = null;
+
+function previewRestoreModular(event) {
+    const file = event.target.files[0];
+    const previewContainer = document.getElementById('container-preview-restore');
+    const listContainer = document.getElementById('list-restore-sections');
+    const btnRestore = document.getElementById('btn-do-restore');
+
+    if (!file) {
+        if (previewContainer) previewContainer.classList.add('d-none');
+        if (btnRestore) btnRestore.disabled = true;
+        currentRestoreBackupObj = null;
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const backupObj = JSON.parse(e.target.result);
+            if (!backupObj || (!backupObj.data && !backupObj.users)) {
+                throw new Error("Format file JSON backup tidak valid.");
+            }
+
+            // Standardize format
+            currentRestoreBackupObj = backupObj.data ? backupObj : { data: backupObj };
+
+            const dataMap = currentRestoreBackupObj.data;
+            const availableTables = Object.keys(dataMap);
+
+            if (availableTables.length === 0) {
+                throw new Error("File backup tidak memiliki data section.");
+            }
+
+            const labelNames = {
+                users: '👤 Data Karyawan & Admin',
+                master_tipe_absen: '⏰ Master Tipe Absen / Shift',
+                app_settings: '⚙️ Pengaturan Aplikasi',
+                master_cabang: '🏢 Master Kantor Cabang',
+                master_jenis_cuti: '📋 Master Jenis Cuti & Kuota',
+                form_cuti_config: '📄 Konfigurasi Form Cuti & Syarat',
+                absensi: '📅 Transaksi Absensi',
+                cuti: '🏖️ Data Pengajuan Cuti'
+            };
+
+            let html = '';
+            availableTables.forEach(table => {
+                const count = Array.isArray(dataMap[table]) ? dataMap[table].length : 0;
+                const nameLabel = labelNames[table] || `📁 Tabel ${table}`;
+                html += `
+                    <div class="form-check mb-1">
+                        <input class="form-check-input check-restore-section" type="checkbox" id="chk_r_${table}" value="${table}" checked>
+                        <label class="form-check-label small" for="chk_r_${table}">
+                            <strong>${nameLabel}</strong> (${count} data)
+                        </label>
+                    </div>
+                `;
+            });
+
+            if (listContainer) listContainer.innerHTML = html;
+            if (previewContainer) previewContainer.classList.remove('d-none');
+            if (btnRestore) btnRestore.disabled = false;
+
+        } catch (err) {
+            console.error(err);
+            Swal.fire("File Tidak Valid", err.message || "Gagal membaca file JSON.", "error");
+            if (previewContainer) previewContainer.classList.add('d-none');
+            if (btnRestore) btnRestore.disabled = true;
+            currentRestoreBackupObj = null;
+        }
+    };
+    reader.readAsText(file);
+}
+window.previewRestoreModular = previewRestoreModular;
+
+async function prosesRestoreModular() {
+    if (!currentRestoreBackupObj || !currentRestoreBackupObj.data) {
+        Swal.fire("Peringatan", "Pilih file backup terlebih dahulu.", "warning");
+        return;
+    }
+
+    const selectedTables = Array.from(document.querySelectorAll('.check-restore-section:checked')).map(c => c.value);
+
+    if (selectedTables.length === 0) {
+        Swal.fire("Peringatan", "Pilih minimal satu section yang ingin di-restore!", "warning");
+        return;
+    }
+
+    const confirmRes = await Swal.fire({
+        title: 'Konfirmasi Restore Data',
+        html: `Apakah Anda yakin ingin mengembalikan <strong>${selectedTables.length} section data</strong> ke database?<br><small class="text-danger">Data yang cocok akan di-update/diterapkan ke sistem.</small>`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Ya, Jalankan Restore',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#198754'
+    });
+
+    if (!confirmRes.isConfirmed) return;
+
+    try {
+        Swal.fire({ title: 'Proses Restore Data...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+        const dataMap = currentRestoreBackupObj.data;
+        let totalRestoredCount = 0;
+
+        for (const tableName of selectedTables) {
+            const rows = dataMap[tableName];
+            if (Array.isArray(rows) && rows.length > 0) {
+                const { error } = await supabaseClient.from(tableName).upsert(rows, { onConflict: 'id' });
+                if (error) {
+                    console.error(`Gagal restore section ${tableName}:`, error);
+                } else {
+                    totalRestoredCount += rows.length;
+                }
+            }
+        }
+
+        Swal.fire('Restore Berhasil!', `Sebanyak ${totalRestoredCount} data dari ${selectedTables.length} section telah berhasil dipulihkan!`, 'success').then(() => {
+            location.reload();
+        });
+
+    } catch (err) {
+        console.error(err);
+        Swal.fire('Error Restore', err.message || 'Gagal menjalankan restore.', 'error');
+    }
+}
+window.prosesRestoreModular = prosesRestoreModular;

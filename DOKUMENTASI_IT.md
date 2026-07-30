@@ -53,12 +53,20 @@ Jika Anda harus menginstal atau memindahkan sistem ini ke Project Supabase yang 
    - Masukkan Password: `admin123`
    - Saat Anda menekan Login, sistem akan otomatis membuatkan Kredensial *Supabase Auth* dan menautkannya ke profil `Super Admin`. Sangat praktis!
 
-4. **Konfigurasi URL & API Key**
-   Buka menu **Project Settings -> API** di Supabase.
-   *Copy* `Project URL` dan `anon/public key`.
-   Buka file `config.js` di dalam source code aplikasi, lalu *paste* nilainya pada variabel `SUPABASE_URL` dan `SUPABASE_ANON_KEY`.
+4. **Konfigurasi URL & API Key (Manual Database Switcher)**
+   Buka file [config.js](./config.js). Aplikasi mendukung dua mode database yang dapat ditukar secara aman lewat variabel `ACTIVE_ENVIRONMENT`:
+   - **Mode `SELF_HOSTED`**: Untuk pengujian lokal via Docker (`127.0.0.1:54321`).
+   - **Mode `CLOUD`**: Untuk produksi menggunakan Supabase Managed Cloud (`https://xxx.supabase.co`).
+   Isi kredensial Cloud Anda pada bagian `CLOUD` di `DATABASE_CONFIGS`, lalu ubah `const ACTIVE_ENVIRONMENT = "CLOUD";`.
+   *Keamanan:* Jika kredensial Cloud belum diisi tetapi mode `CLOUD` diaktifkan, sistem akan otomatis melakukan *fallback* aman ke mode `SELF_HOSTED` tanpa membuat aplikasi *crash*.
 
-5. **Testing**
+5. **Pengelolaan Kompatibilitas Database & Fitur Baru (Schema Migration)**
+   Agar skema database antara lingkungan *Self-Hosted* dan *Cloud* selalu sinkron 100% saat ada penambahan fitur/logika baru:
+   - **Gunakan Supabase CLI Migrations:** Buat skrip migrasi SQL di folder `supabase/migrations/` (misal `YYYYMMDD_nama_fitur.sql`).
+   - **Di Supabase Cloud:** Jalankan migrasi melalui Supabase SQL Editor atau perintah `supabase db push`.
+   - **Di Docker Self-Hosted:** Update file master [db/01_starter_schema.sql](./db/01_starter_schema.sql) dan jalankan file migrasi baru ke container Postgres via `docker exec -i zieda-absen-db psql -U postgres -d postgres < supabase/migrations/file.sql`.
+
+6. **Testing**
    Jalankan file HTML di browser (atau gunakan server lokal ringan seperti Live Server). Login dengan akun `Super Admin` dan sandi `admin123`. Selesai!
 
 ## 5. Integrasi Notifikasi Telegram (Aman via Edge Functions)

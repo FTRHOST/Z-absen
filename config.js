@@ -1,32 +1,95 @@
+if (typeof window !== "undefined") {
+  window.ENV = window.ENV || {};
+}
+
+// Helper membaca variabel dari window.ENV / process.env
+function getEnv(key) {
+  if (typeof window !== "undefined" && window.ENV && window.ENV[key]) return window.ENV[key];
+  if (typeof process !== "undefined" && process.env && process.env[key]) return process.env[key];
+  return "";
+}
+
 // ==========================================
-// KONFIGURASI SUPABASE (Pengganti .env)
+// KONFIGURASI KONEKSI SUPABASE
 // ==========================================
-// Ganti URL dan KEY di bawah ini dengan kredensial Supabase Anda
-const SUPABASE_URL = "https://ddapevcpuvoduaawhkxz.supabase.co";
+// Membaca SUPABASE_URL & ANON_KEY dari .env / Docker / window.ENV
+const rawSupabaseUrl =
+  getEnv("SUPABASE_URL") ||
+  (typeof window !== "undefined" && window.location.origin
+    ? window.location.origin
+    : "http://127.0.0.1:54321");
+
+// Hapus trailing slash '/' di akhir URL agar konsisten dan mencegah isu double slash (//) serta logout berulang
+const SUPABASE_URL = rawSupabaseUrl.replace(/\/+$/, "");
+
 const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkYXBldmNwdXZvZHVhYXdoa3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyOTE4ODQsImV4cCI6MjA5ODg2Nzg4NH0.bbBQSy-b5QP3gvFNt35FdXQaE5RXrU2lj9NznXmt6z0";
+  getEnv("SUPABASE_ANON_KEY") ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
+
+const TELEGRAM_CHAT_ID = getEnv("TELEGRAM_CHAT_ID") || "-5585540383";
+const TELEGRAM_BOT_TOKEN = getEnv("TELEGRAM_BOT_TOKEN") || "";
+
+// ==========================================
+// AUTO DETEKSI PERUBAHAN URL & LOGOUT OTOMATIS
+// ==========================================
+(function checkUrlChangeAndAutoLogout() {
+  if (typeof window === "undefined" || !window.localStorage) return;
+  try {
+    const previousUrl = (localStorage.getItem('LAST_SUPABASE_URL') || '').replace(/\/+$/, "");
+    
+    if (previousUrl && previousUrl !== SUPABASE_URL) {
+      console.info(`🔄 [Zieda Absen] Perubahan URL database terdeteksi (${previousUrl} -> ${SUPABASE_URL}). Membersihkan sesi lama...`);
+      
+      localStorage.removeItem('userLogin');
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('sb-') || key.includes('supabase')) {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      localStorage.setItem('LAST_SUPABASE_URL', SUPABASE_URL);
+      
+      if (!window.location.href.includes('login.html')) {
+        window.location.href = 'login.html?env_changed=true';
+      }
+    } else {
+      localStorage.setItem('LAST_SUPABASE_URL', SUPABASE_URL);
+    }
+  } catch(e) {
+    console.warn("Auto logout error check:", e);
+  }
+})();
 
 // Inisialisasi Klien Supabase secara global
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ==========================================
-// KONFIGURASI TELEGRAM BOT (Aman di Frontend)
-// ==========================================
-// Token bot disimpan secara rahasia di Supabase Secrets
-// Production Chat ID: "-5348785847" | Testing Chat ID: "-5585540383"
-const TELEGRAM_CHAT_ID_PROD = "-5348785847";
-const TELEGRAM_CHAT_ID_TEST = "-5585540383";
+// Mematikan Realtime WebSocket secara permanen untuk mencegah error 'WebSocket connection to wss://... failed' di browser
+if (typeof window !== "undefined" && supabaseClient && supabaseClient.realtime) {
+  try {
+    supabaseClient.realtime.disconnect();
+  } catch (e) {
+    console.warn("Realtime disconnect:", e);
+  }
+}
 
-// Deteksi otomatis environment:
-// Jika diakses via localhost / 127.0.0.1 / port 8080 / url param ?env=test, gunakan ID Testing.
-// Saat di-merge ke main & berjalan di domain production, otomatis beralih ke ID Production (-5348785847).
-const isLocalTesting =
-  typeof window !== "undefined" &&
-  (window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1" ||
-    window.location.port === "8080" ||
-    window.location.search.includes("env=test"));
-
-const TELEGRAM_CHAT_ID = isLocalTesting
-  ? TELEGRAM_CHAT_ID_TEST
-  : TELEGRAM_CHAT_ID_PROD;
+// ==========================================
+// DYNAMIC IMAGE URL NORMALIZER
+// ==========================================
+// Memperbaiki URL gambar dari server lama/mati secara otomatis ke SUPABASE_URL aktif
+function fixStorageUrl(url) {
+    if (!url || typeof url !== 'string') return '';
+    if (url.startsWith('data:')) return url; // Base64 image
+    
+    // Normalisasi double slash opsional
+    const cleanUrl = url.replace(/([^:]\/)\/+/g, "$1");
+    
+    // Cari penanda bucket di URL (misal: /absensi-bucket/)
+    const bucketMarker = '/absensi-bucket/';
+    const idx = cleanUrl.indexOf(bucketMarker);
+    if (idx !== -1) {
+        const pathAfterBucket = cleanUrl.substring(idx + bucketMarker.length).replace(/^\/+/, '');
+        return `${SUPABASE_URL}/storage/v1/object/public/absensi-bucket/${pathAfterBucket}`;
+    }
+    
+    return cleanUrl;
+}

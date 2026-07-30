@@ -422,6 +422,10 @@
                       <td class="text-muted">Penempatan</td>
                       <td id="profil-cabang"></td>
                     </tr>
+                    <tr>
+                      <td class="text-muted">Unit / Divisi</td>
+                      <td id="profil-unit"></td>
+                    </tr>
                   </table>
                 </div>
               </div>
@@ -570,17 +574,21 @@
     >
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="kameraModalLabel">Ambil Foto Wajah</h5>
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title fw-bold" id="kameraModalLabel"><i class="fas fa-camera me-2"></i>Ambil Foto Wajah</h5>
             <button
               type="button"
-              class="btn-close"
+              class="btn-close btn-close-white"
               data-bs-dismiss="modal"
               aria-label="Close"
               onclick="stopKamera()"
             ></button>
           </div>
           <div class="modal-body text-center">
+            <div class="alert alert-primary py-2 px-3 mb-3 text-center fw-bold shadow-sm d-flex align-items-center justify-content-center border-0 bg-primary-subtle text-primary-emphasis">
+              <i class="fas fa-tag me-2"></i> Kategori Absen: 
+              <span id="text-tipe-absen-kamera" class="badge bg-primary text-white fs-6 ms-2 px-3 py-1">Absen Masuk</span>
+            </div>
             <div
               id="kamera-container"
               class="border p-2 bg-dark"
@@ -684,7 +692,7 @@
                 id="register-face-status"
                 class="badge bg-warning-subtle text-warning-emphasis fs-6 border border-warning-subtle rounded-pill px-3 py-2"
               >
-                Memuat model kecerdasan buatan... (Harap tunggu)
+                Menghidupkan kamera...
               </span>
             </div>
           </div>
@@ -711,6 +719,7 @@
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="env.js"></script>
     <script src="config.js"></script>
     <script src="face.js?v=5"></script>
 
@@ -906,14 +915,90 @@
         }
       }
 
+      function hitungDetailWaktuAbsensi(waktuSekarang, tipeData, namaTipe) {
+        let status = "Hadir";
+        let menitTerlambat = 0;
+        let menitLembur = 0;
+        let keteranganWaktu = "Tepat Waktu";
+
+        const tData = tipeData || {};
+        const nTipe = (namaTipe || "").toLowerCase();
+
+        const isIzinAtauIstirahat =
+          nTipe.includes("izin") || nTipe.includes("istirahat");
+
+        const isMasuk =
+          !isIzinAtauIstirahat &&
+          (nTipe.includes("masuk") ||
+            nTipe === "masuk" ||
+            (!nTipe.includes("pulang") &&
+              !nTipe.includes("checkout") &&
+              !tData.is_checkout));
+
+        const isPulang =
+          !isIzinAtauIstirahat &&
+          (nTipe.includes("pulang") ||
+            nTipe.includes("checkout") ||
+            tData.is_checkout);
+
+        const timeToMinutes = (tStr) => {
+          if (!tStr) return 0;
+          const parts = tStr.split(":");
+          return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+        };
+
+        const currMin = timeToMinutes(waktuSekarang);
+
+        if (isIzinAtauIstirahat) {
+          status = nTipe.includes("izin") ? "Izin" : "Istirahat";
+          keteranganWaktu = nTipe.includes("masuk")
+            ? "Kembali ke Kantor"
+            : "Meninggalkan Kantor";
+        } else if (isMasuk && tData.batas_terlambat) {
+          const limitMin = timeToMinutes(tData.batas_terlambat);
+          if (currMin > limitMin) {
+            status = "Terlambat";
+            menitTerlambat = currMin - limitMin;
+            const jam = Math.floor(menitTerlambat / 60);
+            const m = menitTerlambat % 60;
+            keteranganWaktu = `Terlambat ${jam > 0 ? jam + "j " : ""}${m}m`;
+          } else {
+            keteranganWaktu = "Tepat Waktu";
+          }
+        } else if (isPulang && tData.jam_tutup) {
+          const jamTutupMin = timeToMinutes(tData.jam_tutup);
+          if (currMin > jamTutupMin) {
+            status = "Lembur";
+            const totalLemburKotor = currMin - jamTutupMin;
+
+            const potonganIstirahat =
+              tData.potongan_lembur_menit !== undefined &&
+              tData.potongan_lembur_menit !== null
+                ? parseInt(tData.potongan_lembur_menit, 10)
+                : 0;
+
+            menitLembur = Math.max(0, totalLemburKotor - potonganIstirahat);
+            const jamLembur = Math.floor(menitLembur / 60);
+            const mLembur = menitLembur % 60;
+
+            keteranganWaktu =
+              `Lembur ${jamLembur > 0 ? jamLembur + "j " : ""}${mLembur}m` +
+              (potonganIstirahat > 0
+                ? ` (Potongan Istirahat ${potonganIstirahat}m)`
+                : "");
+          } else {
+            keteranganWaktu = "Pulang Normal";
+          }
+        }
+
+        return { status, menitTerlambat, menitLembur, keteranganWaktu };
+      }
+
       function pilihTipeAbsenPopup() {
         const sekarang = new Date();
         const jam = String(sekarang.getHours()).padStart(2, "0");
         const menit = String(sekarang.getMinutes()).padStart(2, "0");
         const waktu_sekarang = `${jam}:${menit}:00`;
-
-        let optionsHtml = '<div class="d-flex flex-column gap-2 mt-2">';
-        let optionsShown = 0;
 
         const sudahPulang = absenHariIni.some(
           (absen) =>
@@ -922,117 +1007,220 @@
         );
 
         if (sudahPulang) {
-          optionsHtml += `<div class="alert alert-success text-center fw-bold mt-2 mb-0"><i class="fas fa-tasks me-2"></i>Semua absensi hari ini selesai!</div>`;
-        } else {
-          // Helper states for strict flow
-          const absenNames = absenHariIni.map((a) =>
-            a.tipe_absen.toLowerCase(),
-          );
-          const sudahMasuk = absenNames.some(
-            (name) => name === "masuk" || name === "absen masuk",
-          );
-          const countIzinKeluar = absenNames.filter((name) =>
-            name.includes("izin keluar"),
-          ).length;
-          const countIzinMasuk = absenNames.filter((name) =>
-            name.includes("izin masuk"),
-          ).length;
-          const sedangIzin = countIzinKeluar > countIzinMasuk;
-
-          const countIstKeluar = absenNames.filter((name) =>
-            name.includes("istirahat keluar"),
-          ).length;
-          const countIstMasuk = absenNames.filter((name) =>
-            name.includes("istirahat masuk"),
-          ).length;
-          const sedangIstirahat = countIstKeluar > countIstMasuk;
-
-          masterTipeAbsen.forEach((item) => {
-            const name = item.nama_tipe.toLowerCase();
-            const isMasuk = name === "masuk" || name === "absen masuk";
-            const isPulang =
-              name.includes("pulang") ||
-              name.includes("checkout") ||
-              item.is_checkout;
-            const isIzinKeluar = name.includes("izin keluar");
-            const isIzinMasuk = name.includes("izin masuk");
-            const isIstirahatKeluar = name.includes("istirahat keluar");
-            const isIstirahatMasuk = name.includes("istirahat masuk");
-
-            const belumBuka = item.jam_mulai && waktu_sekarang < item.jam_mulai;
-            const waktuHabis =
-              item.jam_tutup && waktu_sekarang > item.jam_tutup;
-            const countThisType = absenHariIni.filter(
-              (a) => a.tipe_absen === item.nama_tipe,
-            ).length;
-
-            let allowClick = false;
-            let showSelesai = false;
-
-            if (!sudahMasuk) {
-              // Hanya izinkan Masuk
-              if (isMasuk) allowClick = true;
-            } else {
-              if (isMasuk) showSelesai = true;
-
-              if (sedangIzin) {
-                // Sedang Izin, hanya boleh Izin Masuk
-                if (isIzinMasuk) allowClick = true;
-              } else if (sedangIstirahat) {
-                // Sedang Istirahat, hanya boleh Istirahat Masuk
-                if (isIstirahatMasuk) allowClick = true;
-              } else {
-                // Sedang di kantor (normal state)
-                if (isIzinKeluar || isIstirahatKeluar || isPulang) {
-                  if (isPulang && countThisType > 0) showSelesai = true;
-                  else allowClick = true;
-                }
-              }
-            }
-
-            // Tipe lain yang tidak standar, biarkan muncul jika belum absen
-            if (
-              !isMasuk &&
-              !isPulang &&
-              !isIzinKeluar &&
-              !isIzinMasuk &&
-              !isIstirahatKeluar &&
-              !isIstirahatMasuk
-            ) {
-              if (countThisType > 0) showSelesai = true;
-              else allowClick = true;
-            }
-
-            if (showSelesai) {
-              optionsHtml += `<button class="btn btn-success w-100 py-2 fw-bold absen-btn-item mb-2" disabled><i class="fas fa-check-circle me-1"></i>${item.nama_tipe} (Selesai)</button>`;
-              optionsShown++;
-            } else if (allowClick) {
-              if (belumBuka) {
-                optionsHtml += `<button class="btn btn-secondary w-100 py-2 fw-bold absen-btn-item mb-2" disabled><i class="fas fa-lock me-1"></i>${item.nama_tipe} (Mulai ${item.jam_mulai})</button>`;
-                optionsShown++;
-              } else if (!waktuHabis) {
-                optionsHtml += `<button class="btn btn-primary w-100 py-2 fw-bold absen-btn-item mb-2 shadow-sm" onclick="pilihAbsen('${item.nama_tipe}')"><i class="fas fa-arrow-circle-right me-1"></i>Pilih ${item.nama_tipe}</button>`;
-                optionsShown++;
-              }
-            }
+          Swal.fire({
+            title: "Absensi Selesai",
+            html: '<div class="alert alert-success text-center fw-bold mt-2 mb-0"><i class="fas fa-check-double me-2"></i>Semua absensi hari ini telah selesai!</div>',
+            icon: "success",
+            confirmButtonText: "Tutup",
           });
+          return;
+        }
 
-          if (optionsShown === 0) {
-            optionsHtml += `<div class="alert alert-success text-center fw-bold mt-2 mb-0"><i class="fas fa-tasks me-2"></i>Tidak ada jadwal absen tersedia saat ini.</div>`;
+        const absenNames = absenHariIni.map((a) => a.tipe_absen.toLowerCase());
+        const sudahMasuk = absenNames.some(
+          (name) =>
+            (name.includes("masuk") || name === "masuk") &&
+            !name.includes("izin masuk") &&
+            !name.includes("istirahat masuk"),
+        );
+        const countIzinKeluar = absenNames.filter((name) =>
+          name.includes("izin keluar"),
+        ).length;
+        const countIzinMasuk = absenNames.filter((name) =>
+          name.includes("izin masuk"),
+        ).length;
+        const sedangIzin = countIzinKeluar > countIzinMasuk;
+
+        const countIstKeluar = absenNames.filter((name) =>
+          name.includes("istirahat keluar"),
+        ).length;
+        const countIstMasuk = absenNames.filter((name) =>
+          name.includes("istirahat masuk"),
+        ).length;
+        const sedangIstirahat = countIstKeluar > countIstMasuk;
+
+        let optionsHtml = '<div class="d-flex flex-column gap-2 mt-2">';
+
+        // 1. Kategori ABSEN MASUK
+        if (!sudahMasuk) {
+          optionsHtml += `
+            <button class="btn btn-primary w-100 py-3 fw-bold shadow-sm d-flex align-items-center justify-content-between px-3" onclick="pilihSubTipeAbsen('masuk')">
+              <span><i class="fas fa-sign-in-alt fa-lg me-2"></i> 🟢 Absen Masuk</span>
+              <i class="fas fa-chevron-right"></i>
+            </button>`;
+        } else {
+          optionsHtml += `
+            <button class="btn btn-outline-success w-100 py-2.5 fw-bold text-start px-3 mb-1" disabled>
+              <i class="fas fa-check-circle text-success me-2"></i> 🟢 Absen Masuk (Selesai)
+            </button>`;
+        }
+
+        // 2. Kategori ISTIRAHAT
+        if (sudahMasuk) {
+          if (sedangIstirahat) {
+            optionsHtml += `
+              <button class="btn btn-warning text-dark w-100 py-3 fw-bold shadow-sm d-flex align-items-center justify-content-between px-3" onclick="pilihSubTipeAbsen('istirahat')">
+                <span><i class="fas fa-utensils fa-lg me-2"></i> 🥪 Istirahat Masuk (Kembali)</span>
+                <i class="fas fa-chevron-right"></i>
+              </button>`;
+          } else if (!sedangIzin) {
+            optionsHtml += `
+              <button class="btn btn-outline-primary w-100 py-2.5 fw-bold text-dark d-flex align-items-center justify-content-between px-3" onclick="pilihSubTipeAbsen('istirahat')">
+                <span><i class="fas fa-coffee me-2"></i> 🥪 Istirahat</span>
+                <i class="fas fa-chevron-right"></i>
+              </button>`;
           }
+        }
+
+        // 3. Kategori IZIN KELUAR
+        if (sudahMasuk) {
+          if (sedangIzin) {
+            optionsHtml += `
+              <button class="btn btn-info text-white w-100 py-3 fw-bold shadow-sm d-flex align-items-center justify-content-between px-3" onclick="pilihSubTipeAbsen('izin')">
+                <span><i class="fas fa-walking fa-lg me-2"></i> 🚗 Izin Masuk (Kembali)</span>
+                <i class="fas fa-chevron-right"></i>
+              </button>`;
+          } else if (!sedangIstirahat) {
+            optionsHtml += `
+              <button class="btn btn-outline-info w-100 py-2.5 fw-bold text-dark d-flex align-items-center justify-content-between px-3" onclick="pilihSubTipeAbsen('izin')">
+                <span><i class="fas fa-car me-2"></i> 🚗 Izin Keluar</span>
+                <i class="fas fa-chevron-right"></i>
+              </button>`;
+          }
+        }
+
+        // 4. Kategori ABSEN PULANG
+        if (sudahMasuk && !sedangIzin && !sedangIstirahat) {
+          optionsHtml += `
+            <button class="btn btn-danger w-100 py-3 fw-bold shadow-sm d-flex align-items-center justify-content-between px-3 mt-1" onclick="pilihSubTipeAbsen('pulang')">
+              <span><i class="fas fa-sign-out-alt fa-lg me-2"></i> 🚪 Absen Pulang / Checkout</span>
+              <i class="fas fa-chevron-right"></i>
+            </button>`;
         }
 
         optionsHtml += "</div>";
 
         Swal.fire({
-          title: "Langkah Absensi",
+          title: "Langkah 1: Pilih Kategori Absen",
           html: optionsHtml,
           showCancelButton: true,
-          cancelButtonText: "Kembali",
+          cancelButtonText: "Batal",
           showConfirmButton: false,
           showCloseButton: true,
         });
       }
+
+      function pilihSubTipeAbsen(category) {
+        const sekarang = new Date();
+        const jam = String(sekarang.getHours()).padStart(2, "0");
+        const menit = String(sekarang.getMinutes()).padStart(2, "0");
+        const waktu_sekarang = `${jam}:${menit}:00`;
+
+        const absenNames = absenHariIni.map((a) => a.tipe_absen.toLowerCase());
+        const countIzinKeluar = absenNames.filter((name) =>
+          name.includes("izin keluar"),
+        ).length;
+        const countIzinMasuk = absenNames.filter((name) =>
+          name.includes("izin masuk"),
+        ).length;
+        const sedangIzin = countIzinKeluar > countIzinMasuk;
+
+        const countIstKeluar = absenNames.filter((name) =>
+          name.includes("istirahat keluar"),
+        ).length;
+        const countIstMasuk = absenNames.filter((name) =>
+          name.includes("istirahat masuk"),
+        ).length;
+        const sedangIstirahat = countIstKeluar > countIstMasuk;
+
+        let titleText = "Pilih Detail Tipe Absen";
+        let subItems = [];
+
+        if (category === "masuk") {
+          titleText = "🌅 Pilih Shift Absen Masuk";
+          subItems = masterTipeAbsen.filter((item) => {
+            const name = item.nama_tipe.toLowerCase();
+            return (
+              (name.includes("masuk") || name === "masuk") &&
+              !name.includes("izin") &&
+              !name.includes("istirahat")
+            );
+          });
+        } else if (category === "pulang") {
+          titleText = "🚪 Pilih Shift Absen Pulang";
+          subItems = masterTipeAbsen.filter((item) => {
+            const name = item.nama_tipe.toLowerCase();
+            return (
+              name.includes("pulang") ||
+              name.includes("checkout") ||
+              item.is_checkout
+            );
+          });
+        } else if (category === "istirahat") {
+          titleText = "🥪 Pilih Status Istirahat";
+          subItems = masterTipeAbsen.filter((item) => {
+            const name = item.nama_tipe.toLowerCase();
+            if (sedangIstirahat) return name.includes("istirahat masuk");
+            return name.includes("istirahat keluar");
+          });
+        } else if (category === "izin") {
+          titleText = "🚗 Pilih Status Izin Keluar";
+          subItems = masterTipeAbsen.filter((item) => {
+            const name = item.nama_tipe.toLowerCase();
+            if (sedangIzin) return name.includes("izin masuk");
+            return name.includes("izin keluar");
+          });
+        }
+
+        if (subItems.length === 0) {
+          subItems = masterTipeAbsen;
+        }
+
+        let optionsHtml = '<div class="d-flex flex-column gap-2 mt-2">';
+
+        subItems.forEach((item) => {
+          const isCheckoutType =
+            item.is_checkout ||
+            item.nama_tipe.toLowerCase().includes("pulang") ||
+            item.nama_tipe.toLowerCase().includes("checkout");
+
+          const belumBuka = item.jam_mulai && waktu_sekarang < item.jam_mulai;
+          const waktuHabis =
+            !isCheckoutType && item.jam_tutup && waktu_sekarang > item.jam_tutup;
+
+          const countThisType = absenHariIni.filter(
+            (a) => a.tipe_absen === item.nama_tipe,
+          ).length;
+
+          if (countThisType > 0) {
+            optionsHtml += `<button class="btn btn-success w-100 py-2.5 fw-bold text-start px-3 mb-1" disabled><i class="fas fa-check-circle me-2"></i>${item.nama_tipe} (Sudah Absen)</button>`;
+          } else if (belumBuka) {
+            optionsHtml += `<button class="btn btn-secondary w-100 py-2.5 fw-bold text-start px-3 mb-1 opacity-75" disabled><i class="fas fa-lock me-2"></i>${item.nama_tipe} (Buka Jam ${formatWaktuGlobal(item.jam_mulai)})</button>`;
+          } else if (waktuHabis) {
+            optionsHtml += `<button class="btn btn-outline-secondary w-100 py-2.5 fw-bold text-start px-3 mb-1 opacity-75" disabled><i class="fas fa-hourglass-end me-2"></i>${item.nama_tipe} (Tutup Jam ${formatWaktuGlobal(item.jam_tutup)})</button>`;
+          } else {
+            optionsHtml += `<button class="btn btn-primary w-100 py-2.5 fw-bold text-start px-3 mb-1 shadow-sm d-flex align-items-center justify-content-between" onclick="pilihAbsen('${item.nama_tipe}')"><span><i class="fas fa-clock me-2"></i>${item.nama_tipe}</span><i class="fas fa-arrow-right"></i></button>`;
+          }
+        });
+
+        optionsHtml += `
+          <button class="btn btn-outline-secondary w-100 py-2 fw-bold mt-2" onclick="pilihTipeAbsenPopup()">
+            <i class="fas fa-arrow-left me-1"></i> Kembali ke Kategori Utama
+          </button>
+        </div>`;
+
+        Swal.fire({
+          title: titleText,
+          html: optionsHtml,
+          showCancelButton: false,
+          showConfirmButton: false,
+          showCloseButton: true,
+        });
+      }
+
+      window.pilihTipeAbsenPopup = pilihTipeAbsenPopup;
+      window.pilihSubTipeAbsen = pilihSubTipeAbsen;
+      window.pilihAbsen = pilihAbsen;
 
       function showJadwalAbsen() {
         let jadwalHtml = '<ul class="list-group text-start mt-3">';
@@ -1067,6 +1255,10 @@
         const btnAmbilFoto = document.getElementById("btn-ambil-foto");
         if (btnAmbilFoto) {
           btnAmbilFoto.innerHTML = `📸 Ambil Foto & Simpan (${val})`;
+        }
+        const labelKamera = document.getElementById("text-tipe-absen-kamera");
+        if (labelKamera) {
+          labelKamera.innerText = val;
         }
         prosesCekLokasi();
       }
@@ -1113,6 +1305,7 @@
             }
             isLokasiEnabled = data.enable_lokasi !== false;
             isKameraEnabled = data.enable_kamera !== false;
+            window.currentFormatWaktu = data.format_waktu || "HH:mm:ss";
 
             if (!isLokasiEnabled) {
               document.getElementById("lokasi-section").style.display = "none";
@@ -1126,29 +1319,28 @@
         }
       }
 
+      function formatWaktuGlobal(timeStr) {
+        if (!timeStr || timeStr === "-") return "-";
+        const parts = timeStr.split(":");
+        if (parts.length < 2) return timeStr;
+        const format = window.currentFormatWaktu || "HH:mm:ss";
+        if (format === "HH:mm") {
+          return `${parts[0]}:${parts[1]}`;
+        }
+        return timeStr.length === 5 ? `${timeStr}:00` : timeStr;
+      }
+      window.formatWaktuGlobal = formatWaktuGlobal;
+
       loadAppSettings().then(() => {
         loadKantorUser();
         cekStatusAbsenHariIni();
 
-        // Real-time listener riwayat absen
+        // Auto-Sync Polling Latar Belakang (15s) - Mencegah koneksi WebSocket wss:// di ngrok
         if (userData) {
-          const uData = JSON.parse(userData);
-          supabaseClient
-            .channel("karyawan-absensi")
-            .on(
-              "postgres_changes",
-              {
-                event: "*",
-                schema: "public",
-                table: "absensi",
-                filter: `user_id=eq.${uData.id}`,
-              },
-              (payload) => {
-                loadRiwayatAbsensi();
-                cekStatusAbsenHariIni();
-              },
-            )
-            .subscribe();
+          setInterval(() => {
+            loadRiwayatAbsensi();
+            cekStatusAbsenHariIni();
+          }, 15000);
         }
       });
 
@@ -1172,11 +1364,11 @@
       // Initialize face api models
       let modelsLoaded = false;
       Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(
-          "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/",
-        ),
+        faceapi.nets.tinyFaceDetector.loadFromUri("./models"),
       ]).then(() => {
         modelsLoaded = true;
+      }).catch(err => {
+        console.warn("Local model load warning:", err);
       });
 
       function mulaiKamera() {
@@ -1465,9 +1657,28 @@
       }
 
       function lanjutKeKameraAtauSubmit() {
+        if (!currentUser || !currentUser.face_descriptor) {
+          const btnCek = document.getElementById("btn-cek-lokasi");
+          if (btnCek) btnCek.disabled = false;
+          Swal.fire({
+            title: "Wajah Wajib Terdaftar!",
+            text: "Anda belum mendaftarkan data wajah (Face Recognition). Pendaftaran wajah wajib dilakukan terlebih dahulu sebelum dapat melakukan absensi.",
+            icon: "warning",
+            confirmButtonText: "Daftar Wajah Sekarang",
+          }).then(() => {
+            const modal = new bootstrap.Modal(document.getElementById('modalRegisterFace'));
+            modal.show();
+          });
+          return;
+        }
+
         if (!isKameraEnabled) {
           prosesAbsenTanpaFoto();
         } else {
+          const labelKamera = document.getElementById("text-tipe-absen-kamera");
+          if (labelKamera) {
+            labelKamera.innerText = tipeAbsenSekarang || "Absen Masuk";
+          }
           const kameraModal = new bootstrap.Modal(
             document.getElementById("kameraModal"),
           );
@@ -1477,6 +1688,18 @@
       }
 
       async function prosesAbsenTanpaFoto() {
+        if (!currentUser || !currentUser.face_descriptor) {
+          Swal.fire({
+            title: "Wajah Wajib Terdaftar!",
+            text: "Anda belum mendaftarkan data wajah (Face Recognition). Pendaftaran wajah wajib dilakukan terlebih dahulu sebelum dapat melakukan absensi.",
+            icon: "warning",
+            confirmButtonText: "Daftar Wajah Sekarang",
+          }).then(() => {
+            const modal = new bootstrap.Modal(document.getElementById('modalRegisterFace'));
+            modal.show();
+          });
+          return;
+        }
         Swal.fire({
           title: "Menyimpan...",
           text: "Memproses data absensi Anda",
@@ -1509,28 +1732,8 @@
         const localTime = localDate.toISOString().split("T")[1].substring(0, 8);
         const tanggalHariIni = localDate.toISOString().split("T")[0];
 
-        let statusKehadiran = "Hadir";
         const tipeData = getTipeAbsenData();
-        const namaTipe = tipeAbsenSekarang.toLowerCase();
-        const isMasuk = namaTipe === "masuk" || namaTipe === "absen masuk";
-        const isPulang =
-          namaTipe.includes("pulang") ||
-          namaTipe.includes("checkout") ||
-          tipeData.is_checkout;
-
-        if (
-          isMasuk &&
-          tipeData.batas_terlambat &&
-          localTime > tipeData.batas_terlambat
-        ) {
-          statusKehadiran = "Terlambat";
-        } else if (
-          isPulang &&
-          tipeData.jam_tutup &&
-          localTime > tipeData.jam_tutup
-        ) {
-          statusKehadiran = "Lembur";
-        }
+        const calcWaktu = hitungDetailWaktuAbsensi(localTime, tipeData, tipeAbsenSekarang);
 
         const lokasiTeks = isAbsenCabangLain
           ? `Jarak: ${Math.round(jarakAbsen)}m dari ${cabangAbsenSekarang} (Luar Cabang)`
@@ -1542,7 +1745,10 @@
           waktu: localTime,
           tipe_absen: tipeAbsenSekarang,
           lokasi: lokasiTeks,
-          status: statusKehadiran,
+          status: calcWaktu.status,
+          menit_terlambat: calcWaktu.menitTerlambat,
+          menit_lembur: calcWaktu.menitLembur,
+          keterangan_waktu: calcWaktu.keteranganWaktu,
         };
 
         const response = await supabaseClient.from("absensi").insert([payload]);
@@ -1550,7 +1756,7 @@
         if (response.error) {
           Swal.fire("Gagal", response.error.message, "error");
         } else {
-          const textMsg = `<b>Laporan Absen (Lokasi)</b>\nNama: ${currentUser.nama}\nCabang Utama: ${currentUser.cabang || '-'}\nCabang Absen: ${isAbsenCabangLain ? cabangAbsenSekarang + ' (Luar Cabang)' : (currentUser.cabang || '-')}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${localTime}\nLokasi: ${lokasiTeks}`;
+          const textMsg = `<b>Laporan Absen (Lokasi)</b>\nNama: ${currentUser.nama}\nCabang Utama: ${currentUser.cabang || '-'}\nCabang Absen: ${isAbsenCabangLain ? cabangAbsenSekarang + ' (Luar Cabang)' : (currentUser.cabang || '-')}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${localTime}\nStatus Waktu: ${calcWaktu.keteranganWaktu}\nLokasi: ${lokasiTeks}`;
           await sendTelegramNotification(textMsg);
 
           Swal.fire("Berhasil!", "Absensi berhasil disimpan.", "success").then(
@@ -1571,6 +1777,25 @@
       }
 
       async function prosesAbsenFoto() {
+        if (!currentUser || !currentUser.face_descriptor) {
+          stopKamera();
+          const kameraModalEl = document.getElementById("kameraModal");
+          if (kameraModalEl) {
+            const m = bootstrap.Modal.getInstance(kameraModalEl);
+            if (m) m.hide();
+          }
+          Swal.fire({
+            title: "Wajah Wajib Terdaftar!",
+            text: "Anda belum mendaftarkan data wajah (Face Recognition). Pendaftaran wajah wajib dilakukan terlebih dahulu sebelum dapat melakukan absensi.",
+            icon: "warning",
+            confirmButtonText: "Daftar Wajah Sekarang",
+          }).then(() => {
+            const modal = new bootstrap.Modal(document.getElementById('modalRegisterFace'));
+            modal.show();
+          });
+          return;
+        }
+
         if (faceCountdownTimer) {
           clearInterval(faceCountdownTimer);
           faceCountdownTimer = null;
@@ -1605,6 +1830,7 @@
         if (currentUser && currentUser.face_descriptor) {
           btnSubmit.innerHTML = "⏳ Memindai wajah pada foto...";
           try {
+            await loadFaceModels();
             const registeredDesc = new Float32Array(
               JSON.parse(currentUser.face_descriptor),
             );
@@ -1672,26 +1898,8 @@
             masterTipeAbsen.find((m) => m.nama_tipe === tipeAbsenSekarang) ||
             {};
 
-          const namaTipe = tipeAbsenSekarang.toLowerCase();
-          const isMasuk = namaTipe === "masuk" || namaTipe === "absen masuk";
-          const isPulang =
-            namaTipe.includes("pulang") ||
-            namaTipe.includes("checkout") ||
-            tipeData.is_checkout;
+          const calcWaktu = hitungDetailWaktuAbsensi(waktu_sekarang, tipeData, tipeAbsenSekarang);
 
-          if (
-            isMasuk &&
-            tipeData.batas_terlambat &&
-            waktu_sekarang > tipeData.batas_terlambat
-          ) {
-            statusKehadiran = "Terlambat";
-          } else if (
-            isPulang &&
-            tipeData.jam_tutup &&
-            waktu_sekarang > tipeData.jam_tutup
-          ) {
-            statusKehadiran = "Lembur";
-          }
           const res = await supabaseClient.from("absensi").insert([
             {
               user_id: userObj.id,
@@ -1700,13 +1908,16 @@
               tipe_absen: tipeAbsenSekarang,
               lokasi: lokasiTeks,
               foto: publicUrlData.publicUrl,
-              status: statusKehadiran,
+              status: calcWaktu.status,
               status_wajah: faceAbsenStatus,
+              menit_terlambat: calcWaktu.menitTerlambat,
+              menit_lembur: calcWaktu.menitLembur,
+              keterangan_waktu: calcWaktu.keteranganWaktu,
             },
           ]);
           let dbError = res.error;
 
-          const textMsg = `<b>Laporan Absen (Wajah/Selfie)</b>\nNama: ${userObj.nama}\nCabang Utama: ${userObj.cabang || '-'}\nCabang Absen: ${isAbsenCabangLain ? cabangAbsenSekarang + ' (Luar Cabang)' : (userObj.cabang || '-')}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${waktu_sekarang}\nLokasi: ${lokasiTeks}\nFoto: <a href="${publicUrlData.publicUrl}">Lihat Foto</a>`;
+          const textMsg = `<b>Laporan Absen (Wajah/Selfie)</b>\nNama: ${userObj.nama}\nCabang Utama: ${userObj.cabang || '-'}\nCabang Absen: ${isAbsenCabangLain ? cabangAbsenSekarang + ' (Luar Cabang)' : (userObj.cabang || '-')}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${waktu_sekarang}\nStatus Waktu: ${calcWaktu.keteranganWaktu}\nLokasi: ${lokasiTeks}\nFoto: <a href="${publicUrlData.publicUrl}">Lihat Foto</a>`;
           await sendTelegramNotification(textMsg);
 
           await cekStatusAbsenHariIni();
@@ -2433,7 +2644,7 @@
                     : "success text-white";
                 if (absen.status === "Alpha") bClass = "danger text-white";
                 if (absen.status === "Lembur") bClass = "info text-dark";
-                popupHtml += `<tr><td>${absen.tipe_absen || "-"}</td><td>${absen.waktu || "-"}</td><td><span class="badge bg-${bClass}">${absen.status}</span></td></tr>`;
+                popupHtml += `<tr><td>${absen.tipe_absen || "-"}</td><td>${formatWaktuGlobal(absen.waktu || "-")}</td><td><span class="badge bg-${bClass}">${absen.status}</span></td></tr>`;
               });
             }
             popupHtml += `</tbody></table></div>`;
@@ -2526,7 +2737,7 @@
             <tr>
               <td>${absen.tanggal}</td>
               <td>${absen.tipe_absen || "-"}</td>
-              <td>${absen.waktu || "-"}</td>
+              <td>${formatWaktuGlobal(absen.waktu || "-")}</td>
               <td><span class="badge bg-${badgeClass}">${absen.status}</span></td>
             </tr>
           `;
@@ -2551,34 +2762,69 @@
       async function syncUserSession() {
         if (!userData) return;
 
-        // 1. Cek sesi JWT dari Supabase Auth
-        const {
-          data: { session },
-        } = await supabaseClient.auth.getSession();
-        if (!session) {
-          localStorage.removeItem("userLogin");
-          window.location.href = "login.html";
-          return;
-        }
+        try {
+          let u = JSON.parse(userData);
 
-        let u = JSON.parse(userData);
+          // 1. Cek sesi JWT dari Supabase Auth
+          const {
+            data: { session },
+          } = await supabaseClient.auth.getSession();
 
-        // 2. Cek profil berdasarkan auth_id
-        const { data, error } = await supabaseClient
-          .from("users")
-          .select("*")
-          .eq("auth_id", session.user.id)
-          .maybeSingle();
+          if (session) {
+            // Cek profil berdasarkan auth_id
+            let { data } = await supabaseClient
+              .from("users")
+              .select("*")
+              .eq("auth_id", session.user.id)
+              .maybeSingle();
 
-        if (data) {
-          localStorage.setItem("userLogin", JSON.stringify(data));
-          // Update global reference
-          Object.assign(u, data);
-        } else {
-          // Jika auth ada tapi profil hilang (misal dihapus paksa oleh admin)
-          await supabaseClient.auth.signOut();
-          localStorage.removeItem("userLogin");
-          window.location.href = "login.html";
+            // Self-repair untuk Karyawan Baru: Jika belum terikat via auth_id tapi u.id ada, ikat auth_id secara otomatis
+            if (!data && u && u.id) {
+              const { data: userById } = await supabaseClient
+                .from("users")
+                .select("*")
+                .eq("id", u.id)
+                .maybeSingle();
+
+              if (userById) {
+                await supabaseClient.from("users").update({ auth_id: session.user.id }).eq("id", userById.id);
+                userById.auth_id = session.user.id;
+                data = userById;
+              }
+            }
+
+            if (data) {
+              localStorage.setItem("userLogin", JSON.stringify(data));
+              Object.assign(u, data);
+              if (typeof currentUser !== "undefined" && currentUser) {
+                Object.assign(currentUser, data);
+              }
+            }
+          } else if (u && u.id) {
+            // Sesi Auth belum/tidak aktif, lakukan verifikasi lokal lewat ID user
+            const { data: localData } = await supabaseClient
+              .from("users")
+              .select("*")
+              .eq("id", u.id)
+              .maybeSingle();
+
+            if (localData) {
+              localStorage.setItem("userLogin", JSON.stringify(localData));
+              Object.assign(u, localData);
+              if (typeof currentUser !== "undefined" && currentUser) {
+                Object.assign(currentUser, localData);
+              }
+            } else {
+              // Profil benar-benar tidak ada di DB
+              localStorage.removeItem("userLogin");
+              window.location.href = "login.html";
+            }
+          } else {
+            localStorage.removeItem("userLogin");
+            window.location.href = "login.html";
+          }
+        } catch (e) {
+          console.warn("syncUserSession error:", e);
         }
       }
 
@@ -2661,6 +2907,10 @@
           currentUser.no_hp || "-";
         document.getElementById("profil-cabang").innerText =
           currentUser.cabang || "Pusat";
+        if (document.getElementById("profil-unit")) {
+          document.getElementById("profil-unit").innerText =
+            currentUser.unit || "-";
+        }
       }
 
       async function ubahPassword(e) {
@@ -2713,18 +2963,64 @@
       async function sendTelegramNotification(message) {
         const targetChatId =
           (typeof window !== "undefined" && window.TELEGRAM_CHAT_ID) ||
-          (typeof TELEGRAM_CHAT_ID !== "undefined"
-            ? TELEGRAM_CHAT_ID
-            : "-5585540383");
+          (typeof TELEGRAM_CHAT_ID !== "undefined" ? TELEGRAM_CHAT_ID : "-5585540383");
+
+        const botToken =
+          (typeof window !== "undefined" && window.TELEGRAM_BOT_TOKEN) ||
+          (typeof TELEGRAM_BOT_TOKEN !== "undefined" ? TELEGRAM_BOT_TOKEN : "") ||
+          (typeof window !== "undefined" && window.ENV && window.ENV.TELEGRAM_BOT_TOKEN) || "";
 
         if (
           !targetChatId ||
           targetChatId === "ISI_DENGAN_CHAT_ID_GRUP_ANDA"
         ) {
-          console.log("Telegram Chat ID not configured");
+          console.log("Telegram Chat ID tidak dikonfigurasi");
           return;
         }
 
+        // 1. Jika TELEGRAM_BOT_TOKEN diisi di .env lokal / Docker / window.ENV, kirim langsung via Direct Telegram Bot API
+        if (botToken && !botToken.includes("YOUR_BOT_TOKEN")) {
+          try {
+            const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: targetChatId,
+                text: message,
+                parse_mode: 'HTML'
+              })
+            });
+            const resData = await resp.json();
+            if (resData.ok) {
+              console.log("Notifikasi Telegram berhasil dikirim via Direct Bot API.");
+              return;
+            } else {
+              console.warn("Direct Telegram API response warning:", resData);
+            }
+          } catch(err) {
+            console.warn("Gagal mengirim via Direct Telegram API, mencoba fallback...", err);
+          }
+        }
+
+        // 2. Fallback Vercel Serverless Function (/api/telegram-notif) - Digunakan saat di-deploy ke Vercel (tanpa expose Token di frontend)
+        try {
+          const vercelResp = await fetch('/api/telegram-notif', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: message, chat_id: targetChatId })
+          });
+          if (vercelResp.ok) {
+            const vData = await vercelResp.json();
+            if (vData.ok) {
+              console.log("Notifikasi Telegram berhasil dikirim via Vercel Serverless Function.");
+              return;
+            }
+          }
+        } catch (vErr) {
+          // Bukan di lingkungan Vercel
+        }
+
+        // 3. Fallback: Panggil Supabase Edge Function (telegram-notif) jika dipasang di Cloud
         try {
           const { data, error } = await supabaseClient.functions.invoke(
             "telegram-notif",
@@ -2736,12 +3032,11 @@
           if (error) throw error;
 
           if (data && !data.ok) {
-            console.error("Gagal kirim notifikasi Telegram:", data);
+            console.error("Gagal kirim notifikasi Telegram via Edge Function:", data);
           }
         } catch (error) {
-          console.error(
-            "Error memanggil Supabase Edge Function (telegram-notif):",
-            error,
+          console.info(
+            "Edge Function (telegram-notif) tidak dipasang pada server ini."
           );
         }
       }

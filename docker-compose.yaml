@@ -1,9 +1,197 @@
 services:
+  # ==========================================
+  # 1. FRONTEND APP (Aplikasi Zieda Absen)
+  # ==========================================
   frontend:
     image: nginx:alpine
     container_name: zieda-absen-frontend
     ports:
-      - 8080:80
+      - "8080:80"
+    env_file:
+      - .env
+    environment:
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
     volumes:
       - ./:/usr/share/nginx/html:ro
+      - ./docker/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/frontend/40-generate-env.sh:/docker-entrypoint.d/40-generate-env.sh:ro
+    depends_on:
+      - rest
+      - auth
+      - storage
+      - realtime
     restart: unless-stopped
+
+  # ==========================================
+  # 2. API GATEWAY (Supabase API Proxy)
+  # ==========================================
+  gateway:
+    image: nginx:alpine
+    container_name: zieda-absen-gateway
+    ports:
+      - "54321:54321"
+    volumes:
+      - ./docker/gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - rest
+      - auth
+      - storage
+      - realtime
+    restart: unless-stopped
+
+  # ==========================================
+  # 3. REST API ENGINE (PostgREST)
+  # ==========================================
+  rest:
+    image: postgrest/postgrest:v12.2.0
+    container_name: zieda-absen-rest
+    environment:
+      PGRST_DB_URI: postgresql://postgres:postgres@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  # ==========================================
+  # 4. AUTH ENGINE (Supabase GoTrue)
+  # ==========================================
+  auth:
+    image: supabase/gotrue:v2.158.1
+    container_name: zieda-absen-auth
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      GOTRUE_API_EXTERNAL_URL: http://localhost:8080/auth/v1
+      API_EXTERNAL_URL: http://localhost:8080/auth/v1
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgresql://supabase_admin:postgres@db:5432/postgres?search_path=auth
+      GOTRUE_SITE_URL: http://localhost:8080
+      GOTRUE_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_SMS_AUTOCONFIRM: "true"
+      GOTRUE_DISABLE_SIGNUP: "false"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  # ==========================================
+  # 5. STORAGE ENGINE (Supabase Storage API)
+  # ==========================================
+  storage:
+    image: supabase/storage-api:v1.11.1
+    container_name: zieda-absen-storage
+    environment:
+      ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+      SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+      POSTGREST_URL: http://rest:3000
+      PGRST_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+      DATABASE_URL: "postgresql://supabase_admin:postgres@db:5432/postgres?options=-c%20search_path%3Dstorage,public"
+      DATABASE_SEARCH_PATH: "storage,public"
+      PGOPTIONS: "-c search_path=storage,public"
+      FILE_SIZE_LIMIT: 52428800
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: stub
+      GLOBAL_S3_BUCKET: stub
+    volumes:
+      - zieda_storage_data:/var/lib/storage
+    depends_on:
+      - db
+      - rest
+    restart: unless-stopped
+
+  # ==========================================
+  # 6. REALTIME ENGINE (Supabase Realtime API)
+  # ==========================================
+  realtime:
+    image: supabase/realtime:v2.25.50
+    container_name: zieda-absen-realtime
+    environment:
+      PORT: 4000
+      APP_NAME: realtime
+      FLY_APP_NAME: realtime
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: supabase_admin
+      DB_PASSWORD: postgres
+      DB_NAME: postgres
+      DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
+      DB_ENC_KEY: "1234567890123456"
+      API_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+      METRICS_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+      SECRET_KEY_BASE: Up6D2HVWVvMjjyjtTxayCGyuh6L3ESAi5Y6cHdHAwGivld10aBjg6pRAHAqdEOiJ
+      ERL_AFLAGS: -proto_dist inet_tcp
+      ENABLE_RLS: "false"
+      SEED_SELF_HOST: "true"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  # ==========================================
+  # 7. DATABASE (PostgreSQL Supabase Self-Hosted)
+  # ==========================================
+  db:
+    image: supabase/postgres:15.6.1.143
+    container_name: zieda-absen-db
+    ports:
+      - "54322:5432"
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+    volumes:
+      - ./db/01_starter_schema.sql:/docker-entrypoint-initdb.d/01_starter_schema.sql:ro
+      - zieda_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # ==========================================
+  # 8. POSTGRES META (Supabase Studio Metadata API)
+  # ==========================================
+  pgmeta:
+    image: supabase/postgres-meta:v0.84.2
+    container_name: zieda-absen-pgmeta
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: db
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: postgres
+      PG_META_DB_USER: supabase_admin
+      PG_META_DB_PASSWORD: postgres
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  # ==========================================
+  # 9. SUPABASE STUDIO (Dashboard Web Admin DB)
+  # ==========================================
+  studio:
+    image: supabase/studio:latest
+    container_name: zieda-absen-studio
+    ports:
+      - "54323:3000"
+    environment:
+      STUDIO_PG_META_URL: http://pgmeta:8080
+      POSTGRES_PASSWORD: postgres
+      DEFAULT_ORGANIZATION_ID: default
+      DEFAULT_PROJECT_ID: default
+      SUPABASE_URL: http://gateway:54321
+      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+      SUPABASE_SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+      SNIPPETS_MANAGEMENT_FOLDER: /tmp/snippets
+    depends_on:
+      - pgmeta
+    restart: unless-stopped
+
+volumes:
+  zieda_db_data:
+  zieda_storage_data:
