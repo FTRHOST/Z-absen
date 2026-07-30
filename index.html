@@ -2759,6 +2759,23 @@
       // Generate kalender saat web dimuat (default kosong)
       buatKalender([]);
 
+      // Auto-Sync & Realtime Subscription untuk Halaman Karyawan
+      try {
+        if (typeof supabaseClient !== 'undefined' && supabaseClient.channel) {
+          supabaseClient
+            .channel('realtime_index_absensi')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'absensi' }, (payload) => {
+              if (typeof loadRiwayatAbsensi === 'function') loadRiwayatAbsensi();
+            })
+            .subscribe();
+        }
+      } catch(e) { console.warn(e); }
+
+      // Polling fallback setiap 6 detik
+      setInterval(() => {
+        if (typeof loadRiwayatAbsensi === 'function') loadRiwayatAbsensi();
+      }, 6000);
+
       async function syncUserSession() {
         if (!userData) return;
 

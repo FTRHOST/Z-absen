@@ -84,6 +84,7 @@ window.logout = async function() {
 
     // Load Global App Settings (Format Waktu, Brand, dll)
     await loadSettings();
+    initRealtimeAutoSync();
 
     // Handle Tab Routing
     let hash = window.location.hash || '#tab-dashboard';
@@ -1208,9 +1209,10 @@ let globalFormConfig = [];
 
 let globalMasterTipeAbsen = [];
 
-async function loadDataAbsensi() {
+async function loadDataAbsensi(showSkeleton = true) {
     const gridContainer = document.getElementById("absensi-grid-container");
     const filterBulan = document.getElementById("filter-bulan-absensi");
+    if (!gridContainer || !filterBulan) return;
     
     // Fetch master_tipe_absen untuk detail
     const { data: tipeData } = await supabaseClient.from('master_tipe_absen').select('*').order('id', { ascending: true });
@@ -1233,25 +1235,26 @@ async function loadDataAbsensi() {
     if (expMulai && !expMulai.value) expMulai.value = startDate;
     if (expSelesai && !expSelesai.value) expSelesai.value = endDate;
 
-    const getSkeletonCardHTML = () => `
-        <div class="col-12 col-md-6 col-lg-4">
-            <div class="card shadow-sm border-0 rounded-3 placeholder-glow">
-                <div class="card-header bg-white border-0 pt-3 pb-0">
-                    <h6 class="placeholder col-6"></h6>
-                </div>
-                <div class="card-body">
-                    <div class="d-flex justify-content-between mb-3">
-                        <span class="placeholder col-3"></span>
-                        <span class="placeholder col-3"></span>
-                        <span class="placeholder col-3"></span>
+    if (showSkeleton && (!allAbsensiGrouped || Object.keys(allAbsensiGrouped).length === 0)) {
+        const getSkeletonCardHTML = () => `
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card shadow-sm border-0 rounded-3 placeholder-glow">
+                    <div class="card-header bg-white border-0 pt-3 pb-0">
+                        <h6 class="placeholder col-6"></h6>
                     </div>
-                    <div class="placeholder col-12" style="height: 30px;"></div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-3">
+                            <span class="placeholder col-3"></span>
+                            <span class="placeholder col-3"></span>
+                            <span class="placeholder col-3"></span>
+                        </div>
+                        <div class="placeholder col-12" style="height: 30px;"></div>
+                    </div>
                 </div>
             </div>
-        </div>
-    `;
-
-    gridContainer.innerHTML = Array(6).fill(getSkeletonCardHTML()).join('');
+        `;
+        gridContainer.innerHTML = Array(6).fill(getSkeletonCardHTML()).join('');
+    }
 
     let queryAbsen = supabaseClient.from('absensi').select('*, users!inner(nama, cabang)')
         .not('status', 'ilike', '%-TRASH-%')
@@ -1268,7 +1271,7 @@ async function loadDataAbsensi() {
     
     if (error) {
         console.error("Error Absensi:", error);
-        gridContainer.innerHTML = `<div class="col-12"><div class="alert alert-danger">Gagal memuat absensi: ${error.message}</div></div>`;
+        if (showSkeleton) gridContainer.innerHTML = `<div class="col-12"><div class="alert alert-danger">Gagal memuat absensi: ${error.message}</div></div>`;
         return;
     }
 
@@ -1280,6 +1283,9 @@ async function loadDataAbsensi() {
     if (!data || data.length === 0) {
         gridContainer.innerHTML = '<div class="col-12"><div class="alert alert-light text-center border">Belum ada data absensi di bulan ini.</div></div>';
         allAbsensiGrouped = {};
+        if (currentAbsensiTanggal && typeof showDetailAbsensi === 'function') {
+            showDetailAbsensi(currentAbsensiTanggal, currentAbsensiDateStr);
+        }
         return;
     }
 
@@ -1364,10 +1370,10 @@ async function loadDataAbsensi() {
     });
     gridContainer.innerHTML = gridCardsHtml;
 
-    // Auto-refresh modal jika sedang terbuka
-    const modalEl = document.getElementById("modalDetailAbsensi");
-    if (modalEl && modalEl.classList.contains("show") && currentAbsensiTanggal) {
-        showDetailAbsensi(currentAbsensiTanggal);
+    // Refresh page view detail if currently open
+    const pageView = document.getElementById("absensi-detail-page-view");
+    if (pageView && !pageView.classList.contains("d-none") && currentAbsensiTanggal) {
+        showDetailAbsensi(currentAbsensiTanggal, currentAbsensiDateStr);
     }
 }
 
@@ -3942,8 +3948,16 @@ async function hapusDataAbsen(absenId, tanggal) {
         return;
     }
     
-    Swal.fire("Berhasil", "Data absen beserta foto berhasil dihapus.", "success");
-    loadDataAbsensi();
+    // INSTANT OPTIMISTIC DOM RE-RENDER:
+    if (allAbsensiGrouped && tanggal && allAbsensiGrouped[tanggal] && allAbsensiGrouped[tanggal].records) {
+        allAbsensiGrouped[tanggal].records = allAbsensiGrouped[tanggal].records.filter(r => String(r.id) !== String(absenId));
+        if (currentAbsensiTanggal === tanggal) {
+            showDetailAbsensi(tanggal, currentAbsensiDateStr);
+        }
+    }
+
+    Swal.fire({ title: "Berhasil", text: "Data absen beserta foto berhasil dihapus.", icon: "success", timer: 1200, showConfirmButton: false });
+    loadDataAbsensi(false);
 }
 
 // ==========================================
@@ -4773,3 +4787,38 @@ async function prosesRestoreModular() {
     }
 }
 window.prosesRestoreModular = prosesRestoreModular;
+
+// ==========================================
+// REALTIME & SILENT AUTO-SYNC ENGINE
+// ==========================================
+function initRealtimeAutoSync() {
+    try {
+        if (typeof supabaseClient !== 'undefined' && supabaseClient.channel) {
+            // Subscribe to Postgres absensi table changes via WebSocket
+            const channel = supabaseClient
+                .channel('realtime_absensi_auto_sync')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'absensi' }, (payload) => {
+                    console.log('⚡ Realtime WebSocket notification received for absensi:', payload);
+                    if (typeof loadDataAbsensi === 'function') {
+                        loadDataAbsensi(false); // Silent background refresh
+                    }
+                })
+                .subscribe((status) => {
+                    console.log('Realtime absensi channel status:', status);
+                });
+        }
+    } catch (e) {
+        console.warn('Realtime WebSocket error:', e);
+    }
+
+    // Silent background polling fallback every 5 seconds (failsafe against WebSocket drops)
+    setInterval(() => {
+        if (typeof loadDataAbsensi === 'function') {
+            const activeTab = document.querySelector('.nav-link.active');
+            if (activeTab && activeTab.getAttribute('data-bs-target') === '#tab-absensi') {
+                loadDataAbsensi(false);
+            }
+        }
+    }, 5000);
+}
+window.initRealtimeAutoSync = initRealtimeAutoSync;
