@@ -911,6 +911,78 @@
         }
       }
 
+      function hitungDetailWaktuAbsensi(waktuSekarang, tipeData, namaTipe) {
+        let status = "Hadir";
+        let menitTerlambat = 0;
+        let menitLembur = 0;
+        let keteranganWaktu = "Tepat Waktu";
+
+        const tData = tipeData || {};
+        const nTipe = (namaTipe || "").toLowerCase();
+        const isMasuk =
+          nTipe === "masuk" ||
+          nTipe === "absen masuk" ||
+          (!nTipe.includes("pulang") &&
+            !nTipe.includes("checkout") &&
+            !tData.is_checkout);
+        const isPulang =
+          nTipe.includes("pulang") ||
+          nTipe.includes("checkout") ||
+          tData.is_checkout;
+
+        const timeToMinutes = (tStr) => {
+          if (!tStr) return 0;
+          const parts = tStr.split(":");
+          return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+        };
+
+        const currMin = timeToMinutes(waktuSekarang);
+
+        if (isMasuk && tData.batas_terlambat) {
+          const limitMin = timeToMinutes(tData.batas_terlambat);
+          if (currMin > limitMin) {
+            status = "Terlambat";
+            menitTerlambat = currMin - limitMin;
+            const jam = Math.floor(menitTerlambat / 60);
+            const m = menitTerlambat % 60;
+            keteranganWaktu = `Terlambat ${jam > 0 ? jam + "j " : ""}${m}m`;
+          } else {
+            keteranganWaktu = "Tepat Waktu";
+          }
+        } else if (isPulang && tData.jam_tutup) {
+          const jamTutupMin = timeToMinutes(tData.jam_tutup);
+          if (currMin > jamTutupMin) {
+            status = "Lembur";
+            const totalLemburKotor = currMin - jamTutupMin;
+
+            let potonganIstirahat = 0;
+            const potonganDef =
+              tData.potongan_lembur_menit !== undefined &&
+              tData.potongan_lembur_menit !== null
+                ? parseInt(tData.potongan_lembur_menit, 10)
+                : 60;
+
+            if (currMin >= 1140 && jamTutupMin <= 1080 && totalLemburKotor >= 120) {
+              potonganIstirahat = potonganDef;
+            }
+
+            menitLembur = Math.max(0, totalLemburKotor - potonganIstirahat);
+            const jamLembur = Math.floor(menitLembur / 60);
+            const mLembur = menitLembur % 60;
+
+            keteranganWaktu =
+              `Lembur ${jamLembur > 0 ? jamLembur + "j " : ""}${mLembur}m` +
+              (potonganIstirahat > 0
+                ? ` (Potongan Solat ${potonganIstirahat}m)`
+                : "");
+          } else {
+            keteranganWaktu = "Pulang Normal";
+          }
+        }
+
+        return { status, menitTerlambat, menitLembur, keteranganWaktu };
+      }
+
       function pilihTipeAbsenPopup() {
         const sekarang = new Date();
         const jam = String(sekarang.getHours()).padStart(2, "0");
