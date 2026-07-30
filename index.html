@@ -1184,8 +1184,15 @@
         let optionsHtml = '<div class="d-flex flex-column gap-2 mt-2">';
 
         subItems.forEach((item) => {
+          const isCheckoutType =
+            item.is_checkout ||
+            item.nama_tipe.toLowerCase().includes("pulang") ||
+            item.nama_tipe.toLowerCase().includes("checkout");
+
           const belumBuka = item.jam_mulai && waktu_sekarang < item.jam_mulai;
-          const waktuHabis = item.jam_tutup && waktu_sekarang > item.jam_tutup;
+          const waktuHabis =
+            !isCheckoutType && item.jam_tutup && waktu_sekarang > item.jam_tutup;
+
           const countThisType = absenHariIni.filter(
             (a) => a.tipe_absen === item.nama_tipe,
           ).length;
