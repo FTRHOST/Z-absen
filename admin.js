@@ -3867,7 +3867,7 @@ async function factoryResetDatabase() {
     });
 
     try {
-        // Hapus isi tabel
+        // 1. Hapus isi tabel
         const tablesToClear = ['absensi', 'cuti', 'form_cuti_config', 'kantor', 'master_jenis_cuti', 'master_tipe_absen'];
         
         for (const table of tablesToClear) {
@@ -3889,7 +3889,82 @@ async function factoryResetDatabase() {
             console.warn("Gagal mereset users", e);
         }
 
-        Swal.fire("Berhasil", "Sistem telah direset ke pengaturan awal pabrik.", "success").then(() => {
+        // 2. Inisialisasi Ulang Data Starter Template
+        // A. Kantor
+        await supabaseClient.from('kantor').insert([
+            { nama: 'Zieda Pusat', lat: '-6.917464', lng: '107.619122', radius: 100 },
+            { nama: 'Zieda Cabang Barat', lat: '-6.914000', lng: '107.600000', radius: 100 },
+            { nama: 'Zieda Cabang Timur', lat: '-6.920000', lng: '107.630000', radius: 100 }
+        ]);
+
+        // B. Master Tipe Absen
+        await supabaseClient.from('master_tipe_absen').insert([
+            { nama_tipe: 'Absen Masuk Pagi', jam_mulai: '07:00:00', batas_terlambat: '08:00:00', jam_tutup: '16:00:00', is_checkout: false, is_aktif: true },
+            { nama_tipe: 'Absen Pulang Pagi', jam_mulai: '15:00:00', batas_terlambat: '16:00:00', jam_tutup: '23:59:59', is_checkout: true, is_aktif: true },
+            { nama_tipe: 'Absen Masuk Siang', jam_mulai: '12:00:00', batas_terlambat: '13:00:00', jam_tutup: '21:00:00', is_checkout: false, is_aktif: true },
+            { nama_tipe: 'Absen Pulang Siang', jam_mulai: '20:00:00', batas_terlambat: '21:00:00', jam_tutup: '23:59:59', is_checkout: true, is_aktif: true },
+            { nama_tipe: 'Istirahat Keluar', jam_mulai: '00:00:00', batas_terlambat: null, jam_tutup: null, is_checkout: false, is_aktif: true },
+            { nama_tipe: 'Istirahat Masuk', jam_mulai: '00:00:00', batas_terlambat: null, jam_tutup: null, is_checkout: false, is_aktif: true },
+            { nama_tipe: 'Izin Keluar', jam_mulai: '00:00:00', batas_terlambat: null, jam_tutup: null, is_checkout: false, is_aktif: true },
+            { nama_tipe: 'Izin Masuk', jam_mulai: '00:00:00', batas_terlambat: null, jam_tutup: null, is_checkout: false, is_aktif: true }
+        ]);
+
+        // C. Karyawan Test
+        const { data: insertedUsers } = await supabaseClient.from('users').insert([
+            { nama: 'Budi Pagi', password: '123456', role: 'Karyawan', no_hp: '081234567891', cabang: 'Zieda Pusat', unit: 'Operasional', sisa_cuti: 12 },
+            { nama: 'Siti Siang', password: '123456', role: 'Karyawan', no_hp: '081234567892', cabang: 'Zieda Pusat', unit: 'Kasir', sisa_cuti: 12 },
+            { nama: 'Rudi Istirahat', password: '123456', role: 'Karyawan', no_hp: '081234567893', cabang: 'Zieda Pusat', unit: 'Gudang', sisa_cuti: 12 },
+            { nama: 'Dewi Lembur', password: '123456', role: 'Karyawan', no_hp: '081234567894', cabang: 'Zieda Pusat', unit: 'HRD', sisa_cuti: 12 }
+        ]).select();
+
+        // D. Demo Absensi Hari Ini
+        const now = new Date();
+        const offset = now.getTimezoneOffset() * 60000;
+        const todayStr = new Date(now - offset).toISOString().split('T')[0];
+
+        if (insertedUsers && insertedUsers.length > 0) {
+            const budi = insertedUsers.find(u => u.nama === 'Budi Pagi');
+            const siti = insertedUsers.find(u => u.nama === 'Siti Siang');
+            const rudi = insertedUsers.find(u => u.nama === 'Rudi Istirahat');
+            const dewi = insertedUsers.find(u => u.nama === 'Dewi Lembur');
+
+            let sampleAbsen = [];
+            if (budi) {
+                sampleAbsen.push(
+                    { user_id: budi.id, tanggal: todayStr, waktu: '08:25:00', tipe_absen: 'Absen Masuk Pagi', lokasi: 'Jarak: 5m dari Zieda Pusat', status: 'Terlambat', status_wajah: 'Sesuai', menit_terlambat: 25, menit_lembur: 0, keterangan_waktu: 'Terlambat 25m' },
+                    { user_id: budi.id, tanggal: todayStr, waktu: '16:02:00', tipe_absen: 'Absen Pulang Pagi', lokasi: 'Jarak: 4m dari Zieda Pusat', status: 'Hadir', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Pulang Normal' }
+                );
+            }
+            if (siti) {
+                sampleAbsen.push(
+                    { user_id: siti.id, tanggal: todayStr, waktu: '13:20:00', tipe_absen: 'Absen Masuk Siang', lokasi: 'Jarak: 8m dari Zieda Pusat', status: 'Terlambat', status_wajah: 'Sesuai', menit_terlambat: 20, menit_lembur: 0, keterangan_waktu: 'Terlambat 20m' },
+                    { user_id: siti.id, tanggal: todayStr, waktu: '21:05:00', tipe_absen: 'Absen Pulang Siang', lokasi: 'Jarak: 6m dari Zieda Pusat', status: 'Hadir', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Pulang Normal' }
+                );
+            }
+            if (rudi) {
+                sampleAbsen.push(
+                    { user_id: rudi.id, tanggal: todayStr, waktu: '07:45:00', tipe_absen: 'Absen Masuk Pagi', lokasi: 'Jarak: 3m dari Zieda Pusat', status: 'Hadir', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Tepat Waktu' },
+                    { user_id: rudi.id, tanggal: todayStr, waktu: '12:00:00', tipe_absen: 'Istirahat Keluar', lokasi: 'Jarak: 2m dari Zieda Pusat', status: 'Istirahat', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Meninggalkan Kantor' },
+                    { user_id: rudi.id, tanggal: todayStr, waktu: '12:50:00', tipe_absen: 'Istirahat Masuk', lokasi: 'Jarak: 3m dari Zieda Pusat', status: 'Istirahat', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Kembali ke Kantor' },
+                    { user_id: rudi.id, tanggal: todayStr, waktu: '16:05:00', tipe_absen: 'Absen Pulang Pagi', lokasi: 'Jarak: 5m dari Zieda Pusat', status: 'Hadir', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Pulang Normal' }
+                );
+            }
+            if (dewi) {
+                sampleAbsen.push(
+                    { user_id: dewi.id, tanggal: todayStr, waktu: '07:50:00', tipe_absen: 'Absen Masuk Pagi', lokasi: 'Jarak: 2m dari Zieda Pusat', status: 'Hadir', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Tepat Waktu' },
+                    { user_id: dewi.id, tanggal: todayStr, waktu: '12:00:00', tipe_absen: 'Istirahat Keluar', lokasi: 'Jarak: 3m dari Zieda Pusat', status: 'Istirahat', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Meninggalkan Kantor' },
+                    { user_id: dewi.id, tanggal: todayStr, waktu: '12:45:00', tipe_absen: 'Istirahat Masuk', lokasi: 'Jarak: 4m dari Zieda Pusat', status: 'Istirahat', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Kembali ke Kantor' },
+                    { user_id: dewi.id, tanggal: todayStr, waktu: '18:00:00', tipe_absen: 'Istirahat Keluar', lokasi: 'Jarak: 3m dari Zieda Pusat', status: 'Istirahat', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Meninggalkan Kantor (Lembur)' },
+                    { user_id: dewi.id, tanggal: todayStr, waktu: '18:30:00', tipe_absen: 'Istirahat Masuk', lokasi: 'Jarak: 2m dari Zieda Pusat', status: 'Istirahat', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 0, keterangan_waktu: 'Kembali ke Kantor (Lembur)' },
+                    { user_id: dewi.id, tanggal: todayStr, waktu: '21:30:00', tipe_absen: 'Absen Pulang Pagi', lokasi: 'Jarak: 5m dari Zieda Pusat', status: 'Lembur', status_wajah: 'Sesuai', menit_terlambat: 0, menit_lembur: 330, keterangan_waktu: 'Lembur 5j 30m' }
+                );
+            }
+            if (sampleAbsen.length > 0) {
+                await supabaseClient.from('absensi').insert(sampleAbsen);
+            }
+        }
+
+        Swal.fire("Berhasil Reset & Inisialisasi", "Sistem telah direset dan diisi ulang dengan data starter template resmi.", "success").then(() => {
             window.location.reload();
         });
     } catch (err) {
