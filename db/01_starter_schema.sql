@@ -109,7 +109,6 @@ CREATE TABLE IF NOT EXISTS master_tipe_absen (
     jam_tutup TIME,
     is_checkout BOOLEAN DEFAULT false,
     is_aktif BOOLEAN DEFAULT true,
-    potongan_lembur_menit INTEGER DEFAULT 60,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
 );
 
@@ -380,13 +379,73 @@ CREATE TABLE IF NOT EXISTS _realtime.extensions (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
--- Seed Data Default Shift
+-- ------------------------------------------
+-- 10. SEED DATA STARTER (KANTOR, USERS, MASTER SHIFT, ABSENSI DEMO)
+-- ------------------------------------------
+
+-- Seed App Settings
+INSERT INTO app_settings (id, nama_aplikasi, login_subteks, form_judul, pengumuman, enable_lokasi, enable_kamera)
+VALUES (1, 'Zieda Absen', 'Sistem Presensi Harian Online & Face Recognition', 'Form Kehadiran Harian', 'Selamat datang di Sistem Absensi Zieda!', true, true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Seed Kantor / Cabang
+INSERT INTO kantor (nama, lat, lng, radius)
+VALUES 
+('Zieda Pusat', '-6.917464', '107.619122', 100),
+('Zieda Cabang Barat', '-6.914000', '107.600000', 100),
+('Zieda Cabang Timur', '-6.920000', '107.630000', 100)
+ON CONFLICT DO NOTHING;
+
+-- Seed Users (Super Admin & Connected Test Karyawan)
+INSERT INTO users (nama, password, role, no_hp, cabang, unit, sisa_cuti)
+VALUES 
+('Super Admin', '123456', 'Super Admin', '081234567890', 'Zieda Pusat', 'Management', 12),
+('Budi Pagi', '123456', 'Karyawan', '081234567891', 'Zieda Pusat', 'Operasional', 12),
+('Siti Siang', '123456', 'Karyawan', '081234567892', 'Zieda Pusat', 'Kasir', 12),
+('Rudi Istirahat', '123456', 'Karyawan', '081234567893', 'Zieda Pusat', 'Gudang', 12),
+('Dewi Lembur', '123456', 'Karyawan', '081234567894', 'Zieda Pusat', 'HRD', 12)
+ON CONFLICT DO NOTHING;
+
+-- Seed Master Tipe Absen (Clean Multi-Shift & Break/Izin)
 INSERT INTO master_tipe_absen (nama_tipe, jam_mulai, batas_terlambat, jam_tutup, is_checkout, is_aktif)
 VALUES 
 ('Absen Masuk Pagi', '07:00:00', '08:00:00', '16:00:00', false, true),
 ('Absen Pulang Pagi', '15:00:00', '16:00:00', '23:59:59', true, true),
 ('Absen Masuk Siang', '12:00:00', '13:00:00', '21:00:00', false, true),
-('Absen Pulang Siang', '20:00:00', '21:00:00', '23:59:59', true, true)
+('Absen Pulang Siang', '20:00:00', '21:00:00', '23:59:59', true, true),
+('Istirahat Keluar', '00:00:00', NULL, NULL, false, true),
+('Istirahat Masuk', '00:00:00', NULL, NULL, false, true),
+('Izin Keluar', '00:00:00', NULL, NULL, false, true),
+('Izin Masuk', '00:00:00', NULL, NULL, false, true)
+ON CONFLICT DO NOTHING;
+
+-- Seed Sample Attendance Demo Records for Today
+WITH u AS (
+  SELECT id, nama FROM users WHERE nama IN ('Budi Pagi', 'Siti Siang', 'Rudi Istirahat', 'Dewi Lembur')
+)
+INSERT INTO absensi (user_id, tanggal, waktu, tipe_absen, lokasi, status, status_wajah, menit_terlambat, menit_lembur, keterangan_waktu)
+VALUES
+-- Budi Pagi (Terlambat Shift Pagi 25 menit)
+((SELECT id FROM u WHERE nama='Budi Pagi' LIMIT 1), CURRENT_DATE, '08:25:00', 'Absen Masuk Pagi', 'Jarak: 5m dari Zieda Pusat', 'Terlambat', 'Sesuai', 25, 0, 'Terlambat 25m'),
+((SELECT id FROM u WHERE nama='Budi Pagi' LIMIT 1), CURRENT_DATE, '16:02:00', 'Absen Pulang Pagi', 'Jarak: 4m dari Zieda Pusat', 'Hadir', 'Sesuai', 0, 0, 'Pulang Normal'),
+
+-- Siti Siang (Terlambat Shift Siang 20 menit)
+((SELECT id FROM u WHERE nama='Siti Siang' LIMIT 1), CURRENT_DATE, '13:20:00', 'Absen Masuk Siang', 'Jarak: 8m dari Zieda Pusat', 'Terlambat', 'Sesuai', 20, 0, 'Terlambat 20m'),
+((SELECT id FROM u WHERE nama='Siti Siang' LIMIT 1), CURRENT_DATE, '21:05:00', 'Absen Pulang Siang', 'Jarak: 6m dari Zieda Pusat', 'Hadir', 'Sesuai', 0, 0, 'Pulang Normal'),
+
+-- Rudi Istirahat (Normal + Istirahat Siang)
+((SELECT id FROM u WHERE nama='Rudi Istirahat' LIMIT 1), CURRENT_DATE, '07:45:00', 'Absen Masuk Pagi', 'Jarak: 3m dari Zieda Pusat', 'Hadir', 'Sesuai', 0, 0, 'Tepat Waktu'),
+((SELECT id FROM u WHERE nama='Rudi Istirahat' LIMIT 1), CURRENT_DATE, '12:00:00', 'Istirahat Keluar', 'Jarak: 2m dari Zieda Pusat', 'Istirahat', 'Sesuai', 0, 0, 'Meninggalkan Kantor'),
+((SELECT id FROM u WHERE nama='Rudi Istirahat' LIMIT 1), CURRENT_DATE, '12:50:00', 'Istirahat Masuk', 'Jarak: 3m dari Zieda Pusat', 'Istirahat', 'Sesuai', 0, 0, 'Kembali ke Kantor'),
+((SELECT id FROM u WHERE nama='Rudi Istirahat' LIMIT 1), CURRENT_DATE, '16:05:00', 'Absen Pulang Pagi', 'Jarak: 5m dari Zieda Pusat', 'Hadir', 'Sesuai', 0, 0, 'Pulang Normal'),
+
+-- Dewi Lembur (Normal + Istirahat Siang + Istirahat Lembur + Lembur Pulang)
+((SELECT id FROM u WHERE nama='Dewi Lembur' LIMIT 1), CURRENT_DATE, '07:50:00', 'Absen Masuk Pagi', 'Jarak: 2m dari Zieda Pusat', 'Hadir', 'Sesuai', 0, 0, 'Tepat Waktu'),
+((SELECT id FROM u WHERE nama='Dewi Lembur' LIMIT 1), CURRENT_DATE, '12:00:00', 'Istirahat Keluar', 'Jarak: 3m dari Zieda Pusat', 'Istirahat', 'Sesuai', 0, 0, 'Meninggalkan Kantor'),
+((SELECT id FROM u WHERE nama='Dewi Lembur' LIMIT 1), CURRENT_DATE, '12:45:00', 'Istirahat Masuk', 'Jarak: 4m dari Zieda Pusat', 'Istirahat', 'Sesuai', 0, 0, 'Kembali ke Kantor'),
+((SELECT id FROM u WHERE nama='Dewi Lembur' LIMIT 1), CURRENT_DATE, '18:00:00', 'Istirahat Keluar', 'Jarak: 3m dari Zieda Pusat', 'Istirahat', 'Sesuai', 0, 0, 'Meninggalkan Kantor (Lembur)'),
+((SELECT id FROM u WHERE nama='Dewi Lembur' LIMIT 1), CURRENT_DATE, '18:30:00', 'Istirahat Masuk', 'Jarak: 2m dari Zieda Pusat', 'Istirahat', 'Sesuai', 0, 0, 'Kembali ke Kantor (Lembur)'),
+((SELECT id FROM u WHERE nama='Dewi Lembur' LIMIT 1), CURRENT_DATE, '21:30:00', 'Absen Pulang Pagi', 'Jarak: 5m dari Zieda Pusat', 'Lembur', 'Sesuai', 0, 330, 'Lembur 5j 30m')
 ON CONFLICT DO NOTHING;
 
 GRANT ALL ON SCHEMA _realtime TO postgres, supabase_admin;

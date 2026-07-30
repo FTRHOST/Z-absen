@@ -374,3 +374,43 @@ CREATE TABLE IF NOT EXISTS _realtime.extensions (
 
 GRANT ALL ON SCHEMA _realtime TO postgres, supabase_admin;
 GRANT ALL ON ALL TABLES IN SCHEMA _realtime TO postgres, supabase_admin;
+
+-- ------------------------------------------
+-- 10. SEED DATA STARTER (KANTOR, USERS, MASTER SHIFT, ABSENSI DEMO)
+-- ------------------------------------------
+
+-- Seed App Settings
+INSERT INTO app_settings (id, nama_aplikasi, login_subteks, form_judul, pengumuman, enable_lokasi, enable_kamera)
+VALUES (1, 'Zieda Absen', 'Sistem Presensi Harian Online & Face Recognition', 'Form Kehadiran Harian', 'Selamat datang di Sistem Absensi Zieda!', true, true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Seed Kantor / Cabang
+INSERT INTO kantor (nama, lat, lng, radius)
+VALUES 
+('Zieda Pusat', '-6.917464', '107.619122', 100),
+('Zieda Cabang Barat', '-6.914000', '107.600000', 100),
+('Zieda Cabang Timur', '-6.920000', '107.630000', 100)
+ON CONFLICT DO NOTHING;
+
+-- Seed Users (Super Admin & Connected Test Karyawan)
+INSERT INTO users (nama, password, role, no_hp, cabang, unit, sisa_cuti)
+VALUES 
+('Super Admin', '123456', 'Super Admin', '081234567890', 'Zieda Pusat', 'Management', 12),
+('Budi Pagi', '123456', 'Karyawan', '081234567891', 'Zieda Pusat', 'Operasional', 12),
+('Siti Siang', '123456', 'Karyawan', '081234567892', 'Zieda Pusat', 'Kasir', 12),
+('Rudi Istirahat', '123456', 'Karyawan', '081234567893', 'Zieda Pusat', 'Gudang', 12),
+('Dewi Lembur', '123456', 'Karyawan', '081234567894', 'Zieda Pusat', 'HRD', 12)
+ON CONFLICT DO NOTHING;
+
+-- Seed Master Tipe Absen (Clean Multi-Shift & Break/Izin)
+INSERT INTO master_tipe_absen (nama_tipe, jam_mulai, batas_terlambat, jam_tutup, is_checkout, is_aktif)
+VALUES 
+('Absen Masuk Pagi', '07:00:00', '08:00:00', '16:00:00', false, true),
+('Absen Pulang Pagi', '15:00:00', '16:00:00', '23:59:59', true, true),
+('Absen Masuk Siang', '12:00:00', '13:00:00', '21:00:00', false, true),
+('Absen Pulang Siang', '20:00:00', '21:00:00', '23:59:59', true, true),
+('Istirahat Keluar', '00:00:00', NULL, NULL, false, true),
+('Istirahat Masuk', '00:00:00', NULL, NULL, false, true),
+('Izin Keluar', '00:00:00', NULL, NULL, false, true),
+('Izin Masuk', '00:00:00', NULL, NULL, false, true)
+ON CONFLICT DO NOTHING;
