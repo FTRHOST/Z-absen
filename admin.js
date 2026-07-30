@@ -1407,7 +1407,10 @@ function showDetailAbsensi(tanggal, dateStr) {
             tipeAbsenList.push(tipe);
         }
         
-        grouped[namaUser].absensi[tipe] = row;
+        if (!grouped[namaUser].absensi[tipe]) {
+            grouped[namaUser].absensi[tipe] = [];
+        }
+        grouped[namaUser].absensi[tipe].push(row);
         grouped[namaUser].allRows.push(row);
     });
     
@@ -1445,46 +1448,61 @@ function showDetailAbsensi(tanggal, dateStr) {
             
         // Waktu
         tipeAbsenList.forEach(tipe => {
-            const a = g.absensi[tipe];
-            trHtml += `<td class="align-middle">${a ? (a.waktu || '-') : '-'}</td>`;
+            const list = g.absensi[tipe] || [];
+            if (list.length > 0) {
+                const timeBadges = list.map(a => `<span class="badge bg-light text-dark border d-block mb-1">${a.waktu || '-'}</span>`).join('');
+                trHtml += `<td class="align-middle">${timeBadges}</td>`;
+            } else {
+                trHtml += `<td class="align-middle text-muted">-</td>`;
+            }
         });
         
         // Status
         tipeAbsenList.forEach(tipe => {
-            const a = g.absensi[tipe];
-            if (a) {
-                let badgeClass = "bg-secondary";
-                if (a.status === "Hadir" || a.status === "Tepat Waktu") badgeClass = "bg-success";
-                else if (a.status === "Terlambat") badgeClass = "bg-warning text-dark";
-                else if (a.status === "Alpha") badgeClass = "bg-danger";
-                else if (a.status === "Cuti") badgeClass = "bg-info text-dark";
-                
-                let faceBadgeClass = "bg-secondary";
-                const faceStatus = a.status_wajah || "Sesuai";
-                if (faceStatus.includes("Dicurigai") || faceStatus.includes("Tidak Sama")) faceBadgeClass = "bg-danger";
-                else if (faceStatus.includes("Sesuai") || faceStatus.includes("Sama")) faceBadgeClass = "bg-success";
-                else if (faceStatus.includes("Error")) faceBadgeClass = "bg-warning text-dark";
+            const list = g.absensi[tipe] || [];
+            if (list.length > 0) {
+                let statusHtml = '';
+                list.forEach(a => {
+                    let badgeClass = "bg-secondary";
+                    if (a.status === "Hadir" || a.status === "Tepat Waktu") badgeClass = "bg-success";
+                    else if (a.status === "Terlambat") badgeClass = "bg-warning text-dark";
+                    else if (a.status === "Alpha") badgeClass = "bg-danger";
+                    else if (a.status === "Cuti") badgeClass = "bg-info text-dark";
+                    else if (a.status === "Istirahat") badgeClass = "bg-primary";
+                    
+                    let faceBadgeClass = "bg-secondary";
+                    const faceStatus = a.status_wajah || "Sesuai";
+                    if (faceStatus.includes("Dicurigai") || faceStatus.includes("Tidak Sama")) faceBadgeClass = "bg-danger";
+                    else if (faceStatus.includes("Sesuai") || faceStatus.includes("Sama")) faceBadgeClass = "bg-success";
 
-                trHtml += `<td class="align-middle" style="min-width: 130px;">
-                    <span class="badge ${badgeClass} mb-1 w-100">${a.status || 'Hadir'}</span><br>
-                    <span class="badge ${faceBadgeClass} w-100" title="Status Wajah"><i class="fas fa-user-check"></i> ${faceStatus}</span>
-                </td>`;
+                    statusHtml += `<div class="mb-1 text-center">
+                        <span class="badge ${badgeClass} mb-1 w-100">${a.status || 'Hadir'}</span><br>
+                        <span class="badge ${faceBadgeClass} w-100" title="Status Wajah"><i class="fas fa-user-check"></i> ${faceStatus}</span>
+                    </div>`;
+                });
+                trHtml += `<td class="align-middle" style="min-width: 130px;">${statusHtml}</td>`;
             } else {
-                trHtml += `<td class="align-middle">-</td>`;
+                trHtml += `<td class="align-middle text-muted">-</td>`;
             }
         });
         
         // Lokasi
         tipeAbsenList.forEach(tipe => {
-            const a = g.absensi[tipe];
-            trHtml += `<td class="align-middle"><span class="small text-muted">${a ? (a.lokasi || '-') : '-'}</span></td>`;
+            const list = g.absensi[tipe] || [];
+            if (list.length > 0) {
+                const locHtml = list.map(a => `<div class="small text-muted mb-1">${a.lokasi || '-'}</div>`).join('');
+                trHtml += `<td class="align-middle">${locHtml}</td>`;
+            } else {
+                trHtml += `<td class="align-middle text-muted small fst-italic">-</td>`;
+            }
         });
         
         // Foto
         tipeAbsenList.forEach(tipe => {
-            const a = g.absensi[tipe];
-            if (a && a.foto) {
-                trHtml += `<td class="align-middle"><button class="btn btn-sm btn-info text-white shadow-sm" onclick="lihatFotoAbsenSingle('${a.foto}')">📸 Lihat</button></td>`;
+            const list = g.absensi[tipe] || [];
+            if (list.length > 0) {
+                const fotoHtml = list.map(a => a.foto ? `<button class="btn btn-sm btn-info text-white shadow-sm mb-1 d-block w-100" onclick="lihatFotoAbsenSingle('${a.foto}')">📸 Lihat</button>` : `<div class="text-muted small fst-italic mb-1">-</div>`).join('');
+                trHtml += `<td class="align-middle">${fotoHtml}</td>`;
             } else {
                 trHtml += `<td class="align-middle text-muted small fst-italic">-</td>`;
             }
@@ -1585,7 +1603,7 @@ function showDetailAbsensi(tanggal, dateStr) {
         }
 
         let totalTelatMins = 0;
-        Object.values(g.absensi).forEach(a => {
+        (g.allRows || []).forEach(a => {
             if (a.menit_terlambat && parseInt(a.menit_terlambat, 10) > 0) {
                 totalTelatMins += parseInt(a.menit_terlambat, 10);
             }
@@ -1605,15 +1623,12 @@ function showDetailAbsensi(tanggal, dateStr) {
         
         // Aksi
         tipeAbsenList.forEach(tipe => {
-            const a = g.absensi[tipe];
-            if (a) {
-                trHtml += `<td class="align-middle">
-                    <button class="btn btn-sm btn-danger shadow-sm text-white" onclick="hapusDataAbsen('${a.id}', '${tanggal}')" title="Hapus ${tipe}">
-                        <i class="fas fa-trash-alt me-1"></i>Hapus
-                    </button>
-                </td>`;
+            const list = g.absensi[tipe] || [];
+            if (list.length > 0) {
+                const aksiHtml = list.map(a => `<button class="btn btn-sm btn-danger shadow-sm text-white mb-1 d-block w-100" onclick="hapusDataAbsen('${a.id}', '${tanggal}')" title="Hapus ${tipe} (${a.waktu})"><i class="fas fa-trash-alt me-1"></i>Hapus</button>`).join('');
+                trHtml += `<td class="align-middle">${aksiHtml}</td>`;
             } else {
-                trHtml += `<td class="align-middle">-</td>`;
+                trHtml += `<td class="align-middle text-muted">-</td>`;
             }
         });
 
