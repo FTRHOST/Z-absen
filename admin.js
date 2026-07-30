@@ -1419,6 +1419,7 @@ function showDetailAbsensi(tanggal, dateStr) {
     trHead += `<th colspan="${tipeAbsenList.length}">Foto Muka</th>`;
     trHead += `<th class="align-middle text-center" rowspan="2">Jam Kerja</th>`;
     trHead += `<th class="align-middle text-center" rowspan="2">Jam Lembur</th>`;
+    trHead += `<th class="align-middle text-center text-danger" rowspan="2">Waktu Telat</th>`;
     trHead += `<th colspan="${tipeAbsenList.length}">Aksi</th>`;
     trHead += `</tr><tr>`;
     // Sub-headers for tipe_absen within categories
@@ -1563,8 +1564,24 @@ function showDetailAbsensi(tanggal, dateStr) {
             }
         }
 
+        let totalTelatMins = 0;
+        Object.values(g.absensi).forEach(a => {
+            if (a.menit_terlambat && parseInt(a.menit_terlambat, 10) > 0) {
+                totalTelatMins += parseInt(a.menit_terlambat, 10);
+            }
+        });
+        
+        let telatCellHtml = `<span class="text-muted small">0m</span>`;
+        if (totalTelatMins > 0) {
+            const j = Math.floor(totalTelatMins / 60);
+            const m = totalTelatMins % 60;
+            const telatStr = `${j > 0 ? j + 'j ' : ''}${m}m`;
+            telatCellHtml = `<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">${telatStr}</span>`;
+        }
+
         trHtml += `<td class="align-middle text-center fw-bold text-success">${jamKerjaStr}</td>`;
         trHtml += `<td class="align-middle text-center fw-bold text-warning">${jamLemburStr}</td>`;
+        trHtml += `<td class="align-middle text-center fw-bold">${telatCellHtml}</td>`;
         
         // Aksi
         tipeAbsenList.forEach(tipe => {
