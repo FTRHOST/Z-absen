@@ -3280,8 +3280,25 @@ async function saveSettings() {
 
         const payload = { id: 1, nama_aplikasi, login_subteks, form_judul, logo_url, pengumuman, pengumuman_warna, enable_lokasi, enable_kamera, format_waktu };
         
-        const { error } = await supabaseClient.from('app_settings').upsert(payload, { onConflict: 'id' });
+        let { error } = await supabaseClient.from('app_settings').upsert(payload, { onConflict: 'id' });
         
+        if (error && (error.code === 'PGRST204' || (error.message && error.message.includes('format_waktu')))) {
+            console.warn("Kolom format_waktu belum ada di Supabase Cloud app_settings table. Fallback simpan tanpa format_waktu...");
+            const fallbackPayload = { id: 1, nama_aplikasi, login_subteks, form_judul, logo_url, pengumuman, pengumuman_warna, enable_lokasi, enable_kamera };
+            const { error: fallbackErr } = await supabaseClient.from('app_settings').upsert(fallbackPayload, { onConflict: 'id' });
+            
+            if (!fallbackErr) {
+                window.currentFormatWaktu = format_waktu;
+                if (typeof renderTipeAbsen === 'function') renderTipeAbsen();
+                Swal.fire({
+                    title: 'Pengaturan Disimpan',
+                    html: `Pengaturan utama berhasil disimpan.<br><br><small class="text-warning"><strong>⚠️ Catatan Tambahan:</strong> Database Supabase Cloud Anda belum memiliki kolom <code>format_waktu</code>.<br><br>Silakan jalankan perintah SQL berikut di <strong>Supabase Dashboard (SQL Editor)</strong>:<br><code class="bg-dark text-white p-2 rounded d-block mt-2 text-start">ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS format_waktu TEXT DEFAULT 'HH:mm:ss';</code></small>`,
+                    icon: 'warning'
+                });
+                return;
+            }
+        }
+
         if (error) throw error;
         
         window.currentFormatWaktu = format_waktu;
