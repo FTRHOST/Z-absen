@@ -3368,71 +3368,104 @@ async function backupDatabase() {
         
         if (includeMedia) {
             const zip = new JSZip();
-            zip.file("database_backup.json", json);
             const mediaFolder = zip.folder("media");
             
             const mediaTasks = [];
+            const processedPaths = new Set();
 
-            // 1. Collect media dari absensi
-            for (const a of dbTablesData['absensi'] || []) {
-                const userName = dbTablesData['users']?.find(u => u.id === a.user_id)?.nama || 'Unknown';
-                const fName = `${userName}_${a.tanggal}`.replace(/[^a-z0-9]/gi, '_');
+            const addUrlToBackup = (rawUrl) => {
+                if (!rawUrl || typeof rawUrl !== 'string') return;
+
+                const bucketMarker = '/absensi-bucket/';
+                const idx = rawUrl.indexOf(bucketMarker);
                 
-                const addMediaTask = (url, suffix) => {
-                    if (!url || typeof url !== 'string' || !url.startsWith('http')) return;
+                if (idx !== -1) {
+                    const storagePath = rawUrl.substring(idx + bucketMarker.length).replace(/^\/+/, '');
+                    if (!storagePath || processedPaths.has(storagePath)) return;
+                    processedPaths.add(storagePath);
+
                     mediaTasks.push(async () => {
                         try {
-                            const res = await fetch(url);
-                            if(res.ok) {
-                                const blob = await res.blob();
-                                const ext = url.split('?')[0].split('.').pop() || 'png';
-                                mediaFolder.file(`absensi/${fName}_${suffix}.${ext}`, blob);
+                            // 1. Coba download via Supabase Storage Client (Bypasses CORS/Domain issues)
+                            const { data: blob, error: dlErr } = await supabaseClient.storage.from('absensi-bucket').download(storagePath);
+                            if (!dlErr && blob) {
+                                mediaFolder.file(storagePath, blob);
+                                return;
                             }
-                        } catch(e) {}
+                        } catch (e) {}
+
+                        try {
+                            // 2. Fallback via HTTP fetch menggunakan fixStorageUrl
+                            const targetUrl = typeof fixStorageUrl === 'function' ? fixStorageUrl(rawUrl) : rawUrl;
+                            const res = await fetch(targetUrl);
+                            if (res.ok) {
+                                const blob = await res.blob();
+                                mediaFolder.file(storagePath, blob);
+                            }
+                        } catch (e) {
+                            console.warn("Gagal mendownload foto backup:", storagePath, e);
+                        }
                     });
-                };
-                
-                addMediaTask(a.foto, "Foto");
-                addMediaTask(a.foto_masuk, "Masuk");
-                addMediaTask(a.foto_keluar, "Keluar");
-                addMediaTask(a.foto_istirahat_keluar, "IstirahatKeluar");
-                addMediaTask(a.foto_istirahat_masuk, "IstirahatMasuk");
+                } else if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+                    const fileName = rawUrl.split('?')[0].split('/').pop() || `media_${Date.now()}.png`;
+                    const storagePath = `external/${fileName}`;
+                    if (processedPaths.has(storagePath)) return;
+                    processedPaths.add(storagePath);
+
+                    mediaTasks.push(async () => {
+                        try {
+                            const res = await fetch(rawUrl);
+                            if (res.ok) {
+                                const blob = await res.blob();
+                                mediaFolder.file(storagePath, blob);
+                            }
+                        } catch (e) {}
+                    });
+                }
+            };
+
+            // 1. Kumpulkan media dari tabel ABSENSI
+            for (const a of dbTablesData['absensi'] || []) {
+                addUrlToBackup(a.foto);
+                addUrlToBackup(a.foto_masuk);
+                addUrlToBackup(a.foto_keluar);
+                addUrlToBackup(a.foto_istirahat_keluar);
+                addUrlToBackup(a.foto_istirahat_masuk);
             }
-            
-            // 2. Collect media dari cuti (lampiran)
+
+            // 2. Kumpulkan media dari tabel USERS (foto_wajah)
+            for (const u of dbTablesData['users'] || []) {
+                addUrlToBackup(u.foto_wajah);
+            }
+
+            // 3. Kumpulkan media dari tabel APP_SETTINGS (logo_url)
+            for (const s of dbTablesData['app_settings'] || []) {
+                addUrlToBackup(s.logo_url);
+            }
+
+            // 4. Kumpulkan media dari tabel CUTI (lampiran data_tambahan)
             for (const c of dbTablesData['cuti'] || []) {
                 if (c.data_tambahan && typeof c.data_tambahan === 'object') {
-                    const userName = dbTablesData['users']?.find(u => u.id === c.user_id)?.nama || 'Unknown';
-                    const fName = `${userName}_${c.tanggal_mulai}`.replace(/[^a-z0-9]/gi, '_');
-                    
-                    for (const [key, url] of Object.entries(c.data_tambahan)) {
-                        if (typeof url === 'string' && url.startsWith('http')) {
-                            mediaTasks.push(async () => {
-                                try {
-                                    const res = await fetch(url);
-                                    if(res.ok) {
-                                        const blob = await res.blob();
-                                        const ext = url.split('?')[0].split('.').pop() || 'png';
-                                        mediaFolder.file(`cuti/${fName}_${key.replace(/[^a-z0-9]/gi,'_')}.${ext}`, blob);
-                                    }
-                                } catch(e) {}
-                            });
+                    for (const val of Object.values(c.data_tambahan)) {
+                        if (typeof val === 'string') {
+                            addUrlToBackup(val);
                         }
                     }
                 }
             }
-            
-            // Execute batch fetching
+
+            // Eksekusi pencapaian unduhan media secara paralel (batch 10)
             let completed = 0;
             const batchSize = 10;
             for (let i = 0; i < mediaTasks.length; i += batchSize) {
                 const batch = mediaTasks.slice(i, i + batchSize);
                 await Promise.all(batch.map(task => task()));
                 completed += batch.length;
-                Swal.update({ html: `Mendownload foto & lampiran... (${Math.min(completed, mediaTasks.length)} / ${mediaTasks.length})` });
+                Swal.update({ html: `Mendownload foto & media... (${Math.min(completed, mediaTasks.length)} / ${mediaTasks.length})` });
             }
-            
-            Swal.update({ html: `Membuat file ZIP Enterprise...` });
+
+            zip.file("database_backup.json", json);
+            Swal.update({ html: `Membuat paket ZIP Enterprise...` });
             const zipContent = await zip.generateAsync({ type: "blob" });
             saveAs(zipContent, `Backup_Enterprise_Absensi_${dateStr}.zip`);
             
