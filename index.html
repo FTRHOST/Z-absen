@@ -1528,28 +1528,8 @@
         const localTime = localDate.toISOString().split("T")[1].substring(0, 8);
         const tanggalHariIni = localDate.toISOString().split("T")[0];
 
-        let statusKehadiran = "Hadir";
         const tipeData = getTipeAbsenData();
-        const namaTipe = tipeAbsenSekarang.toLowerCase();
-        const isMasuk = namaTipe === "masuk" || namaTipe === "absen masuk";
-        const isPulang =
-          namaTipe.includes("pulang") ||
-          namaTipe.includes("checkout") ||
-          tipeData.is_checkout;
-
-        if (
-          isMasuk &&
-          tipeData.batas_terlambat &&
-          localTime > tipeData.batas_terlambat
-        ) {
-          statusKehadiran = "Terlambat";
-        } else if (
-          isPulang &&
-          tipeData.jam_tutup &&
-          localTime > tipeData.jam_tutup
-        ) {
-          statusKehadiran = "Lembur";
-        }
+        const calcWaktu = hitungDetailWaktuAbsensi(localTime, tipeData, tipeAbsenSekarang);
 
         const lokasiTeks = isAbsenCabangLain
           ? `Jarak: ${Math.round(jarakAbsen)}m dari ${cabangAbsenSekarang} (Luar Cabang)`
@@ -1561,7 +1541,10 @@
           waktu: localTime,
           tipe_absen: tipeAbsenSekarang,
           lokasi: lokasiTeks,
-          status: statusKehadiran,
+          status: calcWaktu.status,
+          menit_terlambat: calcWaktu.menitTerlambat,
+          menit_lembur: calcWaktu.menitLembur,
+          keterangan_waktu: calcWaktu.keteranganWaktu,
         };
 
         const response = await supabaseClient.from("absensi").insert([payload]);
@@ -1569,7 +1552,7 @@
         if (response.error) {
           Swal.fire("Gagal", response.error.message, "error");
         } else {
-          const textMsg = `<b>Laporan Absen (Lokasi)</b>\nNama: ${currentUser.nama}\nCabang Utama: ${currentUser.cabang || '-'}\nCabang Absen: ${isAbsenCabangLain ? cabangAbsenSekarang + ' (Luar Cabang)' : (currentUser.cabang || '-')}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${localTime}\nLokasi: ${lokasiTeks}`;
+          const textMsg = `<b>Laporan Absen (Lokasi)</b>\nNama: ${currentUser.nama}\nCabang Utama: ${currentUser.cabang || '-'}\nCabang Absen: ${isAbsenCabangLain ? cabangAbsenSekarang + ' (Luar Cabang)' : (currentUser.cabang || '-')}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${localTime}\nStatus Waktu: ${calcWaktu.keteranganWaktu}\nLokasi: ${lokasiTeks}`;
           await sendTelegramNotification(textMsg);
 
           Swal.fire("Berhasil!", "Absensi berhasil disimpan.", "success").then(
@@ -1710,26 +1693,8 @@
             masterTipeAbsen.find((m) => m.nama_tipe === tipeAbsenSekarang) ||
             {};
 
-          const namaTipe = tipeAbsenSekarang.toLowerCase();
-          const isMasuk = namaTipe === "masuk" || namaTipe === "absen masuk";
-          const isPulang =
-            namaTipe.includes("pulang") ||
-            namaTipe.includes("checkout") ||
-            tipeData.is_checkout;
+          const calcWaktu = hitungDetailWaktuAbsensi(waktu_sekarang, tipeData, tipeAbsenSekarang);
 
-          if (
-            isMasuk &&
-            tipeData.batas_terlambat &&
-            waktu_sekarang > tipeData.batas_terlambat
-          ) {
-            statusKehadiran = "Terlambat";
-          } else if (
-            isPulang &&
-            tipeData.jam_tutup &&
-            waktu_sekarang > tipeData.jam_tutup
-          ) {
-            statusKehadiran = "Lembur";
-          }
           const res = await supabaseClient.from("absensi").insert([
             {
               user_id: userObj.id,
@@ -1738,13 +1703,16 @@
               tipe_absen: tipeAbsenSekarang,
               lokasi: lokasiTeks,
               foto: publicUrlData.publicUrl,
-              status: statusKehadiran,
+              status: calcWaktu.status,
               status_wajah: faceAbsenStatus,
+              menit_terlambat: calcWaktu.menitTerlambat,
+              menit_lembur: calcWaktu.menitLembur,
+              keterangan_waktu: calcWaktu.keteranganWaktu,
             },
           ]);
           let dbError = res.error;
 
-          const textMsg = `<b>Laporan Absen (Wajah/Selfie)</b>\nNama: ${userObj.nama}\nCabang Utama: ${userObj.cabang || '-'}\nCabang Absen: ${isAbsenCabangLain ? cabangAbsenSekarang + ' (Luar Cabang)' : (userObj.cabang || '-')}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${waktu_sekarang}\nLokasi: ${lokasiTeks}\nFoto: <a href="${publicUrlData.publicUrl}">Lihat Foto</a>`;
+          const textMsg = `<b>Laporan Absen (Wajah/Selfie)</b>\nNama: ${userObj.nama}\nCabang Utama: ${userObj.cabang || '-'}\nCabang Absen: ${isAbsenCabangLain ? cabangAbsenSekarang + ' (Luar Cabang)' : (userObj.cabang || '-')}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${waktu_sekarang}\nStatus Waktu: ${calcWaktu.keteranganWaktu}\nLokasi: ${lokasiTeks}\nFoto: <a href="${publicUrlData.publicUrl}">Lihat Foto</a>`;
           await sendTelegramNotification(textMsg);
 
           await cekStatusAbsenHariIni();

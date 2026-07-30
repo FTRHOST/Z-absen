@@ -384,6 +384,7 @@ function showDashboardDetail(type) {
             <th>Cabang</th>
             <th>Tipe Absen</th>
             <th>Waktu</th>
+            <th>Rincian Waktu</th>
         </tr>`;
     } else if (type === 'cuti') {
         thead.innerHTML = `<tr>
@@ -402,7 +403,7 @@ function showDashboardDetail(type) {
     tbody.innerHTML = '';
     
     if (dataList.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Tidak ada data untuk ditampilkan.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">Tidak ada data untuk ditampilkan.</td></tr>`;
     } else {
         dataList.forEach(item => {
             let trHtml = '';
@@ -412,12 +413,17 @@ function showDashboardDetail(type) {
                 const cabang = item.users?.cabang || '-';
                 const tipe = `<span class="badge bg-primary">${item.tipe_absen || '-'}</span>`;
                 const waktu = `<span class="badge bg-light text-dark border">${item.waktu_masuk || '-'}</span>`;
+                const ket = item.keterangan_waktu || (item.terlambat ? 'Terlambat' : 'Tepat Waktu');
+                const badgeKet = item.terlambat 
+                    ? `<span class="badge bg-warning text-dark">${ket}</span>`
+                    : (item.menit_lembur > 0 ? `<span class="badge bg-success">${ket}</span>` : `<span class="badge bg-light text-dark border">${ket}</span>`);
                 
                 trHtml = `<tr>
                     <td class="text-start ps-4 fw-bold">${nama}</td>
                     <td>${cabang}</td>
                     <td>${tipe}</td>
                     <td>${waktu}</td>
+                    <td>${badgeKet}</td>
                 </tr>`;
             } else if (type === 'cuti') {
                 const nama = item.users?.nama || '-';

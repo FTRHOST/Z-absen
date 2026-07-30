@@ -109,6 +109,7 @@ CREATE TABLE IF NOT EXISTS master_tipe_absen (
     jam_tutup TIME,
     is_checkout BOOLEAN DEFAULT false,
     is_aktif BOOLEAN DEFAULT true,
+    potongan_lembur_menit INTEGER DEFAULT 60,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
 );
 
@@ -123,6 +124,9 @@ CREATE TABLE IF NOT EXISTS absensi (
     foto TEXT,
     status TEXT DEFAULT 'Hadir',
     status_wajah TEXT,
+    menit_terlambat INTEGER DEFAULT 0,
+    menit_lembur INTEGER DEFAULT 0,
+    keterangan_waktu TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
 );
 
