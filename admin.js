@@ -3960,7 +3960,7 @@ async function loadTipeAbsenAdmin() {
                 </div>
             </td>
             <td>
-                <button class="btn btn-sm btn-warning shadow-sm me-1" onclick="editTipeAbsen(${item.id}, '${item.nama_tipe}', '${item.jam_mulai || ''}', '${item.batas_terlambat || ''}', '${item.jam_tutup || ''}', ${item.is_checkout})"><i class="fas fa-edit me-1"></i>Edit</button>
+                <button class="btn btn-sm btn-warning shadow-sm me-1" onclick="editTipeAbsen(${item.id}, '${item.nama_tipe}', '${item.jam_mulai || ''}', '${item.batas_terlambat || ''}', '${item.jam_tutup || ''}', ${item.is_checkout}, ${item.potongan_lembur_menit || 60})"><i class="fas fa-edit me-1"></i>Edit</button>
                 <button class="btn btn-sm btn-danger shadow-sm" onclick="hapusTipeAbsen(${item.id})"><i class="fas fa-trash-alt me-1"></i>Hapus</button>
             </td>
         </tr>
@@ -3973,17 +3973,21 @@ function batalEditTipeAbsen() {
     document.getElementById("tipe-absen-mulai").value = "07:00";
     document.getElementById("tipe-absen-batas").value = "08:00";
     document.getElementById("tipe-absen-tutup").value = "";
+    const inputPotongan = document.getElementById("tipe-absen-potongan");
+    if (inputPotongan) inputPotongan.value = "60";
     document.getElementById("tipe-absen-checkout").checked = false;
     const label = document.getElementById("modalTipeAbsenLabel");
     if(label) label.innerText = "Tambah Tipe Absen";
 }
 
-function editTipeAbsen(id, nama, mulai, batas, tutup, isCheckout) {
+function editTipeAbsen(id, nama, mulai, batas, tutup, isCheckout, potongan) {
     document.getElementById("tipe-absen-id").value = id;
     document.getElementById("tipe-absen-nama").value = nama;
     document.getElementById("tipe-absen-mulai").value = mulai || '';
     document.getElementById("tipe-absen-batas").value = batas || '';
     document.getElementById("tipe-absen-tutup").value = tutup || '';
+    const inputPotongan = document.getElementById("tipe-absen-potongan");
+    if (inputPotongan) inputPotongan.value = potongan !== undefined && potongan !== null ? potongan : 60;
     document.getElementById("tipe-absen-checkout").checked = isCheckout === true || isCheckout === 'true';
     const label = document.getElementById("modalTipeAbsenLabel");
     if(label) label.innerText = "Edit Tipe Absen";
@@ -3996,6 +4000,8 @@ async function simpanTipeAbsen() {
     const mulai = document.getElementById("tipe-absen-mulai").value || null;
     const batas = document.getElementById("tipe-absen-batas").value || null;
     const tutup = document.getElementById("tipe-absen-tutup").value || null;
+    const inputPotongan = document.getElementById("tipe-absen-potongan");
+    const potongan = inputPotongan ? parseInt(inputPotongan.value || "60", 10) : 60;
     const isCheckout = document.getElementById("tipe-absen-checkout").checked;
 
     if (!nama) {
@@ -4010,6 +4016,7 @@ async function simpanTipeAbsen() {
             jam_mulai: mulai,
             batas_terlambat: batas,
             jam_tutup: tutup,
+            potongan_lembur_menit: potongan,
             is_checkout: isCheckout
         }).eq("id", id);
         error = res.error;
@@ -4019,6 +4026,7 @@ async function simpanTipeAbsen() {
             jam_mulai: mulai,
             batas_terlambat: batas,
             jam_tutup: tutup,
+            potongan_lembur_menit: potongan,
             is_checkout: isCheckout
         }]);
         error = res.error;
