@@ -1399,7 +1399,7 @@ function showDetailAbsensi(tanggal, dateStr) {
         const cabangUser = row.users?.cabang || '-';
         
         if (!grouped[namaUser]) {
-            grouped[namaUser] = { nama: namaUser, cabang: cabangUser, absensi: {} };
+            grouped[namaUser] = { nama: namaUser, cabang: cabangUser, absensi: {}, allRows: [] };
         }
         
         const tipe = row.tipe_absen || 'Unknown';
@@ -1408,6 +1408,7 @@ function showDetailAbsensi(tanggal, dateStr) {
         }
         
         grouped[namaUser].absensi[tipe] = row;
+        grouped[namaUser].allRows.push(row);
     });
     
     // 2. Build Dynamic Header
@@ -1489,78 +1490,97 @@ function showDetailAbsensi(tanggal, dateStr) {
             }
         });
         
-        // Hitung Jam Kerja & Lembur
+        // Hitung Jam Kerja & Lembur berdasarkan allRows
         let jamKerjaStr = '-';
         let jamLemburStr = '-';
-        let waktuMasuk = null;
-        let waktuPulang = null;
-        let batasPulang = null;
-        let waktuIzinKeluar = null;
-        let waktuIzinMasuk = null;
-        
-        if (typeof globalMasterTipeAbsen !== 'undefined') {
-            globalMasterTipeAbsen.forEach(t => {
-                if (g.absensi[t.nama_tipe]) {
-                    const timeStr = g.absensi[t.nama_tipe].waktu;
-                    if (timeStr && timeStr !== '-') {
-                        const namaTipe = t.nama_tipe.toLowerCase();
-                        if (namaTipe.includes('izin keluar')) {
-                            waktuIzinKeluar = timeStr;
-                        } else if (namaTipe.includes('izin masuk') || namaTipe.includes('izin kembali')) {
-                            waktuIzinMasuk = timeStr;
-                        } else if (t.is_checkout) {
-                            waktuPulang = timeStr;
-                            batasPulang = t.batas_terlambat;
-                        } else {
-                            if (!waktuMasuk) waktuMasuk = timeStr;
-                        }
-                    }
-                }
-            });
-        }
-        
+
         const parseT = (tStr) => {
             if (!tStr) return null;
             const p = tStr.split(':');
             if (p.length < 2) return null;
-            return parseInt(p[0]) * 60 + parseInt(p[1]);
+            return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
         };
         const formatM = (m) => {
             if (m <= 0) return '0j 0m';
-            return `${Math.floor(m/60)}j ${m%60}m`;
+            return `${Math.floor(m / 60)}j ${m % 60}m`;
         };
+
+        const allRows = g.allRows || [];
         
-        let lemburMins = 0;
-        if (waktuPulang && batasPulang) {
-            const pMins = parseT(waktuPulang);
-            const bMins = parseT(batasPulang);
-            if (pMins && bMins && pMins > bMins) {
-                lemburMins = pMins - bMins;
+        // 1. Cari Waktu Masuk Pertama
+        const masukRows = allRows.filter(r => {
+            const name = (r.tipe_absen || '').toLowerCase();
+            return name.includes('masuk') && !name.includes('izin') && !name.includes('istirahat');
+        });
+        let waktuMasukMin = null;
+        if (masukRows.length > 0) {
+            masukRows.sort((a, b) => (a.waktu || '').localeCompare(b.waktu || ''));
+            waktuMasukMin = parseT(masukRows[0].waktu);
+        }
+
+        // 2. Cari Waktu Pulang / Checkout Terakhir
+        const pulangRows = allRows.filter(r => {
+            const name = (r.tipe_absen || '').toLowerCase();
+            return name.includes('pulang') || name.includes('checkout');
+        });
+        let waktuPulangMin = null;
+        let jamPulangResmiMin = null;
+
+        if (pulangRows.length > 0) {
+            pulangRows.sort((a, b) => (b.waktu || '').localeCompare(a.waktu || ''));
+            const lastPulang = pulangRows[0];
+            waktuPulangMin = parseT(lastPulang.waktu);
+
+            const masterTarget = (globalMasterTipeAbsen || []).find(m => m.nama_tipe === lastPulang.tipe_absen) ||
+                                 (globalMasterTipeAbsen || []).find(m => m.is_checkout);
+            if (masterTarget) {
+                jamPulangResmiMin = parseT(masterTarget.batas_terlambat || masterTarget.jam_tutup || "16:00:00");
+                if (jamPulangResmiMin > 1400 && masterTarget.batas_terlambat) {
+                    jamPulangResmiMin = parseT(masterTarget.batas_terlambat);
+                }
+            } else {
+                jamPulangResmiMin = 960; // 16:00
             }
         }
-        
-        let izinMins = 0;
-        if (waktuIzinKeluar && waktuIzinMasuk) {
-            const kMins = parseT(waktuIzinKeluar);
-            const mMinsIzin = parseT(waktuIzinMasuk);
-            if (kMins && mMinsIzin && mMinsIzin > kMins) {
-                izinMins = mMinsIzin - kMins;
+
+        // 3. Hitung Durasi Istirahat / Izin (Siang vs Lembur)
+        let istirahatSiangMins = 0;
+        let istirahatLemburMins = 0;
+
+        const istKeluarRows = allRows.filter(r => (r.tipe_absen || '').toLowerCase().includes('istirahat keluar') || (r.tipe_absen || '').toLowerCase().includes('izin keluar')).sort((a, b) => (a.waktu || '').localeCompare(b.waktu || ''));
+        const istMasukRows = allRows.filter(r => (r.tipe_absen || '').toLowerCase().includes('istirahat masuk') || (r.tipe_absen || '').toLowerCase().includes('izin masuk')).sort((a, b) => (a.waktu || '').localeCompare(b.waktu || ''));
+
+        istKeluarRows.forEach(kRow => {
+            const kMin = parseT(kRow.waktu);
+            if (kMin) {
+                const mRow = istMasukRows.find(m => parseT(m.waktu) > kMin);
+                if (mRow) {
+                    const mMin = parseT(mRow.waktu);
+                    const durasi = mMin - kMin;
+                    if (jamPulangResmiMin && kMin >= jamPulangResmiMin) {
+                        istirahatLemburMins += durasi;
+                    } else {
+                        istirahatSiangMins += durasi;
+                    }
+                }
             }
-        }
-        
-        if (lemburMins > 0) {
-            jamLemburStr = formatM(lemburMins);
-        } else if (waktuPulang) {
+        });
+
+        // 4. Kalkulasi Jam Lembur & Jam Kerja
+        if (waktuPulangMin && jamPulangResmiMin && waktuPulangMin > jamPulangResmiMin) {
+            const lemburKotor = waktuPulangMin - jamPulangResmiMin;
+            const lemburBersih = Math.max(0, lemburKotor - istirahatLemburMins);
+            jamLemburStr = formatM(lemburBersih);
+        } else if (waktuPulangMin) {
             jamLemburStr = '0j 0m';
         }
-        
-        if (waktuMasuk && waktuPulang) {
-            const mMins = parseT(waktuMasuk);
-            const pMins = parseT(waktuPulang);
-            if (mMins && pMins && pMins >= mMins) {
-                let kerjaMins = (pMins - mMins) - lemburMins - izinMins;
-                if (kerjaMins < 0) kerjaMins = 0;
-                jamKerjaStr = formatM(kerjaMins);
+
+        if (waktuMasukMin && waktuPulangMin) {
+            const batasAkhirKerja = jamPulangResmiMin && waktuPulangMin > jamPulangResmiMin ? jamPulangResmiMin : waktuPulangMin;
+            if (batasAkhirKerja >= waktuMasukMin) {
+                const kerjaKotor = batasAkhirKerja - waktuMasukMin;
+                const kerjaBersih = Math.max(0, kerjaKotor - istirahatSiangMins);
+                jamKerjaStr = formatM(kerjaBersih);
             }
         }
 
