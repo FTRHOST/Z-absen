@@ -1632,6 +1632,7 @@
         if (currentUser && currentUser.face_descriptor) {
           btnSubmit.innerHTML = "⏳ Memindai wajah pada foto...";
           try {
+            await loadFaceModels();
             const registeredDesc = new Float32Array(
               JSON.parse(currentUser.face_descriptor),
             );

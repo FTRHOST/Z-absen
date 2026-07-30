@@ -1,40 +1,52 @@
 let faceModelsLoaded = false;
+let faceModelsLoadingPromise = null;
+
 async function loadFaceModels() {
-  if (faceModelsLoaded) return;
-  const statusEl = document.getElementById('register-face-status');
-  if (statusEl) statusEl.innerText = "Memuat kecerdasan buatan...";
+  if (faceModelsLoaded) return true;
+  if (faceModelsLoadingPromise) return faceModelsLoadingPromise;
 
-  try {
-    // 1. Coba muat langsung dari folder lokal ./models
-    await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri("./models"),
-      faceapi.nets.faceLandmark68Net.loadFromUri("./models"),
-      faceapi.nets.faceRecognitionNet.loadFromUri("./models")
-    ]);
-    faceModelsLoaded = true;
-    if (statusEl) statusEl.innerText = "Posisikan wajah Anda di tengah layar...";
-    return;
-  } catch (e) {
-    console.warn("Gagal memuat model lokal, mencoba CDN backup...", e);
-  }
+  faceModelsLoadingPromise = (async () => {
+    const statusEl = document.getElementById('register-face-status');
+    if (statusEl) statusEl.innerText = "Memuat kecerdasan buatan...";
 
-  // 2. Fallback CDN GitHub jika lokal bermasalah
-  try {
-    const cdnUrl = "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights";
-    await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri(cdnUrl),
-      faceapi.nets.faceLandmark68Net.loadFromUri(cdnUrl),
-      faceapi.nets.faceRecognitionNet.loadFromUri(cdnUrl)
-    ]);
-    faceModelsLoaded = true;
-    if (statusEl) statusEl.innerText = "Posisikan wajah Anda di tengah layar...";
-  } catch (err) {
-    console.error("Gagal total memuat model AI:", err);
-    if (statusEl) {
-      statusEl.innerText = "Gagal memuat model AI. Periksa koneksi internet.";
-      statusEl.className = "badge bg-danger-subtle text-danger-emphasis fs-6 border border-danger-subtle rounded-pill px-3 py-2";
+    try {
+      // 1. Coba muat langsung dari folder lokal ./models
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri("./models"),
+        faceapi.nets.faceLandmark68Net.loadFromUri("./models"),
+        faceapi.nets.faceRecognitionNet.loadFromUri("./models")
+      ]);
+      faceModelsLoaded = true;
+      if (statusEl) statusEl.innerText = "Posisikan wajah Anda di tengah layar...";
+      return true;
+    } catch (e) {
+      console.warn("Gagal memuat model lokal, mencoba CDN backup...", e);
     }
-  }
+
+    // 2. Fallback CDN GitHub jika lokal bermasalah
+    try {
+      const cdnUrl = "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights";
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(cdnUrl),
+        faceapi.nets.faceLandmark68Net.loadFromUri(cdnUrl),
+        faceapi.nets.faceRecognitionNet.loadFromUri(cdnUrl)
+      ]);
+      faceModelsLoaded = true;
+      if (statusEl) statusEl.innerText = "Posisikan wajah Anda di tengah layar...";
+      return true;
+    } catch (err) {
+      console.error("Gagal total memuat model AI:", err);
+      if (statusEl) {
+        statusEl.innerText = "Gagal memuat model AI. Periksa koneksi internet.";
+        statusEl.className = "badge bg-danger-subtle text-danger-emphasis fs-6 border border-danger-subtle rounded-pill px-3 py-2";
+      }
+      return false;
+    } finally {
+      faceModelsLoadingPromise = null;
+    }
+  })();
+
+  return faceModelsLoadingPromise;
 }
 
 let faceDescriptorTemp = null;
