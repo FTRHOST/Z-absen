@@ -380,5 +380,16 @@ CREATE TABLE IF NOT EXISTS _realtime.extensions (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
+-- Seed Data Default Shift
+INSERT INTO master_tipe_absen (nama_tipe, jam_mulai, batas_terlambat, jam_tutup, is_checkout, is_aktif, potongan_lembur_menit)
+VALUES 
+('Absen Masuk Pagi', '07:00:00', '08:00:00', '16:00:00', false, true, 60),
+('Absen Pulang Pagi', '15:00:00', '16:00:00', '16:00:00', true, true, 60),
+('Absen Masuk Siang', '12:00:00', '13:00:00', '21:00:00', false, true, 60),
+('Absen Pulang Siang', '20:00:00', '21:00:00', '21:00:00', true, true, 60),
+('Absen Masuk Sore', '17:00:00', '18:00:00', '01:00:00', false, true, 60),
+('Absen Pulang Malam', '00:00:00', '01:00:00', '01:00:00', true, true, 60)
+ON CONFLICT DO NOTHING;
+
 GRANT ALL ON SCHEMA _realtime TO postgres, supabase_admin;
 GRANT ALL ON ALL TABLES IN SCHEMA _realtime TO postgres, supabase_admin;
