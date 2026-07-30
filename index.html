@@ -422,6 +422,10 @@
                       <td class="text-muted">Penempatan</td>
                       <td id="profil-cabang"></td>
                     </tr>
+                    <tr>
+                      <td class="text-muted">Unit / Divisi</td>
+                      <td id="profil-unit"></td>
+                    </tr>
                   </table>
                 </div>
               </div>
@@ -2730,6 +2734,10 @@
           currentUser.no_hp || "-";
         document.getElementById("profil-cabang").innerText =
           currentUser.cabang || "Pusat";
+        if (document.getElementById("profil-unit")) {
+          document.getElementById("profil-unit").innerText =
+            currentUser.unit || "-";
+        }
       }
 
       async function ubahPassword(e) {

@@ -406,6 +406,10 @@
                           <input type="tel" class="form-control" id="karyawan_hp" placeholder="No HP (Opsional)" />
                         </div>
                         <div class="col-md-4">
+                          <label class="form-label small text-muted mb-0">Unit / Divisi</label>
+                          <input type="text" class="form-control" id="karyawan_unit" placeholder="Contoh: IT, Marketing, HRD, Operasional" />
+                        </div>
+                        <div class="col-md-4">
                           <label class="form-label small text-muted mb-0">Foto Wajah Terdaftar</label>
                           <div id="foto-wajah-container" class="border rounded text-center p-2 bg-light mb-2">
                             <span class="text-muted small">Belum terdaftar</span>
@@ -476,6 +480,7 @@
                           <th>Role</th>
                           <th>No HP</th>
                           <th>Penempatan</th>
+                          <th>Unit / Divisi</th>
                           <th>Aksi</th>
                         </tr>
                       </thead>
@@ -502,6 +507,7 @@
                        <table class="table table-bordered text-start small">
                          <tbody>
                            <tr><th class="bg-light w-50">Cabang / Penempatan</th><td id="detail_cabang"></td></tr>
+                           <tr><th class="bg-light">Unit / Divisi</th><td id="detail_unit"></td></tr>
                            <tr><th class="bg-light">Nomor HP / WA</th><td id="detail_hp"></td></tr>
                            <tr><th class="bg-light">Jadwal Libur Rutin</th><td id="detail_libur"></td></tr>
                          </tbody>

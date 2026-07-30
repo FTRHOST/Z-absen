@@ -901,6 +901,7 @@ function renderKaryawan() {
                                 </small>
                             </div>
                             <h6 class="card-title fw-bold mb-1">${user.nama}</h6>
+                            <small class="text-primary d-block mt-1"><i class="fas fa-layer-group me-1"></i> ${user.unit || 'Unit: -'}</small>
                         </div>
                     </div>
                 </div>
@@ -911,7 +912,7 @@ function renderKaryawan() {
         tableContainer.classList.remove('d-none');
         
         if (filtered.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Tidak ada pengguna yang cocok.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Tidak ada pengguna yang cocok.</td></tr>';
             return;
         }
         
@@ -924,6 +925,7 @@ function renderKaryawan() {
                     <td><span class="badge bg-${badgeColor} text-white">${user.role}</span></td>
                     <td>${user.no_hp || '-'}</td>
                     <td>${user.cabang || '-'}</td>
+                    <td><span class="badge bg-light text-dark border">${user.unit || '-'}</span></td>
                     <td>
                         <button class="btn btn-sm btn-outline-primary" onclick="showDetailKaryawan('${user.id}')">Detail</button>
                     </td>
@@ -944,6 +946,9 @@ function showDetailKaryawan(id) {
     document.getElementById("detail_role").innerText = user.role;
     
     document.getElementById("detail_cabang").innerText = user.cabang || '-';
+    if (document.getElementById("detail_unit")) {
+        document.getElementById("detail_unit").innerText = user.unit || '-';
+    }
     document.getElementById("detail_hp").innerText = user.no_hp || '-';
     
     const namaHariLibur = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
@@ -993,6 +998,7 @@ async function simpanKaryawan(event) {
     const no_hp = document.getElementById("karyawan_hp").value;
     const password = document.getElementById("karyawan_password").value;
     const cabang = document.getElementById("pilih-cabang").value;
+    const unit = document.getElementById("karyawan_unit") ? document.getElementById("karyawan_unit").value.trim() : "";
     
     const liburCheckboxes = document.querySelectorAll('.form-libur-baru');
     const checkedLibur = Array.from(liburCheckboxes).filter(c => c.checked).map(c => c.value).join(',');
@@ -1000,7 +1006,7 @@ async function simpanKaryawan(event) {
     let res;
     if (id) {
         // Edit Mode
-        const updateData = { nama, no_hp, cabang, hari_libur: checkedLibur };
+        const updateData = { nama, no_hp, cabang, unit, hari_libur: checkedLibur };
         
         // Super Admin boleh ubah role
         if (isSuperAdmin) {
@@ -1028,7 +1034,7 @@ async function simpanKaryawan(event) {
         
         // Pendaftaran profil ke database (Akun Auth akan dibuat otomatis saat login pertama)
         res = await supabaseClient.from('users').insert([
-            { nama, password, role, no_hp, cabang, hari_libur: checkedLibur, sisa_cuti: 12 }
+            { nama, password, role, no_hp, cabang, unit, hari_libur: checkedLibur, sisa_cuti: 12 }
         ]);
     }
 
@@ -1052,12 +1058,16 @@ function editKaryawan(id, nama, role, no_hp, cabang) {
     
     const selectCabang = document.getElementById("pilih-cabang");
     if (cabang) selectCabang.value = cabang;
+
+    const user = allKaryawan.find(u => u.id == id);
+    if (document.getElementById("karyawan_unit")) {
+        document.getElementById("karyawan_unit").value = user ? (user.unit || '') : '';
+    }
     
     document.getElementById("karyawan_password").value = ''; // Kosongkan password
     document.getElementById("karyawan_password").placeholder = "Isi jika ingin ganti password";
     
     // Setup checkboxes untuk hari libur
-    const user = allKaryawan.find(u => u.id == id);
     const arrLibur = user && user.hari_libur ? user.hari_libur.split(',') : [];
     document.querySelectorAll('.form-libur-baru').forEach(cb => {
         cb.checked = arrLibur.includes(cb.value);
@@ -1089,6 +1099,7 @@ function editKaryawan(id, nama, role, no_hp, cabang) {
 function batalEditKaryawan() {
     document.getElementById("form-karyawan").reset();
     document.getElementById("karyawan_id").value = '';
+    if (document.getElementById("karyawan_unit")) document.getElementById("karyawan_unit").value = '';
     document.getElementById("karyawan_password").placeholder = "Password (Wajib)";
     
     document.querySelectorAll('.form-libur-baru').forEach(cb => cb.checked = false);

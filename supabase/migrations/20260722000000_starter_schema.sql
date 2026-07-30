@@ -102,6 +102,7 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT DEFAULT 'Karyawan',
     no_hp TEXT,
     cabang TEXT,
+    unit TEXT,
     auth_id UUID UNIQUE,
     hari_libur TEXT DEFAULT 'Minggu',
     sisa_cuti INTEGER DEFAULT 12,
