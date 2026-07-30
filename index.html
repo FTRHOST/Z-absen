@@ -1195,9 +1195,9 @@
           if (countThisType > 0) {
             optionsHtml += `<button class="btn btn-success w-100 py-2.5 fw-bold text-start px-3 mb-1" disabled><i class="fas fa-check-circle me-2"></i>${item.nama_tipe} (Sudah Absen)</button>`;
           } else if (belumBuka) {
-            optionsHtml += `<button class="btn btn-secondary w-100 py-2.5 fw-bold text-start px-3 mb-1 opacity-75" disabled><i class="fas fa-lock me-2"></i>${item.nama_tipe} (Buka Jam ${item.jam_mulai})</button>`;
+            optionsHtml += `<button class="btn btn-secondary w-100 py-2.5 fw-bold text-start px-3 mb-1 opacity-75" disabled><i class="fas fa-lock me-2"></i>${item.nama_tipe} (Buka Jam ${formatWaktuGlobal(item.jam_mulai)})</button>`;
           } else if (waktuHabis) {
-            optionsHtml += `<button class="btn btn-outline-secondary w-100 py-2.5 fw-bold text-start px-3 mb-1 opacity-75" disabled><i class="fas fa-hourglass-end me-2"></i>${item.nama_tipe} (Tutup Jam ${item.jam_tutup})</button>`;
+            optionsHtml += `<button class="btn btn-outline-secondary w-100 py-2.5 fw-bold text-start px-3 mb-1 opacity-75" disabled><i class="fas fa-hourglass-end me-2"></i>${item.nama_tipe} (Tutup Jam ${formatWaktuGlobal(item.jam_tutup)})</button>`;
           } else {
             optionsHtml += `<button class="btn btn-primary w-100 py-2.5 fw-bold text-start px-3 mb-1 shadow-sm d-flex align-items-center justify-content-between" onclick="pilihAbsen('${item.nama_tipe}')"><span><i class="fas fa-clock me-2"></i>${item.nama_tipe}</span><i class="fas fa-arrow-right"></i></button>`;
           }
@@ -2644,7 +2644,7 @@
                     : "success text-white";
                 if (absen.status === "Alpha") bClass = "danger text-white";
                 if (absen.status === "Lembur") bClass = "info text-dark";
-                popupHtml += `<tr><td>${absen.tipe_absen || "-"}</td><td>${absen.waktu || "-"}</td><td><span class="badge bg-${bClass}">${absen.status}</span></td></tr>`;
+                popupHtml += `<tr><td>${absen.tipe_absen || "-"}</td><td>${formatWaktuGlobal(absen.waktu || "-")}</td><td><span class="badge bg-${bClass}">${absen.status}</span></td></tr>`;
               });
             }
             popupHtml += `</tbody></table></div>`;
@@ -2737,7 +2737,7 @@
             <tr>
               <td>${absen.tanggal}</td>
               <td>${absen.tipe_absen || "-"}</td>
-              <td>${absen.waktu || "-"}</td>
+              <td>${formatWaktuGlobal(absen.waktu || "-")}</td>
               <td><span class="badge bg-${badgeClass}">${absen.status}</span></td>
             </tr>
           `;
