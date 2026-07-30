@@ -1310,22 +1310,26 @@ async function loadDataAbsensi() {
         }
     });
 
-    gridContainer.innerHTML = '';
-    
+    let gridCardsHtml = '';
     Object.keys(allAbsensiGrouped).forEach(tanggal => {
         const d = allAbsensiGrouped[tanggal];
         d.hadir = d.hadirSet.size;
         d.terlambat = d.terlambatSet.size;
         
-        // Format Tanggal
-        const dateObj = new Date(tanggal);
-        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-        const dateStr = dateObj.toLocaleDateString('id-ID', options);
+        let dateStr = tanggal;
+        try {
+            const [yyyy, mm, dd] = tanggal.split('-');
+            const dateObj = new Date(yyyy, parseInt(mm, 10) - 1, dd);
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            dateStr = dateObj.toLocaleDateString('id-ID', options);
+        } catch(e) {
+            dateStr = tanggal;
+        }
         
         const tidakAbsen = totalUsersCount - d.hadir - d.cuti;
 
-        gridContainer.innerHTML += `
-            <div class="col-md-6 col-lg-4 col-xl-3">
+        gridCardsHtml += `
+            <div class="col-md-6 col-lg-4 col-xl-3 mb-3">
                 <div class="card shadow-sm h-100 border-0 dashboard-card-hover" style="border-radius: 12px; transition: transform 0.2s;">
                     <div class="card-body d-flex flex-column">
                         <div class="d-flex justify-content-between align-items-start mb-3">
@@ -1346,7 +1350,7 @@ async function loadDataAbsensi() {
                             </div>
                         </div>
                         <div class="d-flex gap-2 mt-auto">
-                            <button class="btn btn-sm btn-outline-primary w-50 fw-bold shadow-sm" onclick="showDetailAbsensi('${tanggal}', '${dateStr}')">
+                            <button class="btn btn-sm btn-outline-primary w-50 fw-bold shadow-sm" onclick="showDetailAbsensi('${tanggal}')">
                                 <i class="fas fa-list me-1"></i> Detail
                             </button>
                             <button class="btn btn-sm btn-success w-50 fw-bold shadow-sm" onclick="exportCsvHarian('${tanggal}')">
@@ -1358,11 +1362,12 @@ async function loadDataAbsensi() {
             </div>
         `;
     });
+    gridContainer.innerHTML = gridCardsHtml;
 
     // Auto-refresh modal jika sedang terbuka
     const modalEl = document.getElementById("modalDetailAbsensi");
     if (modalEl && modalEl.classList.contains("show") && currentAbsensiTanggal) {
-        showDetailAbsensi(currentAbsensiTanggal, currentAbsensiDateStr);
+        showDetailAbsensi(currentAbsensiTanggal);
     }
 }
 
@@ -1442,6 +1447,7 @@ function showDetailAbsensi(tanggal, dateStr) {
     thead.innerHTML = trHead;
 
     // 3. Build Body Rows
+    let tbodyRowsHtml = '';
     for (const namaUser in grouped) {
         const g = grouped[namaUser];
         let trHtml = `<tr>
@@ -1644,11 +1650,13 @@ function showDetailAbsensi(tanggal, dateStr) {
         });
 
         trHtml += `</tr>`;
-        tbody.innerHTML += trHtml;
+        tbodyRowsHtml += trHtml;
     }
     
+    tbody.innerHTML = tbodyRowsHtml;
+
     const modalEl = document.getElementById('modalDetailAbsensi');
-    if (!modalEl.classList.contains('show')) {
+    if (modalEl && !modalEl.classList.contains('show')) {
         new bootstrap.Modal(modalEl).show();
     }
 }
