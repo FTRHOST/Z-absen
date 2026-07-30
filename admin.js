@@ -4057,3 +4057,202 @@ async function hapusTipeAbsen(id) {
         }
     }
 }
+
+async function jalankanMigrasiDataShift() {
+    const result = await Swal.fire({
+        title: "Konfirmasi Migrasi Data Shift",
+        text: "Sistem akan memindai riwayat absensi lama dan mengonversinya ke tipe shift presisi (Pagi/Siang/Sore/Malam) serta mengkalkulasi ulang durasi telat dan lembur. Lanjutkan?",
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "Ya, Jalankan Migrasi",
+        cancelButtonText: "Batal",
+        reverseButtons: true
+    });
+
+    if (!result.isConfirmed) return;
+
+    const btn = document.getElementById("btn-run-migration");
+    const progressContainer = document.getElementById("migration-progress-container");
+    const progressBar = document.getElementById("migration-progress-bar");
+    const statusText = document.getElementById("migration-status-text");
+
+    if (btn) btn.disabled = true;
+    if (progressContainer) progressContainer.classList.remove("d-none");
+
+    try {
+        // 1. Fetch master tipe absen untuk acuan jam shift & batas telat
+        const { data: masterData, error: errMaster } = await supabaseClient
+            .from('master_tipe_absen')
+            .select('*');
+        
+        if (errMaster) throw errMaster;
+
+        const masterTipeAbsen = masterData || [];
+        const timeToMinutes = (tStr) => {
+            if (!tStr) return 0;
+            const parts = tStr.split(":");
+            return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+        };
+
+        // 2. Fetch seluruh data absensi
+        const { data: absensiList, error: errAbsen } = await supabaseClient
+            .from('absensi')
+            .select('*')
+            .not('status', 'ilike', '%-TRASH-%');
+
+        if (errAbsen) throw errAbsen;
+
+        if (!absensiList || absensiList.length === 0) {
+            Swal.fire("Informasi", "Tidak ditemukan data absensi untuk dimigrasikan.", "info");
+            if (btn) btn.disabled = false;
+            if (progressContainer) progressContainer.classList.add("d-none");
+            return;
+        }
+
+        let updatedCount = 0;
+        let totalCount = absensiList.length;
+
+        for (let i = 0; i < totalCount; i++) {
+            const row = absensiList[i];
+            const pct = Math.round(((i + 1) / totalCount) * 100);
+            if (progressBar) {
+                progressBar.style.width = `${pct}%`;
+                progressBar.innerText = `${pct}%`;
+            }
+            if (statusText) {
+                statusText.innerText = `Memproses (${i + 1}/${totalCount}): ${row.tanggal} - ${row.tipe_absen}`;
+            }
+
+            let newTipeAbsen = row.tipe_absen;
+            let status = row.status || "Hadir";
+            let menitTerlambat = row.menit_terlambat || 0;
+            let menitLembur = row.menit_lembur || 0;
+            let keteranganWaktu = row.keterangan_waktu || "";
+
+            const nTipe = (row.tipe_absen || "").toLowerCase();
+            const waktuStr = row.waktu || "00:00:00";
+            const currMin = timeToMinutes(waktuStr);
+
+            // Klasifikasi Shift & Kalkulasi
+            if (nTipe === "masuk" || nTipe === "absen masuk") {
+                // Tentukan Shift Masuk berdasarkan Jam
+                if (currMin < 660) { // < 11:00 AM ➔ Shift Pagi
+                    newTipeAbsen = "Absen Masuk Pagi";
+                } else if (currMin >= 660 && currMin < 960) { // 11:00 AM - 04:00 PM ➔ Shift Siang
+                    newTipeAbsen = "Absen Masuk Siang";
+                } else { // >= 04:00 PM ➔ Shift Sore
+                    newTipeAbsen = "Absen Masuk Sore";
+                }
+
+                // Cari master tipe absen pencocokan
+                const masterTarget = masterTipeAbsen.find(m => m.nama_tipe === newTipeAbsen) || 
+                                     masterTipeAbsen.find(m => (m.nama_tipe || '').toLowerCase().includes('masuk'));
+
+                if (masterTarget && masterTarget.batas_terlambat) {
+                    const limitMin = timeToMinutes(masterTarget.batas_terlambat);
+                    if (currMin > limitMin) {
+                        status = "Terlambat";
+                        menitTerlambat = currMin - limitMin;
+                        const jam = Math.floor(menitTerlambat / 60);
+                        const m = menitTerlambat % 60;
+                        keteranganWaktu = `Terlambat ${jam > 0 ? jam + "j " : ""}${m}m`;
+                    } else {
+                        status = "Hadir";
+                        menitTerlambat = 0;
+                        keteranganWaktu = "Tepat Waktu";
+                    }
+                }
+            } else if (nTipe === "pulang" || nTipe === "absen pulang" || nTipe === "checkout") {
+                // Tentukan Shift Pulang berdasarkan Jam
+                if (currMin < 1080) { // < 06:00 PM ➔ Pulang Pagi
+                    newTipeAbsen = "Absen Pulang Pagi";
+                } else if (currMin >= 1080 && currMin < 1380) { // 06:00 PM - 11:00 PM ➔ Pulang Siang
+                    newTipeAbsen = "Absen Pulang Siang";
+                } else { // >= 11:00 PM atau Dini Hari ➔ Pulang Malam
+                    newTipeAbsen = "Absen Pulang Malam";
+                }
+
+                const masterTarget = masterTipeAbsen.find(m => m.nama_tipe === newTipeAbsen) || 
+                                     masterTipeAbsen.find(m => m.is_checkout);
+
+                if (masterTarget && masterTarget.jam_tutup) {
+                    const jamTutupMin = timeToMinutes(masterTarget.jam_tutup);
+                    if (currMin > jamTutupMin) {
+                        status = "Lembur";
+                        const totalLemburKotor = currMin - jamTutupMin;
+                        let potonganIstirahat = 0;
+                        const potonganDef = masterTarget.potongan_lembur_menit !== undefined && masterTarget.potongan_lembur_menit !== null 
+                            ? parseInt(masterTarget.potongan_lembur_menit, 10) : 60;
+
+                        if (currMin >= 1140 && jamTutupMin <= 1080 && totalLemburKotor >= 120) {
+                            potonganIstirahat = potonganDef;
+                        }
+
+                        menitLembur = Math.max(0, totalLemburKotor - potonganIstirahat);
+                        const jamLembur = Math.floor(menitLembur / 60);
+                        const mLembur = menitLembur % 60;
+                        keteranganWaktu = `Lembur ${jamLembur > 0 ? jamLembur + "j " : ""}${mLembur}m` + (potonganIstirahat > 0 ? ` (Potongan Solat ${potonganIstirahat}m)` : "");
+                    } else {
+                        status = "Hadir";
+                        menitLembur = 0;
+                        keteranganWaktu = "Pulang Normal";
+                    }
+                }
+            } else if (!keteranganWaktu || row.menit_terlambat === null || row.menit_lembur === null) {
+                // Tipe yang sudah bernama spesifik tapi belum punya keterangan waktu
+                const masterTarget = masterTipeAbsen.find(m => m.nama_tipe === row.tipe_absen);
+                if (masterTarget) {
+                    if (masterTarget.batas_terlambat && currMin > timeToMinutes(masterTarget.batas_terlambat)) {
+                        status = "Terlambat";
+                        menitTerlambat = currMin - timeToMinutes(masterTarget.batas_terlambat);
+                        const jam = Math.floor(menitTerlambat / 60);
+                        const m = menitTerlambat % 60;
+                        keteranganWaktu = `Terlambat ${jam > 0 ? jam + "j " : ""}${m}m`;
+                    } else if (masterTarget.is_checkout && masterTarget.jam_tutup && currMin > timeToMinutes(masterTarget.jam_tutup)) {
+                        status = "Lembur";
+                        const totalKotor = currMin - timeToMinutes(masterTarget.jam_tutup);
+                        let pot = (currMin >= 1140 && timeToMinutes(masterTarget.jam_tutup) <= 1080) ? 60 : 0;
+                        menitLembur = Math.max(0, totalKotor - pot);
+                        const jamLembur = Math.floor(menitLembur / 60);
+                        const mLembur = menitLembur % 60;
+                        keteranganWaktu = `Lembur ${jamLembur > 0 ? jamLembur + "j " : ""}${mLembur}m` + (pot > 0 ? ` (Potongan Solat ${pot}m)` : "");
+                    } else {
+                        keteranganWaktu = "Normal";
+                    }
+                }
+            }
+
+            // Update row ke Supabase
+            const { error: errUpdate } = await supabaseClient
+                .from('absensi')
+                .update({
+                    tipe_absen: newTipeAbsen,
+                    status: status,
+                    menit_terlambat: menitTerlambat,
+                    menit_lembur: menitLembur,
+                    keterangan_waktu: keteranganWaktu
+                })
+                .eq('id', row.id);
+
+            if (!errUpdate) {
+                updatedCount++;
+            }
+        }
+
+        Swal.fire({
+            title: "Migrasi Sukses!",
+            html: `Berhasil memindai <b>${totalCount}</b> data absensi.<br>Sebanyak <b>${updatedCount}</b> data berhasil dimigrasikan ke tipe shift presisi & dikalkulasi ulang.`,
+            icon: "success"
+        });
+
+        // Refresh data absensi di UI
+        loadDataAbsensi();
+
+    } catch (e) {
+        console.error("Gagal Migrasi Data:", e);
+        Swal.fire("Error Migrasi", e.message || "Gagal memigrasikan data absensi", "error");
+    } finally {
+        if (btn) btn.disabled = false;
+        if (progressContainer) progressContainer.classList.add("d-none");
+    }
+}

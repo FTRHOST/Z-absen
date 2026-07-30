@@ -893,6 +893,30 @@ Besok **17 Agustus** kita libur ya!"></textarea>
                 <p class="mb-0 text-dark">Di sini Anda bisa membersihkan data absensi beserta fotonya untuk menghemat penyimpanan. Data yang dibersihkan akan dipindahkan ke <strong>Tempat Sampah</strong> selama 3 hari sebelum dihapus permanen secara otomatis.</p>
               </div>
 
+              <!-- CARD TOOL MIGRASI DATA ABSEN SHIFT -->
+              <div class="card shadow-sm border-0 mb-4 border-primary">
+                <div class="card-header bg-primary text-white fw-bold d-flex justify-content-between align-items-center">
+                  <span><i class="fas fa-tools me-2"></i>Tool Migrasi Data Shift & Kalkulasi Waktu (Data Lama ➔ Shift Baru)</span>
+                  <span class="badge bg-white text-primary fw-bold">Auto-Migration</span>
+                </div>
+                <div class="card-body">
+                  <p class="text-muted small mb-3">
+                    Tool ini akan secara otomatis memindai riwayat absensi lama yang masih bernama generic (<em>"Absen Masuk" / "Absen Pulang"</em>) atau belum memiliki rincian keterlambatan/lembur, kemudian memigrasikannya ke tipe shift presisi (<em>Absen Masuk Pagi/Siang/Sore, Absen Pulang Pagi/Siang/Malam</em>) serta mengkalkulasi ulang durasi telat & lembur bersihnya.
+                  </p>
+                  <div class="d-flex flex-column gap-2">
+                    <div id="migration-progress-container" class="d-none mb-2">
+                      <div class="progress" style="height: 20px;">
+                        <div id="migration-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: 0%;">0%</div>
+                      </div>
+                      <small id="migration-status-text" class="text-muted text-center d-block mt-1">Memproses data...</small>
+                    </div>
+                    <button class="btn btn-primary fw-bold shadow-sm" id="btn-run-migration" onclick="jalankanMigrasiDataShift()">
+                      <i class="fas fa-rocket me-2"></i>Jalankan Migrasi Data Absen Shift & Kalkulasi Ulang
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div class="card shadow-sm border-0 mb-4 border-danger">
                 <div class="card-header bg-danger text-white fw-bold"><i class="fas fa-database me-2"></i>Backup & Restore Database Enterprise</div>
                 <div class="card-body">
