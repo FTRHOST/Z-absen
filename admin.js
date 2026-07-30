@@ -4667,6 +4667,8 @@ function previewRestoreModular(event) {
                 master_tipe_absen: '⏰ Master Tipe Absen / Shift',
                 app_settings: '⚙️ Pengaturan Aplikasi',
                 master_cabang: '🏢 Master Kantor Cabang',
+                master_jenis_cuti: '📋 Master Jenis Cuti & Kuota',
+                form_cuti_config: '📄 Konfigurasi Form Cuti & Syarat',
                 absensi: '📅 Transaksi Absensi',
                 cuti: '🏖️ Data Pengajuan Cuti'
             };
