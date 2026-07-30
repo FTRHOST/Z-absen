@@ -574,17 +574,21 @@
     >
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="kameraModalLabel">Ambil Foto Wajah</h5>
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title fw-bold" id="kameraModalLabel"><i class="fas fa-camera me-2"></i>Ambil Foto Wajah</h5>
             <button
               type="button"
-              class="btn-close"
+              class="btn-close btn-close-white"
               data-bs-dismiss="modal"
               aria-label="Close"
               onclick="stopKamera()"
             ></button>
           </div>
           <div class="modal-body text-center">
+            <div class="alert alert-primary py-2 px-3 mb-3 text-center fw-bold shadow-sm d-flex align-items-center justify-content-center border-0 bg-primary-subtle text-primary-emphasis">
+              <i class="fas fa-tag me-2"></i> Kategori Absen: 
+              <span id="text-tipe-absen-kamera" class="badge bg-primary text-white fs-6 ms-2 px-3 py-1">Absen Masuk</span>
+            </div>
             <div
               id="kamera-container"
               class="border p-2 bg-dark"
@@ -1177,8 +1181,10 @@
           if (countThisType > 0) {
             optionsHtml += `<button class="btn btn-success w-100 py-2.5 fw-bold text-start px-3 mb-1" disabled><i class="fas fa-check-circle me-2"></i>${item.nama_tipe} (Sudah Absen)</button>`;
           } else if (belumBuka) {
-            optionsHtml += `<button class="btn btn-secondary w-100 py-2.5 fw-bold text-start px-3 mb-1" disabled><i class="fas fa-lock me-2"></i>${item.nama_tipe} (Mulai ${item.jam_mulai})</button>`;
-          } else if (!waktuHabis) {
+            optionsHtml += `<button class="btn btn-secondary w-100 py-2.5 fw-bold text-start px-3 mb-1 opacity-75" disabled><i class="fas fa-lock me-2"></i>${item.nama_tipe} (Buka Jam ${item.jam_mulai})</button>`;
+          } else if (waktuHabis) {
+            optionsHtml += `<button class="btn btn-outline-secondary w-100 py-2.5 fw-bold text-start px-3 mb-1 opacity-75" disabled><i class="fas fa-hourglass-end me-2"></i>${item.nama_tipe} (Tutup Jam ${item.jam_tutup})</button>`;
+          } else {
             optionsHtml += `<button class="btn btn-primary w-100 py-2.5 fw-bold text-start px-3 mb-1 shadow-sm d-flex align-items-center justify-content-between" onclick="pilihAbsen('${item.nama_tipe}')"><span><i class="fas fa-clock me-2"></i>${item.nama_tipe}</span><i class="fas fa-arrow-right"></i></button>`;
           }
         });
@@ -1231,6 +1237,10 @@
         const btnAmbilFoto = document.getElementById("btn-ambil-foto");
         if (btnAmbilFoto) {
           btnAmbilFoto.innerHTML = `📸 Ambil Foto & Simpan (${val})`;
+        }
+        const labelKamera = document.getElementById("text-tipe-absen-kamera");
+        if (labelKamera) {
+          labelKamera.innerText = val;
         }
         prosesCekLokasi();
       }
@@ -1634,6 +1644,10 @@
         if (!isKameraEnabled) {
           prosesAbsenTanpaFoto();
         } else {
+          const labelKamera = document.getElementById("text-tipe-absen-kamera");
+          if (labelKamera) {
+            labelKamera.innerText = tipeAbsenSekarang || "Absen Masuk";
+          }
           const kameraModal = new bootstrap.Modal(
             document.getElementById("kameraModal"),
           );
