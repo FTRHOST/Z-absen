@@ -3140,6 +3140,10 @@ async function loadSettings() {
             document.getElementById('setting_enable_lokasi').checked = data.enable_lokasi !== false;
             document.getElementById('setting_enable_kamera').checked = data.enable_kamera !== false;
             
+            const elFormat = document.getElementById('setting_format_waktu');
+            if (elFormat) elFormat.value = data.format_waktu || 'HH:mm:ss';
+            window.currentFormatWaktu = data.format_waktu || 'HH:mm:ss';
+            
             if (data.logo_url) {
                 currentLogoUrl = data.logo_url;
                 const imgPreview = document.getElementById('preview_setting_logo');
@@ -3168,6 +3172,18 @@ async function loadSettings() {
     }
 }
 
+function formatWaktuGlobal(timeStr) {
+    if (!timeStr || timeStr === '-') return '-';
+    const parts = timeStr.split(':');
+    if (parts.length < 2) return timeStr;
+    const format = window.currentFormatWaktu || 'HH:mm:ss';
+    if (format === 'HH:mm') {
+        return `${parts[0]}:${parts[1]}`;
+    }
+    return timeStr.length === 5 ? `${timeStr}:00` : timeStr;
+}
+window.formatWaktuGlobal = formatWaktuGlobal;
+
 async function saveSettings() {
     const nama_aplikasi = document.getElementById('setting_nama_aplikasi').value;
     const login_subteks = document.getElementById('setting_login_subteks').value;
@@ -3176,6 +3192,7 @@ async function saveSettings() {
     const pengumuman_warna = document.getElementById('setting_pengumuman_warna').value;
     const enable_lokasi = document.getElementById('setting_enable_lokasi').checked;
     const enable_kamera = document.getElementById('setting_enable_kamera').checked;
+    const format_waktu = document.getElementById('setting_format_waktu')?.value || 'HH:mm:ss';
     const fileInput = document.getElementById('setting_logo_file');
     
     try {
@@ -3201,12 +3218,13 @@ async function saveSettings() {
             logo_url = publicUrlData.publicUrl;
         }
 
-        const payload = { id: 1, nama_aplikasi, login_subteks, form_judul, logo_url, pengumuman, pengumuman_warna, enable_lokasi, enable_kamera };
+        const payload = { id: 1, nama_aplikasi, login_subteks, form_judul, logo_url, pengumuman, pengumuman_warna, enable_lokasi, enable_kamera, format_waktu };
         
         const { error } = await supabaseClient.from('app_settings').upsert(payload, { onConflict: 'id' });
         
         if (error) throw error;
         
+        window.currentFormatWaktu = format_waktu;
         Swal.fire('Berhasil', 'Pengaturan berhasil disimpan!', 'success');
     } catch (err) {
         console.error(err);

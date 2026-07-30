@@ -1305,6 +1305,7 @@
             }
             isLokasiEnabled = data.enable_lokasi !== false;
             isKameraEnabled = data.enable_kamera !== false;
+            window.currentFormatWaktu = data.format_waktu || "HH:mm:ss";
 
             if (!isLokasiEnabled) {
               document.getElementById("lokasi-section").style.display = "none";
@@ -1317,6 +1318,18 @@
           console.error(err);
         }
       }
+
+      function formatWaktuGlobal(timeStr) {
+        if (!timeStr || timeStr === "-") return "-";
+        const parts = timeStr.split(":");
+        if (parts.length < 2) return timeStr;
+        const format = window.currentFormatWaktu || "HH:mm:ss";
+        if (format === "HH:mm") {
+          return `${parts[0]}:${parts[1]}`;
+        }
+        return timeStr.length === 5 ? `${timeStr}:00` : timeStr;
+      }
+      window.formatWaktuGlobal = formatWaktuGlobal;
 
       loadAppSettings().then(() => {
         loadKantorUser();

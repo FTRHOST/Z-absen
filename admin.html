@@ -864,7 +864,13 @@
                       <textarea id="setting_pengumuman" class="form-control" rows="5" placeholder="Gunakan Markdown. Contoh:
 ### 📣 Info Libur Nasional
 Besok **17 Agustus** kita libur ya!"></textarea>
-                      <small class="text-muted">Gunakan syntax Markdown seperti `# Judul`, `**Tebal**`, atau `[Link](URL)` untuk memformat pengumuman.</small>
+                    <div class="mb-3">
+                      <label class="form-label fw-bold">⏱️ Format Tampilan Waktu (Jam)</label>
+                      <select id="setting_format_waktu" class="form-select">
+                        <option value="HH:mm:ss">HH:mm:ss (Contoh: 08:30:45)</option>
+                        <option value="HH:mm">HH:mm (Contoh: 08:30)</option>
+                      </select>
+                      <small class="text-muted">Pilih format tampilan jam transaksi di seluruh tabel absensi dan sistem.</small>
                     </div>
                     <div class="row">
                       <div class="col-md-6 mb-3">
