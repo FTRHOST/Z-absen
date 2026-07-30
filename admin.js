@@ -1627,8 +1627,17 @@ function showDetailAbsensi(tanggal, dateStr) {
         tipeAbsenList.forEach(tipe => {
             const list = g.absensi[tipe] || [];
             if (list.length > 0) {
-                const aksiHtml = list.map(a => `<button class="btn btn-sm btn-danger shadow-sm text-white mb-1 d-block w-100" onclick="hapusDataAbsen('${a.id}', '${tanggal}')" title="Hapus ${tipe} (${a.waktu})"><i class="fas fa-trash-alt me-1"></i>Hapus</button>`).join('');
-                trHtml += `<td class="align-middle">${aksiHtml}</td>`;
+                const aksiHtml = list.map(a => `
+                    <div class="d-flex flex-column gap-1 my-1">
+                        <button class="btn btn-sm btn-warning text-dark shadow-sm fw-bold w-100" onclick="bukaModalEditAbsensi('${a.id}', '${a.tipe_absen}', '${a.waktu}', '${tanggal}')" title="Edit / Pindah Shift ${tipe}">
+                            <i class="fas fa-edit me-1"></i>Edit
+                        </button>
+                        <button class="btn btn-sm btn-danger shadow-sm text-white w-100" onclick="hapusDataAbsen('${a.id}', '${tanggal}')" title="Hapus ${tipe}">
+                            <i class="fas fa-trash-alt me-1"></i>Hapus
+                        </button>
+                    </div>
+                `).join('');
+                trHtml += `<td class="align-middle" style="min-width: 110px;">${aksiHtml}</td>`;
             } else {
                 trHtml += `<td class="align-middle text-muted">-</td>`;
             }
@@ -4383,3 +4392,134 @@ async function jalankanMigrasiDataShift() {
         if (progressContainer) progressContainer.classList.add("d-none");
     }
 }
+
+// ==========================================
+// TOOL EDIT WAKTU & PINDAH SHIFT ABSENSI (SUPER ADMIN)
+// ==========================================
+async function bukaModalEditAbsensi(id, tipeAbsen, waktu, tanggal) {
+    if (!isSuperAdmin) {
+        Swal.fire("Akses Ditolak", "Hanya Super Admin yang dapat mengedit data absensi.", "error");
+        return;
+    }
+    document.getElementById("edit_absen_id").value = id;
+    document.getElementById("edit_absen_tanggal").value = tanggal;
+    document.getElementById("edit_absen_waktu").value = waktu && waktu !== '-' ? waktu : "08:00:00";
+    document.getElementById("edit_absen_keterangan").value = "";
+
+    const selectTipe = document.getElementById("edit_absen_tipe");
+    selectTipe.innerHTML = '<option value="">Memuat tipe...</option>';
+
+    try {
+        const { data: masterData } = await supabaseClient.from("master_tipe_absen").select("*").eq("is_aktif", true).order("id", { ascending: true });
+        if (masterData && masterData.length > 0) {
+            selectTipe.innerHTML = masterData.map(m => `
+                <option value="${m.nama_tipe}" ${m.nama_tipe === tipeAbsen ? 'selected' : ''}>${m.nama_tipe}</option>
+            `).join('');
+        } else {
+            selectTipe.innerHTML = `<option value="${tipeAbsen}">${tipeAbsen}</option>`;
+        }
+    } catch(e) {
+        selectTipe.innerHTML = `<option value="${tipeAbsen}">${tipeAbsen}</option>`;
+    }
+
+    const modalEl = document.getElementById("modalEditAbsensi");
+    if (modalEl) {
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+}
+window.bukaModalEditAbsensi = bukaModalEditAbsensi;
+
+async function simpanEditAbsensi() {
+    const id = document.getElementById("edit_absen_id").value;
+    const tanggal = document.getElementById("edit_absen_tanggal").value;
+    const tipe_absen = document.getElementById("edit_absen_tipe").value;
+    let waktu = document.getElementById("edit_absen_waktu").value;
+    const ket_alasan = document.getElementById("edit_absen_keterangan").value;
+
+    if (!id || !tipe_absen || !waktu) {
+        Swal.fire("Peringatan", "Semua data wajib diisi.", "warning");
+        return;
+    }
+
+    if (waktu.length === 5) waktu += ":00";
+
+    try {
+        Swal.fire({ title: "Menyimpan...", allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+        // Hitung ulang status, menit_terlambat, dan menit_lembur berdasarkan master_tipe_absen
+        const { data: masterList } = await supabaseClient.from("master_tipe_absen").select("*");
+        const targetMaster = (masterList || []).find(m => m.nama_tipe === tipe_absen);
+
+        const parseT = (tStr) => {
+            if (!tStr) return null;
+            const p = tStr.split(':');
+            if (p.length < 2) return null;
+            return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+        };
+
+        let status = "Hadir";
+        let menit_terlambat = 0;
+        let menit_lembur = 0;
+        let keterangan_waktu = ket_alasan || "Diperbarui oleh Super Admin";
+
+        if (targetMaster) {
+            const wMins = parseT(waktu);
+            const bMins = parseT(targetMaster.batas_terlambat);
+
+            if (targetMaster.is_checkout) {
+                if (bMins && wMins > bMins) {
+                    status = "Lembur";
+                    menit_lembur = wMins - bMins;
+                    keterangan_waktu = ket_alasan || `Lembur ${Math.floor(menit_lembur/60)}j ${menit_lembur%60}m`;
+                } else {
+                    status = "Hadir";
+                    keterangan_waktu = ket_alasan || "Pulang Normal";
+                }
+            } else if (targetMaster.nama_tipe.toLowerCase().includes("istirahat") || targetMaster.nama_tipe.toLowerCase().includes("izin")) {
+                status = targetMaster.nama_tipe.toLowerCase().includes("istirahat") ? "Istirahat" : "Izin";
+                keterangan_waktu = ket_alasan || targetMaster.nama_tipe;
+            } else {
+                if (bMins && wMins > bMins) {
+                    status = "Terlambat";
+                    menit_terlambat = wMins - bMins;
+                    keterangan_waktu = ket_alasan || `Terlambat ${Math.floor(menit_terlambat/60)}j ${menit_terlambat%60}m`;
+                } else {
+                    status = "Hadir";
+                    keterangan_waktu = ket_alasan || "Tepat Waktu";
+                }
+            }
+        }
+
+        const payload = {
+            tipe_absen,
+            waktu,
+            status,
+            menit_terlambat,
+            menit_lembur,
+            keterangan_waktu
+        };
+
+        const { error } = await supabaseClient.from("absensi").update(payload).eq("id", id);
+        if (error) throw error;
+
+        const modalEl = document.getElementById("modalEditAbsensi");
+        if (modalEl) {
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+        }
+
+        Swal.fire("Berhasil", "Data absensi berhasil diperbarui!", "success").then(() => {
+            if (typeof showDetailAbsensi === "function" && tanggal) {
+                showDetailAbsensi(tanggal);
+            }
+            if (typeof loadDataAbsensi === "function") {
+                loadDataAbsensi();
+            }
+        });
+    } catch (err) {
+        console.error(err);
+        Swal.fire("Error", err.message || "Gagal memperbarui absensi", "error");
+    }
+}
+window.simpanEditAbsensi = simpanEditAbsensi;

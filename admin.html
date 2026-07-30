@@ -599,6 +599,43 @@
                   </div>
                 </div>
               </div>
+            <!-- Modal Edit Absensi Karyawan (Super Admin) -->
+            <div class="modal fade" id="modalEditAbsensi" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content shadow-lg">
+                  <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title fw-bold" id="modalEditAbsensiLabel"><i class="fas fa-edit me-2"></i>Edit Data Absensi Karyawan</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body">
+                    <input type="hidden" id="edit_absen_id" value="">
+                    <input type="hidden" id="edit_absen_tanggal" value="">
+                    
+                    <div class="alert alert-info py-2 small mb-3">
+                      <strong>💡 Info Super Admin:</strong> Anda dapat mengedit waktu transaksi atau memindahkan tipe absen karyawan jika terjadi kesalahan pilih shift.
+                    </div>
+
+                    <div class="mb-3">
+                      <label class="form-label fw-bold">Pilih Tipe Absen (Shift / Status)</label>
+                      <select id="edit_absen_tipe" class="form-select fw-bold"></select>
+                    </div>
+
+                    <div class="mb-3">
+                      <label class="form-label fw-bold">Waktu Absen (Jam:Menit:Detik)</label>
+                      <input type="time" id="edit_absen_waktu" class="form-control fw-bold" step="1">
+                    </div>
+
+                    <div class="mb-3">
+                      <label class="form-label fw-bold">Catatan / Alasan Perubahan (Opsional)</label>
+                      <input type="text" id="edit_absen_keterangan" class="form-control" placeholder="Contoh: Perbaikan salah klik tipe shift oleh karyawan">
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-warning fw-bold shadow-sm" onclick="simpanEditAbsensi()"><i class="fas fa-save me-1"></i> Simpan Perubahan</button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div class="tab-pane" id="tab-absensi">
