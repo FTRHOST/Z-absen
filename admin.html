@@ -991,24 +991,32 @@ Besok **17 Agustus** kita libur ya!"></textarea>
                       
                       <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom">
                         <small class="fw-bold text-muted">Section Data Database</small>
-                        <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 fw-bold" onclick="toggleSelectAllBackup(this)">Batal Pilih Semua</button>
+                        <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 fw-bold" onclick="toggleSelectAllBackup(this)">Pilih Semua</button>
                       </div>
 
                       <div class="form-check mb-2">
-                        <input class="form-check-input check-backup-section" type="checkbox" id="chk_b_users" value="users" checked>
+                        <input class="form-check-input check-backup-section" type="checkbox" id="chk_b_users" value="users">
                         <label class="form-check-label fw-bold small" for="chk_b_users">👤 Data Karyawan & User Admin</label>
                       </div>
                       <div class="form-check mb-2">
-                        <input class="form-check-input check-backup-section" type="checkbox" id="chk_b_master_tipe" value="master_tipe_absen" checked>
+                        <input class="form-check-input check-backup-section" type="checkbox" id="chk_b_master_tipe" value="master_tipe_absen">
                         <label class="form-check-label fw-bold small" for="chk_b_master_tipe">⏰ Master Tipe Absen / Shift Kerja</label>
                       </div>
                       <div class="form-check mb-2">
-                        <input class="form-check-input check-backup-section" type="checkbox" id="chk_b_settings" value="app_settings" checked>
+                        <input class="form-check-input check-backup-section" type="checkbox" id="chk_b_settings" value="app_settings">
                         <label class="form-check-label fw-bold small" for="chk_b_settings">⚙️ Pengaturan Aplikasi Global</label>
                       </div>
                       <div class="form-check mb-2">
-                        <input class="form-check-input check-backup-section" type="checkbox" id="chk_b_cabang" value="master_cabang" checked>
+                        <input class="form-check-input check-backup-section" type="checkbox" id="chk_b_cabang" value="master_cabang">
                         <label class="form-check-label fw-bold small" for="chk_b_cabang">🏢 Master Kantor Cabang / Lokasi</label>
+                      </div>
+                      <div class="form-check mb-2">
+                        <input class="form-check-input check-backup-section" type="checkbox" id="chk_b_jenis_cuti" value="master_jenis_cuti">
+                        <label class="form-check-label fw-bold small" for="chk_b_jenis_cuti">📋 Master Jenis Cuti & Kuota</label>
+                      </div>
+                      <div class="form-check mb-2">
+                        <input class="form-check-input check-backup-section" type="checkbox" id="chk_b_config_cuti" value="form_cuti_config">
+                        <label class="form-check-label fw-bold small" for="chk_b_config_cuti">📄 Konfigurasi Form Cuti & Syarat Dokumen</label>
                       </div>
                       <div class="form-check mb-2">
                         <input class="form-check-input check-backup-section" type="checkbox" id="chk_b_absensi" value="absensi">
@@ -1017,14 +1025,6 @@ Besok **17 Agustus** kita libur ya!"></textarea>
                       <div class="form-check mb-2">
                         <input class="form-check-input check-backup-section" type="checkbox" id="chk_b_cuti" value="cuti">
                         <label class="form-check-label fw-bold small" for="chk_b_cuti">🏖️ Data Pengajuan Cuti & Approval</label>
-                      </div>
-                      <div class="form-check mb-2">
-                        <input class="form-check-input check-backup-section" type="checkbox" id="chk_b_jenis_cuti" value="master_jenis_cuti" checked>
-                        <label class="form-check-label fw-bold small" for="chk_b_jenis_cuti">📋 Master Jenis Cuti & Kuota</label>
-                      </div>
-                      <div class="form-check mb-2">
-                        <input class="form-check-input check-backup-section" type="checkbox" id="chk_b_config_cuti" value="form_cuti_config" checked>
-                        <label class="form-check-label fw-bold small" for="chk_b_config_cuti">📄 Konfigurasi Form Cuti & Syarat Dokumen</label>
                       </div>
 
                       <button class="btn btn-warning fw-bold w-100 mt-3 shadow-sm text-dark" onclick="downloadBackupModular()">
