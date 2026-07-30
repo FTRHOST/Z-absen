@@ -4580,7 +4580,31 @@ async function simpanEditAbsensi() {
             keterangan_waktu
         };
 
-        const { error } = await supabaseClient.from("absensi").update(payload).eq("id", id);
+        let { error } = await supabaseClient.from("absensi").update(payload).eq("id", id);
+
+        if (error && (error.code === 'PGRST204' || (error.message && error.message.includes('keterangan_waktu')))) {
+            console.warn("Kolom keterangan_waktu belum ada di Supabase Cloud absensi table. Fallback update tanpa keterangan_waktu...");
+            const fallbackPayload = { tipe_absen, waktu, status, menit_terlambat, menit_lembur };
+            const fallbackRes = await supabaseClient.from("absensi").update(fallbackPayload).eq("id", id);
+            
+            if (!fallbackRes.error) {
+                const modalEl = document.getElementById("modalEditAbsensi");
+                if (modalEl) {
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+                }
+                Swal.fire({
+                    title: "Berhasil Diperbarui",
+                    html: `Data absensi berhasil diperbarui.<br><br><small class="text-warning"><strong>⚠️ Catatan Tambahan:</strong> Database Supabase Cloud Anda belum memiliki kolom <code>keterangan_waktu</code>.<br><br>Jalankan perintah SQL berikut di <strong>Supabase Dashboard (SQL Editor)</strong>:<br><code class="bg-dark text-white p-2 rounded d-block mt-2 text-start">ALTER TABLE absensi ADD COLUMN IF NOT EXISTS keterangan_waktu TEXT;</code></small>`,
+                    icon: "warning"
+                }).then(() => {
+                    if (typeof showDetailAbsensi === "function" && tanggal) showDetailAbsensi(tanggal);
+                    if (typeof loadDataAbsensi === "function") loadDataAbsensi(false);
+                });
+                return;
+            }
+        }
+
         if (error) throw error;
 
         const modalEl = document.getElementById("modalEditAbsensi");
@@ -4594,7 +4618,7 @@ async function simpanEditAbsensi() {
                 showDetailAbsensi(tanggal);
             }
             if (typeof loadDataAbsensi === "function") {
-                loadDataAbsensi();
+                loadDataAbsensi(false);
             }
         });
     } catch (err) {

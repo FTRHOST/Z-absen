@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
     pengumuman_warna TEXT DEFAULT 'alert-info',
     enable_lokasi BOOLEAN DEFAULT true,
     enable_kamera BOOLEAN DEFAULT true,
+    format_waktu TEXT DEFAULT 'HH:mm:ss',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
 );
 
