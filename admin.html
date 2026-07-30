@@ -641,89 +641,99 @@
             </div>
 
             <div class="tab-pane" id="tab-absensi">
-              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                <h5 class="fw-bold mb-0 text-primary"><i class="fas fa-calendar-alt me-2"></i>Rekap Absensi Harian</h5>
-                <div class="d-flex align-items-center gap-2">
-                  <input
-                    type="month"
-                    id="filter-bulan-absensi"
-                    class="form-control form-control-sm w-auto shadow-sm"
-                    onchange="loadDataAbsensi()"
-                  />
-                  <button class="btn btn-sm btn-success fw-bold shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#collapseExportAbsensi" aria-expanded="false" aria-controls="collapseExportAbsensi">
-                    <i class="fas fa-file-export me-1"></i> Export Data Absensi
-                  </button>
-                </div>
-              </div>
-
-              <!-- COLLAPSIBLE EXPORT CARD DI REKAP ABSENSI -->
-              <div class="collapse mb-4" id="collapseExportAbsensi">
-                <div class="card shadow-sm border-0 border-start border-4 border-success">
-                  <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
-                    <span><i class="fas fa-file-excel text-success me-2"></i>Export Data Absensi (CSV / ZIP Foto)</span>
-                    <button type="button" class="btn-close" data-bs-toggle="collapse" data-bs-target="#collapseExportAbsensi" aria-label="Close"></button>
+              <!-- SUB-VIEW 1: REKAP BULANAN (GRID VIEW) -->
+              <div id="absensi-grid-view">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                  <h5 class="fw-bold mb-0 text-primary"><i class="fas fa-calendar-alt me-2"></i>Rekap Absensi Harian</h5>
+                  <div class="d-flex align-items-center gap-2">
+                    <input
+                      type="month"
+                      id="filter-bulan-absensi"
+                      class="form-control form-control-sm w-auto shadow-sm"
+                      onchange="loadDataAbsensi()"
+                    />
+                    <button class="btn btn-sm btn-success fw-bold shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#collapseExportAbsensi" aria-expanded="false" aria-controls="collapseExportAbsensi">
+                      <i class="fas fa-file-export me-1"></i> Export Data Absensi
+                    </button>
                   </div>
-                  <div class="card-body">
-                    <form id="form-export" onsubmit="prosesExport(event)">
-                      <div class="row g-3">
-                        <div class="col-md-5">
-                          <label class="form-label small text-muted">Tanggal Mulai</label>
-                          <input type="date" class="form-control form-control-sm" id="export_mulai" required>
-                        </div>
-                        <div class="col-md-5">
-                          <label class="form-label small text-muted">Tanggal Selesai</label>
-                          <input type="date" class="form-control form-control-sm" id="export_selesai" required>
-                        </div>
-                        <div class="col-md-2 d-flex align-items-end">
-                          <button type="submit" class="btn btn-sm btn-success w-100 fw-bold shadow-sm" id="btn-export">
-                            <i class="fas fa-download me-1"></i> Export
-                          </button>
-                        </div>
-                        <div class="col-md-12">
-                          <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="export_media">
-                            <label class="form-check-label text-muted small" for="export_media">Sertakan foto absensi (Download format ZIP + folder media foto)</label>
+                </div>
+
+                <!-- COLLAPSIBLE EXPORT CARD DI REKAP ABSENSI -->
+                <div class="collapse mb-4" id="collapseExportAbsensi">
+                  <div class="card shadow-sm border-0 border-start border-4 border-success">
+                    <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                      <span><i class="fas fa-file-excel text-success me-2"></i>Export Data Absensi (CSV / ZIP Foto)</span>
+                      <button type="button" class="btn-close" data-bs-toggle="collapse" data-bs-target="#collapseExportAbsensi" aria-label="Close"></button>
+                    </div>
+                    <div class="card-body">
+                      <form id="form-export" onsubmit="prosesExport(event)">
+                        <div class="row g-3">
+                          <div class="col-md-5">
+                            <label class="form-label small text-muted">Tanggal Mulai</label>
+                            <input type="date" class="form-control form-control-sm" id="export_mulai" required>
+                          </div>
+                          <div class="col-md-5">
+                            <label class="form-label small text-muted">Tanggal Selesai</label>
+                            <input type="date" class="form-control form-control-sm" id="export_selesai" required>
+                          </div>
+                          <div class="col-md-2 d-flex align-items-end">
+                            <button type="submit" class="btn btn-sm btn-success w-100 fw-bold shadow-sm" id="btn-export">
+                              <i class="fas fa-download me-1"></i> Export
+                            </button>
+                          </div>
+                          <div class="col-md-12">
+                            <div class="form-check">
+                              <input class="form-check-input" type="checkbox" id="export_media">
+                              <label class="form-check-label text-muted small" for="export_media">Sertakan foto absensi (Download format ZIP + folder media foto)</label>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </form>
+                      </form>
+                    </div>
                   </div>
+                </div>
+
+                <!-- Kontainer Grid Card Absensi -->
+                <div id="absensi-grid-container" class="row g-3">
+                  <!-- Card harian dimuat via JS -->
                 </div>
               </div>
 
-              <!-- Kontainer Grid Card Absensi -->
-              <div id="absensi-grid-container" class="row g-3">
-                <!-- Card harian dimuat via JS -->
-              </div>
-
-              <!-- Modal Detail Absensi Harian -->
-              <div class="modal fade" id="modalDetailAbsensi" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-                  <div class="modal-content border-0 shadow">
-                    <div class="modal-header bg-primary text-white">
-                      <h5 class="modal-title fw-bold" id="modalDetailAbsensiTitle">Detail Absensi</h5>
-                      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body p-0">
-                      <div class="p-3 border-bottom bg-light">
-                        <div class="input-group">
+              <!-- SUB-VIEW 2: HALAMAN DETAIL ABSENSI HARIAN (PAGE VIEW) -->
+              <div id="absensi-detail-page-view" class="d-none">
+                <!-- Header Toolbar Page Detail -->
+                <div class="card shadow-sm border-0 mb-4 rounded-3">
+                  <div class="card-body p-3">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                      <div class="d-flex align-items-center gap-3">
+                        <button class="btn btn-outline-secondary fw-bold shadow-sm" onclick="tutupDetailAbsensiPage()">
+                          <i class="fas fa-arrow-left me-2"></i>Kembali ke Rekap Bulan
+                        </button>
+                        <h4 class="fw-bold mb-0 text-primary" id="pageDetailAbsensiTitle">
+                          <i class="fas fa-calendar-day me-2"></i>Detail Absensi Harian
+                        </h4>
+                      </div>
+                      <div class="d-flex align-items-center gap-2">
+                        <div class="input-group input-group-sm" style="max-width: 250px;">
                           <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
-                          <input type="text" id="searchDetailAbsensi" class="form-control" placeholder="Cari nama karyawan, kantor, atau tipe absen..." onkeyup="filterDetailAbsensi()">
+                          <input type="text" id="searchDetailAbsensiPage" class="form-control" placeholder="Cari karyawan / kantor..." onkeyup="filterDetailAbsensiPage()">
                         </div>
-                      </div>
-                      <div class="table-responsive">
-                        <table class="table table-hover table-striped mb-0 text-center align-middle">
-                          <thead class="table-light" id="modalDetailAbsensiHead">
-                            <!-- Headers dimuat dinamis -->
-                          </thead>
-                          <tbody id="modalDetailAbsensiBody">
-                            <!-- Data dimuat dinamis -->
-                          </tbody>
-                        </table>
+                        <button class="btn btn-sm btn-success fw-bold shadow-sm" onclick="exportCsvCurrentDetail()">
+                          <i class="fas fa-file-excel me-1"></i> Export Detail CSV
+                        </button>
                       </div>
                     </div>
-                    <div class="modal-footer bg-light">
-                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                  </div>
+                </div>
+
+                <!-- Page Table Card -->
+                <div class="card shadow-sm border-0 rounded-3">
+                  <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 75vh;">
+                      <table class="table table-bordered table-hover align-middle mb-0 text-center small">
+                        <thead class="table-dark sticky-top" id="pageDetailAbsensiHead"></thead>
+                        <tbody id="pageDetailAbsensiBody"></tbody>
+                      </table>
                     </div>
                   </div>
                 </div>

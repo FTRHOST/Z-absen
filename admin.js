@@ -1374,22 +1374,44 @@ async function loadDataAbsensi() {
 let currentAbsensiTanggal = null;
 let currentAbsensiDateStr = null;
 
-function showDetailAbsensi(tanggal, dateStr) {
+function showDetailAbsensi(tanggal, dateStrParam) {
     currentAbsensiTanggal = tanggal;
+
+    let dateStr = dateStrParam;
+    if (!dateStr) {
+        try {
+            const [yyyy, mm, dd] = tanggal.split('-');
+            const dateObj = new Date(yyyy, parseInt(mm, 10) - 1, dd);
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            dateStr = dateObj.toLocaleDateString('id-ID', options);
+        } catch(e) {
+            dateStr = tanggal;
+        }
+    }
     currentAbsensiDateStr = dateStr;
-    const thead = document.getElementById("modalDetailAbsensiHead");
-    const tbody = document.getElementById("modalDetailAbsensiBody");
-    document.getElementById("modalDetailAbsensiTitle").innerHTML = `<i class="fas fa-calendar-day me-2"></i>Detail Absensi - ${dateStr}`;
-    const searchInput = document.getElementById("searchDetailAbsensi");
-    if (searchInput) searchInput.value = '';
+
+    // Switch view to Page View section
+    const gridView = document.getElementById("absensi-grid-view");
+    const pageView = document.getElementById("absensi-detail-page-view");
+    if (gridView) gridView.classList.add("d-none");
+    if (pageView) pageView.classList.remove("d-none");
+
+    const pageTitle = document.getElementById("pageDetailAbsensiTitle");
+    if (pageTitle) pageTitle.innerHTML = `<i class="fas fa-calendar-day me-2"></i>Detail Absensi - ${dateStr}`;
+
+    const searchInputPage = document.getElementById("searchDetailAbsensiPage");
+    if (searchInputPage) searchInputPage.value = '';
+
+    const thead = document.getElementById("pageDetailAbsensiHead") || document.getElementById("modalDetailAbsensiHead");
+    const tbody = document.getElementById("pageDetailAbsensiBody") || document.getElementById("modalDetailAbsensiBody");
     
-    thead.innerHTML = '';
-    tbody.innerHTML = '';
+    if (thead) thead.innerHTML = '';
+    if (tbody) tbody.innerHTML = '';
     
     const records = allAbsensiGrouped[tanggal]?.records || [];
     
     if (records.length === 0) {
-        tbody.innerHTML = `<tr><td class="text-center py-4 text-muted">Tidak ada data detail absensi</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td class="text-center py-4 text-muted">Tidak ada data detail absensi</td></tr>`;
         return;
     }
 
@@ -1444,7 +1466,7 @@ function showDetailAbsensi(tanggal, dateStr) {
         trHead += `<th><span class="badge bg-secondary">${tipe}</span></th>`;
     });
     trHead += `</tr>`;
-    thead.innerHTML = trHead;
+    if (thead) thead.innerHTML = trHead;
 
     // 3. Build Body Rows
     let tbodyRowsHtml = '';
@@ -1653,19 +1675,16 @@ function showDetailAbsensi(tanggal, dateStr) {
         tbodyRowsHtml += trHtml;
     }
     
-    tbody.innerHTML = tbodyRowsHtml;
-
-    const modalEl = document.getElementById('modalDetailAbsensi');
-    if (modalEl && !modalEl.classList.contains('show')) {
-        new bootstrap.Modal(modalEl).show();
-    }
+    if (tbody) tbody.innerHTML = tbodyRowsHtml;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function filterDetailAbsensi() {
-    const input = document.getElementById("searchDetailAbsensi");
+function filterDetailAbsensiPage() {
+    const input = document.getElementById("searchDetailAbsensiPage");
     if (!input) return;
     const filter = input.value.toLowerCase();
-    const tbody = document.getElementById("modalDetailAbsensiBody");
+    const tbody = document.getElementById("pageDetailAbsensiBody");
+    if (!tbody) return;
     const trs = tbody.getElementsByTagName("tr");
     
     for (let i = 0; i < trs.length; i++) {
@@ -1678,6 +1697,28 @@ function filterDetailAbsensi() {
         }
     }
 }
+window.filterDetailAbsensiPage = filterDetailAbsensiPage;
+
+function filterDetailAbsensi() {
+    filterDetailAbsensiPage();
+}
+window.filterDetailAbsensi = filterDetailAbsensi;
+
+function tutupDetailAbsensiPage() {
+    const gridView = document.getElementById("absensi-grid-view");
+    const pageView = document.getElementById("absensi-detail-page-view");
+    if (gridView) gridView.classList.remove("d-none");
+    if (pageView) pageView.classList.add("d-none");
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+window.tutupDetailAbsensiPage = tutupDetailAbsensiPage;
+
+function exportCsvCurrentDetail() {
+    if (currentAbsensiTanggal) {
+        exportCsvHarian(currentAbsensiTanggal);
+    }
+}
+window.exportCsvCurrentDetail = exportCsvCurrentDetail;
 
 async function exportCsvHarian(tanggal) {
     try {
