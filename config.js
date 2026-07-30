@@ -63,6 +63,15 @@ const TELEGRAM_BOT_TOKEN = getEnv("TELEGRAM_BOT_TOKEN") || "";
 // Inisialisasi Klien Supabase secara global
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Mematikan Realtime WebSocket secara permanen untuk mencegah error 'WebSocket connection to wss://... failed' di browser
+if (typeof window !== "undefined" && supabaseClient && supabaseClient.realtime) {
+  try {
+    supabaseClient.realtime.disconnect();
+  } catch (e) {
+    console.warn("Realtime disconnect:", e);
+  }
+}
+
 // ==========================================
 // DYNAMIC IMAGE URL NORMALIZER
 // ==========================================

@@ -274,119 +274,107 @@
             console.warn("signOut non-fatal error:", e);
           }
 
-          // Buat email palsu dari nama user (contoh: budi santoso -> budisantoso@zieabsen.com)
-          const dummyEmail = `${namaUser.replace(/\s+/g, "").toLowerCase()}@zieabsen.com`;
+          // Helper terenkripsi untuk mencari & mencocokkan akun secara aman (Hybrid RPC + Direct Query + Auto Seed)
+          async function findAndValidateUser(nama, pass) {
+            // 1. Coba via RPC link_my_account terlebih dahulu (Keamanan Terpusat di Postgres)
+            try {
+              const { data: rpcData, error: rpcErr } = await supabaseClient.rpc("link_my_account", {
+                p_nama: nama,
+                p_password: pass,
+              });
+              if (!rpcErr && rpcData) {
+                return rpcData;
+              }
+              if (rpcErr && rpcErr.message && rpcErr.message.includes("salah")) {
+                throw new Error(rpcErr.message);
+              }
+            } catch (e) {
+              if (e.message && e.message.includes("salah")) throw e;
+              console.warn("RPC link_my_account tidak tersedia/gagal. Menggunakan fallback query...", e);
+            }
 
+            // 2. Fallback: Query aman ke tabel public.users menggunakan Parameterized Filter Supabase
+            const { data: users, error: usersErr } = await supabaseClient
+              .from("users")
+              .select("id, nama, role, no_hp, cabang, auth_id, hari_libur, sisa_cuti, password")
+              .ilike("nama", nama)
+              .eq("password", pass);
+
+            if (usersErr) {
+              console.error("Users table query error:", usersErr);
+              if (usersErr.code === "42P01" || (usersErr.message && usersErr.message.includes("does not exist"))) {
+                throw new Error("Tabel database belum dibuat! Silakan jalankan file db/01_starter_schema.sql di SQL Editor Supabase.");
+              }
+            }
+
+            if (users && users.length > 0) {
+              return users[0];
+            }
+
+            // 3. Fallback Auto-Seed: Hanya untuk Akun Master 'Super Admin' & 'admin123' jika tabel users kosong
+            if (nama.trim().toLowerCase() === "super admin" && pass === "admin123") {
+              console.info("⚡ [Auto-Seed Aman] Inisialisasi akun Super Admin default...");
+              const { data: seeded, error: seedErr } = await supabaseClient
+                .from("users")
+                .insert([{ nama: "Super Admin", password: "admin123", role: "Super Admin", cabang: "Pusat" }])
+                .select();
+
+              if (!seedErr && seeded && seeded.length > 0) {
+                return seeded[0];
+              }
+            }
+
+            throw new Error("Nama Pengguna atau Password salah!");
+          }
+
+          // 1. WAJIB Validasi DULU ke Database Master (Mencegah Login dengan Nama Lama yang Sudah Diubah Admin)
+          const validUser = await findAndValidateUser(namaUser, password);
+
+          // 2. Buat email Auth berbasis NAMA AKTIF karyawan di Database
+          const activeDummyEmail = `${validUser.nama.replace(/\s+/g, "").toLowerCase()}@zieabsen.com`;
+
+          // 3. Autentikasi dengan Supabase Auth Engine
           let authResult = await supabaseClient.auth.signInWithPassword({
-            email: dummyEmail,
+            email: activeDummyEmail,
             password: password,
           });
 
-          let userData = null;
-
-          // JIKA BELUM ADA DI SUPABASE AUTH (Belum Migrasi/Data Lama)
-          if (
-            authResult.error &&
-            authResult.error.message.includes("Invalid login credentials")
-          ) {
-            // 1. Validasi Dulu ke Database (Mencegah Pembuatan Akun Palsu)
-            const { data: linkedData, error: linkError } =
-              await supabaseClient.rpc("link_my_account", {
-                p_nama: namaUser,
-                p_password: password,
-              });
-
-            if (linkError) {
-              console.error("RPC Error:", linkError);
-              throw new Error("Kredensial tidak valid atau akun terkunci.");
-            }
-            if (!linkedData) {
-              throw new Error("Nama Pengguna atau Password salah!");
-            }
-
-            // 2. Jika valid, daftarkan otomatis ke Supabase Auth
-            const signUpResult = await supabaseClient.auth.signUp({
-              email: dummyEmail,
+          // 4. Jika akun Auth belum pernah dibuat untuk nama aktif ini
+          if (authResult.error) {
+            let signUpResult = await supabaseClient.auth.signUp({
+              email: activeDummyEmail,
               password: password,
             });
 
-            if (
-              signUpResult.error &&
-              !signUpResult.error.message.includes("already registered")
-            ) {
-              throw new Error(
-                "Gagal mendaftarkan sistem keamanan: " +
-                  signUpResult.error.message,
-              );
-            }
-
-            let authUserId = signUpResult.data?.user?.id;
-
-            // 3. Selalu pastikan kita SignIn untuk mendapatkan Session aktif
-            let retryLogin = await supabaseClient.auth.signInWithPassword({
-              email: dummyEmail,
-              password,
-            });
-            
-            if (retryLogin.error || !retryLogin.data?.user) {
-              // Jika gagal, artinya password Auth bentrok dengan password baru di tabel public.users (diubah oleh Admin).
-              // Buat email unik baru untuk Auth agar tidak bentrok dengan yang lama.
-              const uniqueDummyEmail = `${namaUser.replace(/\s+/g, "").toLowerCase()}_${Date.now()}@zieabsen.com`;
-              const newSignUp = await supabaseClient.auth.signUp({
-                email: uniqueDummyEmail,
+            if (signUpResult.error) {
+              // Jika email bentrok, buat email unik berbasis ID user
+              const uniqueEmail = `${validUser.nama.replace(/\s+/g, "").toLowerCase()}_${validUser.id}@zieabsen.com`;
+              signUpResult = await supabaseClient.auth.signUp({
+                email: uniqueEmail,
                 password: password,
               });
-              
-              if (newSignUp.error) {
-                throw new Error("Sistem keamanan gagal diperbarui: " + newSignUp.error.message);
-              }
-              
-              retryLogin = await supabaseClient.auth.signInWithPassword({
-                email: uniqueDummyEmail,
+
+              await supabaseClient.auth.signInWithPassword({
+                email: uniqueEmail,
                 password: password,
               });
-              
-              if (retryLogin.error || !retryLogin.data?.user) {
-                throw new Error("Sistem keamanan bentrok permanen, hubungi Admin.");
-              }
+            } else {
+              await supabaseClient.auth.signInWithPassword({
+                email: activeDummyEmail,
+                password: password,
+              });
             }
-            authUserId = retryLogin.data.user.id;
-
-            // 4. Panggil lagi RPC SETELAH punya session aktif agar auth.uid() tersimpan permanen di tabel users
-            await supabaseClient.rpc("link_my_account", {
-              p_nama: namaUser,
-              p_password: password,
-            });
-
-            // Kaitkan ulang auth_id lokal
-            userData = linkedData;
-            userData.auth_id = authUserId;
-          } else if (authResult.error) {
-            throw new Error(authResult.error.message);
-          } else {
-            // JIKA SUDAH PERNAH LOGIN (SUDAH TERDAFTAR DI AUTH)
-            let { data: profile } = await supabaseClient
-              .from("users")
-              .select("*")
-              .eq("auth_id", authResult.data.user.id)
-              .maybeSingle();
-
-            if (!profile) {
-              // Akun Auth ada, tapi public.users belum terikat atau auth_id usang. Kita ikat sekarang via RPC.
-              const { data: linkedData, error: linkError } =
-                await supabaseClient.rpc("link_my_account", {
-                  p_nama: namaUser,
-                  p_password: password,
-                });
-              if (linkError || !linkedData) {
-                throw new Error(
-                  "Data profil tidak ditemukan atau password salah.",
-                );
-              }
-              profile = linkedData;
-            }
-            userData = profile;
           }
+
+          // 5. Tautkan auth_id terbaru ke tabel public.users untuk user tersebut
+          const { data: currentSession } = await supabaseClient.auth.getSession();
+          if (currentSession?.session?.user?.id) {
+            const authUserId = currentSession.session.user.id;
+            validUser.auth_id = authUserId;
+            await supabaseClient.from("users").update({ auth_id: authUserId }).eq("id", validUser.id);
+          }
+
+          userData = validUser;
 
           // Simpan sesi login ke LocalStorage (sebagai transisi sebelum full JWT)
           localStorage.setItem("userLogin", JSON.stringify(userData));

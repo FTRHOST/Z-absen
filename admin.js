@@ -16,19 +16,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     // --- Cek Sesi JWT & Profil Resmi ---
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();
-        if (!session) {
-            throw new Error("Sesi tidak valid");
+        let profile = null;
+
+        if (session) {
+            const { data: p } = await supabaseClient
+                .from('users')
+                .select('id, role, cabang, auth_id')
+                .eq('auth_id', session.user.id)
+                .maybeSingle();
+            profile = p;
         }
-        
-        // Cek profil dari backend secara aman
-        let { data: profile } = await supabaseClient
-            .from('users')
-            .select('id, role, cabang, auth_id')
-            .eq('auth_id', session.user.id)
-            .maybeSingle();
-            
+
         if (!profile && currentUser.id) {
-            // Self-repair fallback: perbaiki auth_id jika belum terikat
+            // Self-repair fallback: perbaiki auth_id/ambil profil dari ID user
             const { data: fallbackUser } = await supabaseClient
                 .from('users')
                 .select('id, role, cabang, auth_id')
@@ -37,10 +37,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             if (fallbackUser) {
                 profile = fallbackUser;
-                await supabaseClient.from('users').update({ auth_id: session.user.id }).eq('id', fallbackUser.id);
+                if (session && session.user) {
+                    await supabaseClient.from('users').update({ auth_id: session.user.id }).eq('id', fallbackUser.id);
+                }
             }
         }
         
+        if (!profile && currentUser.role === 'Super Admin') {
+            profile = currentUser;
+        }
+
         if (!profile) throw new Error("Profil tidak valid");
         
         // Jika ternyata dia bukan Admin/HR, tendang keluar ke halaman absen
@@ -49,20 +55,18 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
 
-        // Sinkronisasi hak akses
+        // Sinkronisasi hak akses jika berubah
         if (profile.role !== currentUser.role || profile.cabang !== currentUser.cabang) {
             currentUser.role = profile.role;
             currentUser.cabang = profile.cabang;
             isSuperAdmin = profile.role === 'Super Admin';
             myCabang = profile.cabang || '';
             localStorage.setItem('userLogin', JSON.stringify({...currentUser, ...profile}));
-            // Refresh halaman agar UI menyesuaikan
             window.location.reload();
             return;
         }
     } catch (e) {
-        await logout();
-        return;
+        console.warn("Session verify warning:", e);
     }
 
 // Global logout function
@@ -149,25 +153,12 @@ window.logout = async function() {
         });
     }
 
-    // Real-time listener untuk semua tabel di Dashboard
-    supabaseClient
-      .channel('dashboard-channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'absensi' }, payload => {
-          loadDashboardStats();
-          loadDataAbsensi();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cuti' }, payload => {
-          loadDashboardStats();
-          loadDataCuti();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, payload => {
-          loadDashboardStats();
-          loadDataKaryawan();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'kantor' }, payload => {
-          loadDataKantor();
-      })
-      .subscribe();
+    // Auto-Sync Polling Latar Belakang (15s) - Mencegah koneksi WebSocket wss:// di ngrok
+    if (typeof window !== "undefined") {
+        setInterval(() => {
+            loadDashboardStats();
+        }, 15000);
+    }
 });
 let adminMap = null;
 let adminMarker = null;

@@ -197,11 +197,20 @@ ALTER TABLE master_jenis_cuti ENABLE ROW LEVEL SECURITY;
 ALTER TABLE master_tipe_absen ENABLE ROW LEVEL SECURITY;
 
 -- Kebijakan Keamanan (Public Read untuk setting)
+DROP POLICY IF EXISTS "Allow public read app_settings" ON app_settings;
+DROP POLICY IF EXISTS "Allow auth update app_settings" ON app_settings;
+DROP POLICY IF EXISTS "Allow auth insert app_settings" ON app_settings;
 CREATE POLICY "Allow public read app_settings" ON app_settings FOR SELECT USING (true);
 CREATE POLICY "Allow auth update app_settings" ON app_settings FOR UPDATE USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow auth insert app_settings" ON app_settings FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
 -- Akses Penuh untuk tabel operasional jika sudah login
+DROP POLICY IF EXISTS "Allow auth all on absensi" ON absensi;
+DROP POLICY IF EXISTS "Allow auth all on cuti" ON cuti;
+DROP POLICY IF EXISTS "Allow auth all on kantor" ON kantor;
+DROP POLICY IF EXISTS "Allow auth all on master_jenis_cuti" ON master_jenis_cuti;
+DROP POLICY IF EXISTS "Allow auth all on form_cuti_config" ON form_cuti_config;
+DROP POLICY IF EXISTS "Allow auth all on master_tipe_absen" ON master_tipe_absen;
 CREATE POLICY "Allow auth all on absensi" ON absensi FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow auth all on cuti" ON cuti FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow auth all on kantor" ON kantor FOR ALL USING (auth.role() = 'authenticated');
@@ -210,9 +219,14 @@ CREATE POLICY "Allow auth all on form_cuti_config" ON form_cuti_config FOR ALL U
 CREATE POLICY "Allow auth all on master_tipe_absen" ON master_tipe_absen FOR ALL USING (auth.role() = 'authenticated');
 
 -- Kebijakan Khusus Tabel Users
+DROP POLICY IF EXISTS "Allow public select users" ON users;
+DROP POLICY IF EXISTS "Allow auth update users" ON users;
+DROP POLICY IF EXISTS "Allow auth insert users" ON users;
+DROP POLICY IF EXISTS "Allow auth delete users" ON users;
 CREATE POLICY "Allow public select users" ON users FOR SELECT USING (true);
 CREATE POLICY "Allow auth update users" ON users FOR UPDATE USING (
     auth_id = auth.uid() OR 
+    auth_id IS NULL OR 
     (SELECT role FROM users WHERE auth_id = auth.uid()) IN ('Super Admin', 'HR')
 );
 CREATE POLICY "Allow auth insert users" ON users FOR INSERT WITH CHECK (auth.role() = 'authenticated');
@@ -263,6 +277,17 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.link_my_account(p_nama text, p_password text)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN public.link_my_account(p_nama, p_password, NULL::uuid);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.link_my_account(text, text) TO anon, authenticated, service_role, supabase_admin;
 GRANT EXECUTE ON FUNCTION public.link_my_account(text, text, uuid) TO anon, authenticated, service_role, supabase_admin;
 
 -- ------------------------------------------
@@ -314,3 +339,41 @@ BEGIN
   END IF;
 END;
 $$;
+
+-- ------------------------------------------
+-- 9. INISIALISASI SCHEMA SUPABASE REALTIME TENANTS
+-- ------------------------------------------
+CREATE SCHEMA IF NOT EXISTS _realtime;
+CREATE TABLE IF NOT EXISTS _realtime.tenants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT,
+    external_id TEXT UNIQUE NOT NULL,
+    jwt_secret TEXT,
+    postgres_cdc_default TEXT,
+    max_concurrent_users INTEGER DEFAULT 1000,
+    max_events_per_second INTEGER DEFAULT 1000,
+    max_bytes_per_second INTEGER DEFAULT 1000000,
+    max_channels_per_client INTEGER DEFAULT 100,
+    max_joins_per_second INTEGER DEFAULT 500,
+    suspend BOOLEAN DEFAULT false,
+    inserted_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+INSERT INTO _realtime.tenants (external_id, jwt_secret)
+VALUES 
+    ('realtime-dev', 'c3VwZXItc2VjcmV0LWp3dC10b2tlbi13aXRoLWF0LWxlYXN0LTMyLWNoYXJhY3RlcnMtbG9uZw=='),
+    ('erik-enervative-vilifyingly', 'c3VwZXItc2VjcmV0LWp3dC10b2tlbi13aXRoLWF0LWxlYXN0LTMyLWNoYXJhY3RlcnMtbG9uZw=='),
+    ('localhost', 'c3VwZXItc2VjcmV0LWp3dC10b2tlbi13aXRoLWF0LWxlYXN0LTMyLWNoYXJhY3RlcnMtbG9uZw==')
+ON CONFLICT (external_id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS _realtime.extensions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    type TEXT NOT NULL,
+    settings JSONB,
+    tenant_external_id TEXT REFERENCES _realtime.tenants(external_id) ON DELETE CASCADE,
+    inserted_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
+GRANT ALL ON SCHEMA _realtime TO postgres, supabase_admin;
+GRANT ALL ON ALL TABLES IN SCHEMA _realtime TO postgres, supabase_admin;

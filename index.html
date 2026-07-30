@@ -684,7 +684,7 @@
                 id="register-face-status"
                 class="badge bg-warning-subtle text-warning-emphasis fs-6 border border-warning-subtle rounded-pill px-3 py-2"
               >
-                Memuat model kecerdasan buatan... (Harap tunggu)
+                Menghidupkan kamera...
               </span>
             </div>
           </div>
@@ -1131,25 +1131,12 @@
         loadKantorUser();
         cekStatusAbsenHariIni();
 
-        // Real-time listener riwayat absen
+        // Auto-Sync Polling Latar Belakang (15s) - Mencegah koneksi WebSocket wss:// di ngrok
         if (userData) {
-          const uData = JSON.parse(userData);
-          supabaseClient
-            .channel("karyawan-absensi")
-            .on(
-              "postgres_changes",
-              {
-                event: "*",
-                schema: "public",
-                table: "absensi",
-                filter: `user_id=eq.${uData.id}`,
-              },
-              (payload) => {
-                loadRiwayatAbsensi();
-                cekStatusAbsenHariIni();
-              },
-            )
-            .subscribe();
+          setInterval(() => {
+            loadRiwayatAbsensi();
+            cekStatusAbsenHariIni();
+          }, 15000);
         }
       });
 
@@ -1173,11 +1160,11 @@
       // Initialize face api models
       let modelsLoaded = false;
       Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(
-          "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/",
-        ),
+        faceapi.nets.tinyFaceDetector.loadFromUri("./models"),
       ]).then(() => {
         modelsLoaded = true;
+      }).catch(err => {
+        console.warn("Local model load warning:", err);
       });
 
       function mulaiKamera() {
@@ -1466,6 +1453,21 @@
       }
 
       function lanjutKeKameraAtauSubmit() {
+        if (!currentUser || !currentUser.face_descriptor) {
+          const btnCek = document.getElementById("btn-cek-lokasi");
+          if (btnCek) btnCek.disabled = false;
+          Swal.fire({
+            title: "Wajah Wajib Terdaftar!",
+            text: "Anda belum mendaftarkan data wajah (Face Recognition). Pendaftaran wajah wajib dilakukan terlebih dahulu sebelum dapat melakukan absensi.",
+            icon: "warning",
+            confirmButtonText: "Daftar Wajah Sekarang",
+          }).then(() => {
+            const modal = new bootstrap.Modal(document.getElementById('modalRegisterFace'));
+            modal.show();
+          });
+          return;
+        }
+
         if (!isKameraEnabled) {
           prosesAbsenTanpaFoto();
         } else {
@@ -1478,6 +1480,18 @@
       }
 
       async function prosesAbsenTanpaFoto() {
+        if (!currentUser || !currentUser.face_descriptor) {
+          Swal.fire({
+            title: "Wajah Wajib Terdaftar!",
+            text: "Anda belum mendaftarkan data wajah (Face Recognition). Pendaftaran wajah wajib dilakukan terlebih dahulu sebelum dapat melakukan absensi.",
+            icon: "warning",
+            confirmButtonText: "Daftar Wajah Sekarang",
+          }).then(() => {
+            const modal = new bootstrap.Modal(document.getElementById('modalRegisterFace'));
+            modal.show();
+          });
+          return;
+        }
         Swal.fire({
           title: "Menyimpan...",
           text: "Memproses data absensi Anda",
@@ -1572,6 +1586,25 @@
       }
 
       async function prosesAbsenFoto() {
+        if (!currentUser || !currentUser.face_descriptor) {
+          stopKamera();
+          const kameraModalEl = document.getElementById("kameraModal");
+          if (kameraModalEl) {
+            const m = bootstrap.Modal.getInstance(kameraModalEl);
+            if (m) m.hide();
+          }
+          Swal.fire({
+            title: "Wajah Wajib Terdaftar!",
+            text: "Anda belum mendaftarkan data wajah (Face Recognition). Pendaftaran wajah wajib dilakukan terlebih dahulu sebelum dapat melakukan absensi.",
+            icon: "warning",
+            confirmButtonText: "Daftar Wajah Sekarang",
+          }).then(() => {
+            const modal = new bootstrap.Modal(document.getElementById('modalRegisterFace'));
+            modal.show();
+          });
+          return;
+        }
+
         if (faceCountdownTimer) {
           clearInterval(faceCountdownTimer);
           faceCountdownTimer = null;
@@ -2552,34 +2585,69 @@
       async function syncUserSession() {
         if (!userData) return;
 
-        // 1. Cek sesi JWT dari Supabase Auth
-        const {
-          data: { session },
-        } = await supabaseClient.auth.getSession();
-        if (!session) {
-          localStorage.removeItem("userLogin");
-          window.location.href = "login.html";
-          return;
-        }
+        try {
+          let u = JSON.parse(userData);
 
-        let u = JSON.parse(userData);
+          // 1. Cek sesi JWT dari Supabase Auth
+          const {
+            data: { session },
+          } = await supabaseClient.auth.getSession();
 
-        // 2. Cek profil berdasarkan auth_id
-        const { data, error } = await supabaseClient
-          .from("users")
-          .select("*")
-          .eq("auth_id", session.user.id)
-          .maybeSingle();
+          if (session) {
+            // Cek profil berdasarkan auth_id
+            let { data } = await supabaseClient
+              .from("users")
+              .select("*")
+              .eq("auth_id", session.user.id)
+              .maybeSingle();
 
-        if (data) {
-          localStorage.setItem("userLogin", JSON.stringify(data));
-          // Update global reference
-          Object.assign(u, data);
-        } else {
-          // Jika auth ada tapi profil hilang (misal dihapus paksa oleh admin)
-          await supabaseClient.auth.signOut();
-          localStorage.removeItem("userLogin");
-          window.location.href = "login.html";
+            // Self-repair untuk Karyawan Baru: Jika belum terikat via auth_id tapi u.id ada, ikat auth_id secara otomatis
+            if (!data && u && u.id) {
+              const { data: userById } = await supabaseClient
+                .from("users")
+                .select("*")
+                .eq("id", u.id)
+                .maybeSingle();
+
+              if (userById) {
+                await supabaseClient.from("users").update({ auth_id: session.user.id }).eq("id", userById.id);
+                userById.auth_id = session.user.id;
+                data = userById;
+              }
+            }
+
+            if (data) {
+              localStorage.setItem("userLogin", JSON.stringify(data));
+              Object.assign(u, data);
+              if (typeof currentUser !== "undefined" && currentUser) {
+                Object.assign(currentUser, data);
+              }
+            }
+          } else if (u && u.id) {
+            // Sesi Auth belum/tidak aktif, lakukan verifikasi lokal lewat ID user
+            const { data: localData } = await supabaseClient
+              .from("users")
+              .select("*")
+              .eq("id", u.id)
+              .maybeSingle();
+
+            if (localData) {
+              localStorage.setItem("userLogin", JSON.stringify(localData));
+              Object.assign(u, localData);
+              if (typeof currentUser !== "undefined" && currentUser) {
+                Object.assign(currentUser, localData);
+              }
+            } else {
+              // Profil benar-benar tidak ada di DB
+              localStorage.removeItem("userLogin");
+              window.location.href = "login.html";
+            }
+          } else {
+            localStorage.removeItem("userLogin");
+            window.location.href = "login.html";
+          }
+        } catch (e) {
+          console.warn("syncUserSession error:", e);
         }
       }
 
@@ -2729,25 +2797,7 @@
           return;
         }
 
-        // 1. Coba Vercel Serverless Function (/api/telegram-notif) - Token Rahasia 100% Terjaga di Server
-        try {
-          const vercelResp = await fetch('/api/telegram-notif', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: message, chat_id: targetChatId })
-          });
-          if (vercelResp.ok) {
-            const vData = await vercelResp.json();
-            if (vData.ok) {
-              console.log("Notifikasi Telegram berhasil dikirim via Vercel Serverless Function.");
-              return;
-            }
-          }
-        } catch (vErr) {
-          // Bukan di Vercel, lanjut ke opsi berikutnya
-        }
-
-        // 2. Jika TELEGRAM_BOT_TOKEN diisi di .env lokal / Docker, kirim langsung via Direct Telegram Bot API
+        // 1. Jika TELEGRAM_BOT_TOKEN diisi di .env lokal / Docker / window.ENV, kirim langsung via Direct Telegram Bot API
         if (botToken && !botToken.includes("YOUR_BOT_TOKEN")) {
           try {
             const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
@@ -2767,8 +2817,26 @@
               console.warn("Direct Telegram API response warning:", resData);
             }
           } catch(err) {
-            console.warn("Gagal mengirim via Direct Telegram API, mencoba Supabase Edge Function...", err);
+            console.warn("Gagal mengirim via Direct Telegram API, mencoba fallback...", err);
           }
+        }
+
+        // 2. Fallback Vercel Serverless Function (/api/telegram-notif) - Digunakan saat di-deploy ke Vercel (tanpa expose Token di frontend)
+        try {
+          const vercelResp = await fetch('/api/telegram-notif', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: message, chat_id: targetChatId })
+          });
+          if (vercelResp.ok) {
+            const vData = await vercelResp.json();
+            if (vData.ok) {
+              console.log("Notifikasi Telegram berhasil dikirim via Vercel Serverless Function.");
+              return;
+            }
+          }
+        } catch (vErr) {
+          // Bukan di lingkungan Vercel
         }
 
         // 3. Fallback: Panggil Supabase Edge Function (telegram-notif) jika dipasang di Cloud
