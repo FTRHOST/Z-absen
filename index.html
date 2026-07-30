@@ -934,7 +934,10 @@
             a.tipe_absen.toLowerCase(),
           );
           const sudahMasuk = absenNames.some(
-            (name) => name === "masuk" || name === "absen masuk",
+            (name) =>
+              (name.includes("masuk") || name === "masuk") &&
+              !name.includes("izin masuk") &&
+              !name.includes("istirahat masuk"),
           );
           const countIzinKeluar = absenNames.filter((name) =>
             name.includes("izin keluar"),
@@ -954,7 +957,10 @@
 
           masterTipeAbsen.forEach((item) => {
             const name = item.nama_tipe.toLowerCase();
-            const isMasuk = name === "masuk" || name === "absen masuk";
+            const isMasuk =
+              (name.includes("masuk") || name === "masuk") &&
+              !name.includes("izin masuk") &&
+              !name.includes("istirahat masuk");
             const isPulang =
               name.includes("pulang") ||
               name.includes("checkout") ||
