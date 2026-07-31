@@ -1148,13 +1148,34 @@
           });
         } else if (category === "pulang") {
           titleText = "🚪 Pilih Shift Absen Pulang";
+          
+          // Smart Shift Filter: Deteksi shift masuk karyawan hari ini
+          const hasMasukPagi = absenNames.some((n) => n.includes("masuk pagi") || n.includes("pagi"));
+          const hasMasukSiang = absenNames.some((n) => n.includes("masuk siang") || n.includes("siang"));
+          const hasMasukMalam = absenNames.some((n) => n.includes("masuk malam") || n.includes("malam"));
+
           subItems = masterTipeAbsen.filter((item) => {
             const name = item.nama_tipe.toLowerCase();
-            return (
+            const isPulang =
               name.includes("pulang") ||
               name.includes("checkout") ||
-              item.is_checkout
-            );
+              item.is_checkout;
+            if (!isPulang) return false;
+
+            // Jika sudah absen Masuk Pagi -> sembunyikan Pulang Siang/Malam, tampilkan Pulang Pagi
+            if (hasMasukPagi && !hasMasukSiang && !hasMasukMalam) {
+              return name.includes("pagi");
+            }
+            // Jika sudah absen Masuk Siang -> sembunyikan Pulang Pagi/Malam, tampilkan Pulang Siang
+            if (hasMasukSiang && !hasMasukPagi && !hasMasukMalam) {
+              return name.includes("siang");
+            }
+            // Jika sudah absen Masuk Malam -> sembunyikan Pulang Pagi/Siang, tampilkan Pulang Malam
+            if (hasMasukMalam && !hasMasukPagi && !hasMasukSiang) {
+              return name.includes("malam");
+            }
+
+            return true;
           });
         } else if (category === "istirahat") {
           titleText = "🥪 Pilih Status Istirahat";

@@ -4608,13 +4608,80 @@ async function simpanEditAbsensi() {
 
         if (error) throw error;
 
+        // AUTO-PAIR SHIFT TRANSFER FOR SUPER ADMIN:
+        // Jika Super Admin memindahkan shift (misal Masuk Siang -> Masuk Pagi), otomatis pindahkan pasangan Pulang ke Shift Pagi juga!
+        const currentGroupRecord = (allAbsensiGrouped[tanggal]?.records || []).find(r => String(r.id) === String(id));
+        const targetUserId = currentGroupRecord ? currentGroupRecord.user_id : null;
+
+        if (targetUserId && currentGroupRecord) {
+            const newTipeLower = tipe_absen.toLowerCase();
+            let shiftKeyword = '';
+            if (newTipeLower.includes('pagi')) shiftKeyword = 'Pagi';
+            else if (newTipeLower.includes('siang')) shiftKeyword = 'Siang';
+            else if (newTipeLower.includes('malam')) shiftKeyword = 'Malam';
+
+            if (shiftKeyword) {
+                const siblingRecords = (allAbsensiGrouped[tanggal]?.records || []).filter(r => r.user_id === targetUserId && String(r.id) !== String(id));
+                for (let sib of siblingRecords) {
+                    const sibLower = sib.tipe_absen.toLowerCase();
+                    let pairedTipeName = '';
+
+                    if (newTipeLower.includes('masuk') && (sibLower.includes('pulang') || sibLower.includes('checkout'))) {
+                        pairedTipeName = `Absen Pulang ${shiftKeyword}`;
+                    } else if ((newTipeLower.includes('pulang') || newTipeLower.includes('checkout')) && sibLower.includes('masuk')) {
+                        pairedTipeName = `Absen Masuk ${shiftKeyword}`;
+                    }
+
+                    if (pairedTipeName && sib.tipe_absen !== pairedTipeName) {
+                        const sibMaster = (masterList || []).find(m => m.nama_tipe === pairedTipeName);
+                        if (sibMaster) {
+                            let pStatus = "Hadir";
+                            let pTerlambat = 0;
+                            let pLembur = 0;
+                            let pKet = `Disesuaikan otomatis ke Shift ${shiftKeyword}`;
+
+                            const sibWMins = parseT(sib.waktu);
+                            const sibBMins = parseT(sibMaster.batas_terlambat);
+
+                            if (sibMaster.is_checkout) {
+                                if (sibBMins && sibWMins > sibBMins) {
+                                    pStatus = "Lembur";
+                                    pLembur = sibWMins - sibBMins;
+                                    pKet = `Lembur ${Math.floor(pLembur/60)}j ${pLembur%60}m`;
+                                } else {
+                                    pStatus = "Hadir";
+                                    pKet = "Pulang Normal";
+                                }
+                            } else {
+                                if (sibBMins && sibWMins > sibBMins) {
+                                    pStatus = "Terlambat";
+                                    pTerlambat = sibWMins - sibBMins;
+                                    pKet = `Terlambat ${Math.floor(pTerlambat/60)}j ${pTerlambat%60}m`;
+                                }
+                            }
+
+                            const sibPayload = {
+                                tipe_absen: pairedTipeName,
+                                status: pStatus,
+                                menit_terlambat: pTerlambat,
+                                menit_lembur: pLembur,
+                                keterangan_waktu: pKet
+                            };
+
+                            await supabaseClient.from("absensi").update(sibPayload).eq("id", sib.id);
+                        }
+                    }
+                }
+            }
+        }
+
         const modalEl = document.getElementById("modalEditAbsensi");
         if (modalEl) {
             const modal = bootstrap.Modal.getInstance(modalEl);
             if (modal) modal.hide();
         }
 
-        Swal.fire("Berhasil", "Data absensi berhasil diperbarui!", "success").then(() => {
+        Swal.fire("Berhasil", "Data absensi & pasangan shift berhasil diperbarui!", "success").then(() => {
             if (typeof showDetailAbsensi === "function" && tanggal) {
                 showDetailAbsensi(tanggal);
             }
