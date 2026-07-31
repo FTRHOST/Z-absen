@@ -1228,7 +1228,8 @@ async function loadDataAbsensi(showSkeleton = true) {
 
     const [year, month] = filterBulan.value.split('-');
     const startDate = `${year}-${month}-01`;
-    const endDate = new Date(year, month, 0).toISOString().split('T')[0];
+    const lastDay = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
+    const endDate = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
 
     const expMulai = document.getElementById("export_mulai");
     const expSelesai = document.getElementById("export_selesai");
