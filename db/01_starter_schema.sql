@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS kantor (
     lat TEXT,
     lng TEXT,
     radius INTEGER DEFAULT 100,
+    tipe_absen_ids JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
 );
 

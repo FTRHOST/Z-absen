@@ -567,7 +567,71 @@ function toggleKantorView(view) {
     }
 }
 
+let allMasterTipeAbsen = [];
+
+async function loadTipeAbsenKantorOptions(selectedIds = null) {
+    const container = document.getElementById("kantor-tipe-absen-list");
+    if (!container) return;
+
+    if (allMasterTipeAbsen.length === 0) {
+        const { data } = await supabaseClient
+            .from("master_tipe_absen")
+            .select("*")
+            .eq("is_aktif", true)
+            .order("id", { ascending: true });
+        allMasterTipeAbsen = data || [];
+    }
+
+    if (allMasterTipeAbsen.length === 0) {
+        container.innerHTML = `<div class="col-12 text-muted small">Belum ada master tipe absen yang aktif.</div>`;
+        return;
+    }
+
+    const selArray = Array.isArray(selectedIds) ? selectedIds.map(Number) : null;
+
+    container.innerHTML = allMasterTipeAbsen.map(t => {
+        const isChecked = selArray === null || selArray.length === 0 || selArray.includes(Number(t.id));
+        const badgeText = t.is_checkout ? 'Pulang' : 'Masuk/Lain';
+        const badgeClass = t.is_checkout ? 'bg-danger' : 'bg-success';
+        return `
+            <div class="col-md-6">
+                <div class="form-check border rounded p-2 bg-white d-flex align-items-center me-0">
+                    <input class="form-check-input ms-0 me-2 check-kantor-tipe" type="checkbox" value="${t.id}" id="kantor_tipe_${t.id}" ${isChecked ? 'checked' : ''} onchange="updateTipeAbsenAllCheckboxState()">
+                    <label class="form-check-label small me-auto cursor-pointer text-start" for="kantor_tipe_${t.id}">
+                        <strong>${t.nama_tipe}</strong>
+                        ${t.jam_mulai ? `<br><span class="text-muted" style="font-size:0.75rem;"><i class="fas fa-clock me-1"></i>${formatWaktuGlobal(t.jam_mulai)} - ${formatWaktuGlobal(t.jam_tutup || t.batas_terlambat)}</span>` : ''}
+                    </label>
+                    <span class="badge ${badgeClass} ms-1" style="font-size:0.65rem;">${badgeText}</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    updateTipeAbsenAllCheckboxState();
+}
+
+function toggleSelectAllTipeAbsenKantor(checked) {
+    const checkboxes = document.querySelectorAll('.check-kantor-tipe');
+    checkboxes.forEach(cb => cb.checked = checked);
+}
+
+function updateTipeAbsenAllCheckboxState() {
+    const checkboxes = document.querySelectorAll('.check-kantor-tipe');
+    const allChk = document.getElementById('chk-kantor-tipe-all');
+    if (!allChk || checkboxes.length === 0) return;
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    allChk.checked = allChecked;
+}
+
+window.toggleSelectAllTipeAbsenKantor = toggleSelectAllTipeAbsenKantor;
+window.updateTipeAbsenAllCheckboxState = updateTipeAbsenAllCheckboxState;
+
 async function loadDataKantor() {
+    if (allMasterTipeAbsen.length === 0) {
+        const { data: tipeData } = await supabaseClient.from('master_tipe_absen').select('*').eq('is_aktif', true).order('id', { ascending: true });
+        allMasterTipeAbsen = tipeData || [];
+    }
+
     let queryKantor = supabaseClient.from('kantor').select('*').order('nama', { ascending: true });
     if (!isSuperAdmin) {
         queryKantor = queryKantor.eq('nama', myCabang); // HR hanya bisa melihat cabangnya
@@ -641,22 +705,33 @@ function renderKantor() {
         const hapusBtnGrid = isSuperAdmin ? `<button class="btn btn-sm btn-danger ms-2 shadow-sm" onclick="hapusKantor('${kantor.id}')"><i class="fas fa-trash me-1"></i>Hapus</button>` : '';
         const hapusBtnTable = isSuperAdmin ? `<button class="btn btn-sm btn-danger ms-1" onclick="hapusKantor('${kantor.id}')">Hapus</button>` : '';
         
-        const argsStr = `'${kantor.id}', '${kantor.nama}', '${kantor.lat}', '${kantor.lng}', '${kantor.radius}'`;
+        let tipeAbsenBadges = '<span class="badge bg-secondary">Semua Tipe Absen</span>';
+        if (Array.isArray(kantor.tipe_absen_ids) && kantor.tipe_absen_ids.length > 0) {
+            const namaTipeList = allMasterTipeAbsen
+                .filter(m => kantor.tipe_absen_ids.map(Number).includes(Number(m.id)))
+                .map(m => m.nama_tipe);
+            if (namaTipeList.length > 0) {
+                tipeAbsenBadges = namaTipeList.map(n => `<span class="badge bg-info text-dark me-1 mb-1">${n}</span>`).join('');
+            }
+        }
 
         // Render Grid
         gridContainer.innerHTML += `
             <div class="col-md-6 col-lg-4">
                 <div class="card shadow-sm h-100 border-0 dashboard-card-hover" style="border-radius: 12px; transition: transform 0.2s;">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="card-body d-flex flex-column">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
                             <h5 class="card-title fw-bold text-primary mb-0"><i class="fas fa-building me-2"></i>${kantor.nama}</h5>
                         </div>
                         <p class="card-text small text-muted mb-2">
                             <i class="fas fa-map-marker-alt me-2 text-danger"></i>${kantor.lat}, ${kantor.lng} (Rad: ${kantor.radius}m)
                         </p>
+                        <div class="mb-3">
+                            <small class="text-muted d-block mb-1"><i class="fas fa-clock me-1 text-primary"></i>Tipe Absen / Shift:</small>
+                            <div>${tipeAbsenBadges}</div>
                         </div>
                         <div class="d-flex justify-content-end mt-auto border-top pt-2">
-                            <button class="btn btn-sm btn-warning shadow-sm" onclick="editKantor(${argsStr})"><i class="fas fa-edit me-1"></i>Edit</button>
+                            <button class="btn btn-sm btn-warning shadow-sm" onclick="editKantor(${kantor.id})"><i class="fas fa-edit me-1"></i>Edit</button>
                             ${hapusBtnGrid}
                         </div>
                     </div>
@@ -669,9 +744,9 @@ function renderKantor() {
             <tr>
                 <td class="fw-bold">${kantor.nama}</td>
                 <td>${kantor.lat}, ${kantor.lng} <br> <span class="badge bg-secondary">Rad: ${kantor.radius}m</span></td>
-                <td></td>
+                <td>${tipeAbsenBadges}</td>
                 <td>
-                    <button class="btn btn-sm btn-warning" onclick="editKantor(${argsStr})">Edit</button>
+                    <button class="btn btn-sm btn-warning" onclick="editKantor(${kantor.id})">Edit</button>
                     ${hapusBtnTable}
                 </td>
             </tr>
@@ -679,19 +754,24 @@ function renderKantor() {
     });
 }
 
-function editKantor(id, nama, lat, lng, rad) {
-    document.getElementById('kantor_id').value = id;
-    document.getElementById('kantor_nama').value = nama;
-    document.getElementById('kantor_rad').value = rad;
+function editKantor(id) {
+    const kantor = allKantor.find(k => k.id == id);
+    if (!kantor) return;
+
+    document.getElementById('kantor_id').value = kantor.id;
+    document.getElementById('kantor_nama').value = kantor.nama || '';
+    document.getElementById('kantor_lat').value = kantor.lat || '';
+    document.getElementById('kantor_lng').value = kantor.lng || '';
+    document.getElementById('kantor_rad').value = kantor.radius || 100;
     document.getElementById('kantor_btn').innerText = 'Update Data Cabang';
     document.getElementById('kantor-card-header').innerText = '✏️ Edit Data Kantor';
 
-    // Simpan koordinat di atribut modal untuk digunakan saat event shown
-    const modalEl = document.getElementById('modalKantor');
-    modalEl.dataset.lat = lat || '';
-    modalEl.dataset.lng = lng || '';
+    loadTipeAbsenKantorOptions(kantor.tipe_absen_ids);
 
-    // Buka Modal dengan instance global atau baru
+    const modalEl = document.getElementById('modalKantor');
+    modalEl.dataset.lat = kantor.lat || '';
+    modalEl.dataset.lng = kantor.lng || '';
+
     const modalKantor = bootstrap.Modal.getOrCreateInstance(modalEl);
     modalKantor.show();
 }
@@ -709,7 +789,12 @@ function batalEditKantor() {
     const modalEl = document.getElementById('modalKantor');
     modalEl.dataset.lat = '';
     modalEl.dataset.lng = '';
+
+    loadTipeAbsenKantorOptions(null);
 }
+
+window.editKantor = editKantor;
+window.batalEditKantor = batalEditKantor;
 
 // Ensure map is correctly rendered when modal is opened for 'Tambah Baru'
 document.addEventListener('DOMContentLoaded', () => {
@@ -758,20 +843,49 @@ async function simpanKantor(event) {
     const lat = document.getElementById('kantor_lat').value;
     const lng = document.getElementById('kantor_lng').value;
     const rad = document.getElementById('kantor_rad').value;
-    let res;
-    if (id) {
-        res = await supabaseClient.from('kantor').update({
-            nama: nama,
-            lat: lat,
-            lng: lng,
-            radius: rad
-        }).eq('id', id);
-    } else {
-        res = await supabaseClient.from('kantor').insert([
-            { 
-              nama: nama, lat: lat, lng: lng, radius: rad
-            }
-        ]);
+    
+    const selectedTipeAbsenIds = Array.from(document.querySelectorAll('.check-kantor-tipe:checked')).map(cb => Number(cb.value));
+
+    const payload = {
+        nama: nama,
+        lat: lat,
+        lng: lng,
+        radius: rad,
+        tipe_absen_ids: selectedTipeAbsenIds
+    };
+
+    let res = id
+        ? await supabaseClient.from('kantor').update(payload).eq('id', id)
+        : await supabaseClient.from('kantor').insert([payload]);
+
+    const isMissingColumnError = res.error && (
+        (res.error.message && res.error.message.toLowerCase().includes("tipe_absen_ids")) ||
+        (res.error.details && res.error.details.toLowerCase().includes("tipe_absen_ids")) ||
+        res.error.code === "42703"
+    );
+    
+    // Fallback HANYA jika error spesifik karena kolom tipe_absen_ids belum terdeteksi oleh Supabase/PostgREST
+    if (isMissingColumnError) {
+        console.warn("Kolom tipe_absen_ids belum terdeteksi di DB. Mencoba simpan fallback tanpa tipe_absen_ids...");
+        delete payload.tipe_absen_ids;
+        res = id
+            ? await supabaseClient.from('kantor').update(payload).eq('id', id)
+            : await supabaseClient.from('kantor').insert([payload]);
+
+        if (!res.error) {
+            btn.disabled = false;
+            Swal.fire({
+                title: "Data Kantor Disimpan (Perhatian)",
+                html: `Data kantor berhasil disimpan, namun kolom <code>tipe_absen_ids</code> belum terdeteksi oleh API Supabase.<br><br>Jalankan 2 perintah ini di <strong>SQL Editor Supabase</strong> Anda lalu muat ulang halaman:<br><pre class="bg-dark text-light p-2 rounded text-start mt-2">ALTER TABLE kantor ADD COLUMN IF NOT EXISTS tipe_absen_ids JSONB DEFAULT '[]'::jsonb;\nNOTIFY pgrst, 'reload schema';</pre>`,
+                icon: "warning"
+            });
+            batalEditKantor();
+            loadDataKantor();
+            const modalKantorEl = document.getElementById('modalKantor');
+            const modalKantor = bootstrap.Modal.getInstance(modalKantorEl);
+            if (modalKantor) modalKantor.hide();
+            return;
+        }
     }
     
     btn.disabled = false;
