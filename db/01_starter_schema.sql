@@ -451,3 +451,11 @@ ON CONFLICT DO NOTHING;
 
 GRANT ALL ON SCHEMA _realtime TO postgres, supabase_admin;
 GRANT ALL ON ALL TABLES IN SCHEMA _realtime TO postgres, supabase_admin;
+
+-- Sync Serial Primary Key Sequences
+SELECT setval(pg_get_serial_sequence('kantor', 'id'), COALESCE(max(id), 1)) FROM kantor;
+SELECT setval(pg_get_serial_sequence('master_tipe_absen', 'id'), COALESCE(max(id), 1)) FROM master_tipe_absen;
+SELECT setval(pg_get_serial_sequence('users', 'id'), COALESCE(max(id), 1)) FROM users;
+SELECT setval(pg_get_serial_sequence('absensi', 'id'), COALESCE(max(id), 1)) FROM absensi;
+SELECT setval(pg_get_serial_sequence('cuti', 'id'), COALESCE(max(id), 1)) FROM cuti;
+
