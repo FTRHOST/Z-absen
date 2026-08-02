@@ -1119,14 +1119,60 @@ function showDetailKaryawan(id) {
     new bootstrap.Modal(document.getElementById('modalDetailKaryawan')).show();
 }
 
+function handleSupabaseError(error, contextMessage = "Terjadi kesalahan") {
+    if (!error) return false;
+    const msg = error.message || "";
+
+    // Deteksi error kolom missing 'unit' di tabel 'users'
+    if (msg.includes("'unit'") || msg.includes("column \"unit\"") || (msg.includes("unit") && msg.includes("users"))) {
+        Swal.fire({
+            title: "Peringatan Skema Database (Kolom 'unit')",
+            html: `
+                <div class="text-start">
+                    <p class="mb-2 text-danger font-monospace small">${msg}</p>
+                    <p class="mb-2">Gagal memproses bidang <strong>Unit / Departemen</strong> karena kolom <code>unit</code> belum terdeteksi di tabel <code>users</code> database Supabase Anda.</p>
+                    <hr class="my-2">
+                    <p class="mb-1 fw-bold text-dark"><i class="fas fa-tools me-1 text-primary"></i>Cara Mengatasinya:</p>
+                    <p class="small text-muted mb-2">Jalankan 2 perintah SQL berikut di <strong>SQL Editor Supabase</strong> Anda, lalu muat ulang halaman:</p>
+                    <pre class="bg-dark text-light p-2.5 rounded small font-monospace text-start">ALTER TABLE users ADD COLUMN IF NOT EXISTS unit TEXT;\nNOTIFY pgrst, 'reload schema';</pre>
+                </div>
+            `,
+            icon: "warning"
+        });
+        return true;
+    }
+
+    // Deteksi error kolom missing 'tipe_absen_ids' di tabel 'kantor'
+    if (msg.includes("'tipe_absen_ids'") || msg.includes("column \"tipe_absen_ids\"") || (msg.includes("tipe_absen_ids") && msg.includes("kantor"))) {
+        Swal.fire({
+            title: "Peringatan Skema Database (Kolom 'tipe_absen_ids')",
+            html: `
+                <div class="text-start">
+                    <p class="mb-2 text-danger font-monospace small">${msg}</p>
+                    <p class="mb-2">Gagal memproses tipe absen cabang karena kolom <code>tipe_absen_ids</code> belum terdeteksi di tabel <code>kantor</code> database Supabase Anda.</p>
+                    <hr class="my-2">
+                    <p class="mb-1 fw-bold text-dark"><i class="fas fa-tools me-1 text-primary"></i>Cara Mengatasinya:</p>
+                    <p class="small text-muted mb-2">Jalankan 2 perintah SQL berikut di <strong>SQL Editor Supabase</strong> Anda, lalu muat ulang halaman:</p>
+                    <pre class="bg-dark text-light p-2.5 rounded small font-monospace text-start">ALTER TABLE kantor ADD COLUMN IF NOT EXISTS tipe_absen_ids JSONB DEFAULT '[]'::jsonb;\nNOTIFY pgrst, 'reload schema';</pre>
+                </div>
+            `,
+            icon: "warning"
+        });
+        return true;
+    }
+
+    // Default error alert
+    Swal.fire("Gagal", msg || contextMessage, "error");
+    return false;
+}
+
 async function simpanKaryawan(event) {
     event.preventDefault();
     const btn = event.target.querySelector('button[type="submit"]');
     btn.disabled = true;
 
     const id = document.getElementById("karyawan_id").value;
-    const roleEl = document.getElementById("role-karyawan");
-    const role = roleEl.value;
+    const role = document.getElementById("role-karyawan").value;
     const nama = document.getElementById("karyawan_nama").value;
     const no_hp = document.getElementById("karyawan_hp").value;
     const password = document.getElementById("karyawan_password").value;
@@ -1148,6 +1194,41 @@ async function simpanKaryawan(event) {
         
         let { data, error } = await supabaseClient.from('users').update(updateData).eq('id', id);
         
+        // Fallback jika 'unit' belum ada di DB
+        if (error && (error.message.includes("'unit'") || error.message.includes("unit"))) {
+            console.warn("Kolom unit belum ada di DB. Mencoba update tanpa kolom unit...");
+            delete updateData.unit;
+            const resFallback = await supabaseClient.from('users').update(updateData).eq('id', id);
+            if (!resFallback.error) {
+                if (password.trim() !== '') {
+                    await supabaseClient.rpc('admin_change_password', {
+                        p_user_id: id,
+                        p_new_password: password
+                    });
+                }
+                btn.disabled = false;
+                Swal.fire({
+                    title: "Data Karyawan Disimpan (Perhatian)",
+                    html: `
+                        <div class="text-start">
+                            <p class="mb-2">Data Karyawan berhasil diperbarui, namun bidang <strong>Unit</strong> belum tersimpan karena kolom <code>unit</code> belum ada di tabel <code>users</code> database Supabase Anda.</p>
+                            <hr class="my-2">
+                            <p class="mb-1 fw-bold text-dark"><i class="fas fa-tools me-1 text-primary"></i>Cara Mengatasinya:</p>
+                            <p class="small text-muted mb-2">Jalankan 2 perintah SQL ini di <strong>SQL Editor Supabase</strong> Anda:</p>
+                            <pre class="bg-dark text-light p-2.5 rounded small font-monospace">ALTER TABLE users ADD COLUMN IF NOT EXISTS unit TEXT;\nNOTIFY pgrst, 'reload schema';</pre>
+                        </div>
+                    `,
+                    icon: "warning"
+                });
+                batalEditKaryawan();
+                loadDataKaryawan();
+                const modalEl = document.getElementById('modalKaryawan');
+                const modalK = bootstrap.Modal.getInstance(modalEl);
+                if (modalK) modalK.hide();
+                return;
+            }
+        }
+        
         // Hanya update password jika diisi
         if (password.trim() !== '') {
             const { error: rpcError } = await supabaseClient.rpc('admin_change_password', {
@@ -1165,14 +1246,44 @@ async function simpanKaryawan(event) {
             return;
         }
         
-        // Pendaftaran profil ke database (Akun Auth akan dibuat otomatis saat login pertama)
-        res = await supabaseClient.from('users').insert([
-            { nama, password, role, no_hp, cabang, unit, hari_libur: checkedLibur, sisa_cuti: 12 }
-        ]);
+        const insertData = { nama, password, role, no_hp, cabang, unit, hari_libur: checkedLibur, sisa_cuti: 12 };
+        res = await supabaseClient.from('users').insert([insertData]);
+
+        // Fallback jika 'unit' belum ada di DB
+        if (res.error && (res.error.message.includes("'unit'") || res.error.message.includes("unit"))) {
+            console.warn("Kolom unit belum ada di DB. Mencoba insert tanpa kolom unit...");
+            delete insertData.unit;
+            res = await supabaseClient.from('users').insert([insertData]);
+            if (!res.error) {
+                btn.disabled = false;
+                Swal.fire({
+                    title: "Data Karyawan Disimpan (Perhatian)",
+                    html: `
+                        <div class="text-start">
+                            <p class="mb-2">Data Karyawan berhasil ditambahkan, namun bidang <strong>Unit</strong> belum tersimpan karena kolom <code>unit</code> belum ada di tabel <code>users</code> database Supabase Anda.</p>
+                            <hr class="my-2">
+                            <p class="mb-1 fw-bold text-dark"><i class="fas fa-tools me-1 text-primary"></i>Cara Mengatasinya:</p>
+                            <p class="small text-muted mb-2">Jalankan 2 perintah SQL ini di <strong>SQL Editor Supabase</strong> Anda:</p>
+                            <pre class="bg-dark text-light p-2.5 rounded small font-monospace">ALTER TABLE users ADD COLUMN IF NOT EXISTS unit TEXT;\nNOTIFY pgrst, 'reload schema';</pre>
+                        </div>
+                    `,
+                    icon: "warning"
+                });
+                batalEditKaryawan();
+                loadDataKaryawan();
+                const modalEl = document.getElementById('modalKaryawan');
+                const modalK = bootstrap.Modal.getInstance(modalEl);
+                if (modalK) modalK.hide();
+                return;
+            }
+        }
     }
 
     btn.disabled = false;
-    if (res.error) return Swal.fire("Gagal", res.error.message, "error");
+    if (res.error) {
+        handleSupabaseError(res.error, "Gagal menyimpan data karyawan");
+        return;
+    }
     
     Swal.fire("Sukses", `Data Karyawan berhasil ${id ? 'diperbarui' : 'ditambahkan'}!`, "success");
     batalEditKaryawan();
