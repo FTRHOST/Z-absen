@@ -313,6 +313,26 @@
                           <input type="number" class="form-control" id="kantor_rad" placeholder="Radius (Meter)" value="100" required />
                         </div>
 
+                        <div class="col-md-12">
+                          <label class="form-label fw-bold text-dark mb-1">
+                            <i class="fas fa-clock me-1 text-primary"></i> Pengaturan Tipe Absen & Shift Cabang
+                          </label>
+                          <div class="card bg-light border-0">
+                            <div class="card-body p-3">
+                              <div class="d-flex justify-content-between align-items-center mb-2">
+                                <small class="text-muted">Centang tipe absen/shift yang diizinkan untuk cabang ini:</small>
+                                <div class="form-check form-check-inline m-0">
+                                  <input class="form-check-input" type="checkbox" id="chk-kantor-tipe-all" onchange="toggleSelectAllTipeAbsenKantor(this.checked)">
+                                  <label class="form-check-label small fw-bold" for="chk-kantor-tipe-all">Pilih Semua</label>
+                                </div>
+                              </div>
+                              <div id="kantor-tipe-absen-list" class="row g-2">
+                                <!-- Populated dynamically by admin.js -->
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
                         <div class="col-md-12 text-end mt-4">
                           <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Batal</button>
                           <button type="submit" class="btn btn-success" id="kantor_btn">Simpan Data Cabang</button>
@@ -338,7 +358,7 @@
                         <tr>
                           <th>Nama Kantor</th>
                           <th>Koordinat & Radius</th>
-
+                          <th>Tipe Absen / Shift</th>
                           <th>Aksi</th>
                         </tr>
                       </thead>

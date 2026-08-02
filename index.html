@@ -908,10 +908,30 @@
           .order("jam_mulai", { ascending: true, nullsFirst: false })
           .order("id", { ascending: true });
 
+        let rawData = [];
         if (error || !data || data.length === 0) {
-          masterTipeAbsen = [{ nama_tipe: "Masuk" }, { nama_tipe: "Pulang" }];
+          rawData = [{ id: 1, nama_tipe: "Masuk" }, { id: 2, nama_tipe: "Pulang", is_checkout: true }];
         } else {
-          masterTipeAbsen = data;
+          rawData = data;
+        }
+
+        // Filter berdasarkan cabang user (tipe_absen_ids di kantor)
+        const userCabang = currentUser ? currentUser.cabang : null;
+        let assignedKantor = null;
+        if (userCabang && listKantor && listKantor.length > 0) {
+          assignedKantor = listKantor.find((k) => k.nama === userCabang);
+        }
+
+        if (
+          assignedKantor &&
+          Array.isArray(assignedKantor.tipe_absen_ids) &&
+          assignedKantor.tipe_absen_ids.length > 0
+        ) {
+          const allowedIds = assignedKantor.tipe_absen_ids.map(Number);
+          const filtered = rawData.filter((t) => allowedIds.includes(Number(t.id)));
+          masterTipeAbsen = filtered.length > 0 ? filtered : rawData;
+        } else {
+          masterTipeAbsen = rawData;
         }
       }
 
@@ -1039,24 +1059,70 @@
         ).length;
         const sedangIstirahat = countIstKeluar > countIstMasuk;
 
+        const masukSubItems = masterTipeAbsen.filter((item) => {
+          const name = item.nama_tipe.toLowerCase();
+          return (
+            (name.includes("masuk") || name === "masuk") &&
+            !name.includes("izin") &&
+            !name.includes("istirahat")
+          );
+        });
+
+        const hasMasukPagi = absenNames.some((n) => n.includes("masuk pagi") || n.includes("pagi"));
+        const hasMasukSiang = absenNames.some((n) => n.includes("masuk siang") || n.includes("siang"));
+        const hasMasukMalam = absenNames.some((n) => n.includes("masuk malam") || n.includes("malam"));
+
+        const pulangSubItems = masterTipeAbsen.filter((item) => {
+          const name = item.nama_tipe.toLowerCase();
+          const isPulang =
+            name.includes("pulang") ||
+            name.includes("checkout") ||
+            item.is_checkout;
+          if (!isPulang) return false;
+
+          if (hasMasukPagi && !hasMasukSiang && !hasMasukMalam) return name.includes("pagi");
+          if (hasMasukSiang && !hasMasukPagi && !hasMasukMalam) return name.includes("siang");
+          if (hasMasukMalam && !hasMasukPagi && !hasMasukSiang) return name.includes("malam");
+          return true;
+        });
+
+        const istirahatSubItems = masterTipeAbsen.filter((item) => {
+          const name = item.nama_tipe.toLowerCase();
+          return name.includes("istirahat");
+        });
+
+        const izinSubItems = masterTipeAbsen.filter((item) => {
+          const name = item.nama_tipe.toLowerCase();
+          return name.includes("izin");
+        });
+
         let optionsHtml = '<div class="d-flex flex-column gap-2 mt-2">';
 
-        // 1. Kategori ABSEN MASUK
-        if (!sudahMasuk) {
-          optionsHtml += `
-            <button class="btn btn-primary w-100 py-3 fw-bold shadow-sm d-flex align-items-center justify-content-between px-3" onclick="pilihSubTipeAbsen('masuk')">
-              <span><i class="fas fa-sign-in-alt fa-lg me-2"></i> 🟢 Absen Masuk</span>
-              <i class="fas fa-chevron-right"></i>
-            </button>`;
-        } else {
+        // 1. Kategori ABSEN MASUK (Hanya jika cabang memiliki/mengizinkan tipe absen masuk)
+        if (!sudahMasuk && masukSubItems.length > 0) {
+          if (masukSubItems.length === 1) {
+            const singleMasuk = masukSubItems[0];
+            optionsHtml += `
+              <button class="btn btn-primary w-100 py-3 fw-bold shadow-sm d-flex align-items-center justify-content-between px-3" onclick="pilihAbsen('${singleMasuk.nama_tipe}')">
+                <span><i class="fas fa-sign-in-alt fa-lg me-2"></i> 🟢 Absen Masuk</span>
+                <i class="fas fa-arrow-right"></i>
+              </button>`;
+          } else {
+            optionsHtml += `
+              <button class="btn btn-primary w-100 py-3 fw-bold shadow-sm d-flex align-items-center justify-content-between px-3" onclick="pilihSubTipeAbsen('masuk')">
+                <span><i class="fas fa-sign-in-alt fa-lg me-2"></i> 🟢 Absen Masuk</span>
+                <i class="fas fa-chevron-right"></i>
+              </button>`;
+          }
+        } else if (sudahMasuk && masukSubItems.length > 0) {
           optionsHtml += `
             <button class="btn btn-outline-success w-100 py-2.5 fw-bold text-start px-3 mb-1" disabled>
               <i class="fas fa-check-circle text-success me-2"></i> 🟢 Absen Masuk (Selesai)
             </button>`;
         }
 
-        // 2. Kategori ISTIRAHAT
-        if (sudahMasuk) {
+        // 2. Kategori ISTIRAHAT (Hanya jika cabang memiliki/mengizinkan tipe absen istirahat)
+        if (sudahMasuk && istirahatSubItems.length > 0) {
           if (sedangIstirahat) {
             optionsHtml += `
               <button class="btn btn-warning text-dark w-100 py-3 fw-bold shadow-sm d-flex align-items-center justify-content-between px-3" onclick="pilihSubTipeAbsen('istirahat')">
@@ -1072,8 +1138,8 @@
           }
         }
 
-        // 3. Kategori IZIN KELUAR
-        if (sudahMasuk) {
+        // 3. Kategori IZIN KELUAR (Hanya jika cabang memiliki/mengizinkan tipe absen izin)
+        if (sudahMasuk && izinSubItems.length > 0) {
           if (sedangIzin) {
             optionsHtml += `
               <button class="btn btn-info text-white w-100 py-3 fw-bold shadow-sm d-flex align-items-center justify-content-between px-3" onclick="pilihSubTipeAbsen('izin')">
@@ -1089,13 +1155,22 @@
           }
         }
 
-        // 4. Kategori ABSEN PULANG
-        if (sudahMasuk && !sedangIzin && !sedangIstirahat) {
-          optionsHtml += `
-            <button class="btn btn-danger w-100 py-3 fw-bold shadow-sm d-flex align-items-center justify-content-between px-3 mt-1" onclick="pilihSubTipeAbsen('pulang')">
-              <span><i class="fas fa-sign-out-alt fa-lg me-2"></i> 🚪 Absen Pulang / Checkout</span>
-              <i class="fas fa-chevron-right"></i>
-            </button>`;
+        // 4. Kategori ABSEN PULANG (Hanya jika cabang memiliki/mengizinkan tipe absen pulang)
+        if (sudahMasuk && !sedangIzin && !sedangIstirahat && pulangSubItems.length > 0) {
+          if (pulangSubItems.length === 1) {
+            const singlePulang = pulangSubItems[0];
+            optionsHtml += `
+              <button class="btn btn-danger w-100 py-3 fw-bold shadow-sm d-flex align-items-center justify-content-between px-3 mt-1" onclick="pilihAbsen('${singlePulang.nama_tipe}')">
+                <span><i class="fas fa-sign-out-alt fa-lg me-2"></i> 🚪 Absen Pulang / Checkout</span>
+                <i class="fas fa-arrow-right"></i>
+              </button>`;
+          } else {
+            optionsHtml += `
+              <button class="btn btn-danger w-100 py-3 fw-bold shadow-sm d-flex align-items-center justify-content-between px-3 mt-1" onclick="pilihSubTipeAbsen('pulang')">
+                <span><i class="fas fa-sign-out-alt fa-lg me-2"></i> 🚪 Absen Pulang / Checkout</span>
+                <i class="fas fa-chevron-right"></i>
+              </button>`;
+          }
         }
 
         optionsHtml += "</div>";
@@ -1194,7 +1269,13 @@
         }
 
         if (subItems.length === 0) {
-          subItems = masterTipeAbsen;
+          Swal.fire("Informasi", "Tidak ada pilihan tipe absen yang aktif untuk kategori ini di cabang Anda.", "info");
+          return;
+        }
+
+        if (subItems.length === 1) {
+          pilihAbsen(subItems[0].nama_tipe);
+          return;
         }
 
         let optionsHtml = '<div class="d-flex flex-column gap-2 mt-2">';

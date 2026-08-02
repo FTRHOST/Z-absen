@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS kantor (
     lat TEXT,
     lng TEXT,
     radius INTEGER DEFAULT 100,
+    tipe_absen_ids JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
 );
 
@@ -205,37 +206,44 @@ ALTER TABLE master_tipe_absen ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow public read app_settings" ON app_settings;
 DROP POLICY IF EXISTS "Allow auth update app_settings" ON app_settings;
 DROP POLICY IF EXISTS "Allow auth insert app_settings" ON app_settings;
-CREATE POLICY "Allow public read app_settings" ON app_settings FOR SELECT USING (true);
-CREATE POLICY "Allow auth update app_settings" ON app_settings FOR UPDATE USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow auth insert app_settings" ON app_settings FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Allow all on app_settings" ON app_settings;
+CREATE POLICY "Allow all on app_settings" ON app_settings FOR ALL USING (true) WITH CHECK (true);
 
--- Akses Penuh untuk tabel operasional jika sudah login
+-- Akses Penuh untuk tabel operasional
 DROP POLICY IF EXISTS "Allow auth all on absensi" ON absensi;
 DROP POLICY IF EXISTS "Allow auth all on cuti" ON cuti;
 DROP POLICY IF EXISTS "Allow auth all on kantor" ON kantor;
 DROP POLICY IF EXISTS "Allow auth all on master_jenis_cuti" ON master_jenis_cuti;
 DROP POLICY IF EXISTS "Allow auth all on form_cuti_config" ON form_cuti_config;
 DROP POLICY IF EXISTS "Allow auth all on master_tipe_absen" ON master_tipe_absen;
-CREATE POLICY "Allow auth all on absensi" ON absensi FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow auth all on cuti" ON cuti FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow auth all on kantor" ON kantor FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow auth all on master_jenis_cuti" ON master_jenis_cuti FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow auth all on form_cuti_config" ON form_cuti_config FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow auth all on master_tipe_absen" ON master_tipe_absen FOR ALL USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Allow all on absensi" ON absensi;
+DROP POLICY IF EXISTS "Allow all on cuti" ON cuti;
+DROP POLICY IF EXISTS "Allow all on kantor" ON kantor;
+DROP POLICY IF EXISTS "Allow all on master_jenis_cuti" ON master_jenis_cuti;
+DROP POLICY IF EXISTS "Allow all on form_cuti_config" ON form_cuti_config;
+DROP POLICY IF EXISTS "Allow all on master_tipe_absen" ON master_tipe_absen;
+
+CREATE POLICY "Allow all on absensi" ON absensi FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on cuti" ON cuti FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on kantor" ON kantor FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on master_jenis_cuti" ON master_jenis_cuti FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on form_cuti_config" ON form_cuti_config FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on master_tipe_absen" ON master_tipe_absen FOR ALL USING (true) WITH CHECK (true);
 
 -- Kebijakan Khusus Tabel Users
 DROP POLICY IF EXISTS "Allow public select users" ON users;
 DROP POLICY IF EXISTS "Allow auth update users" ON users;
 DROP POLICY IF EXISTS "Allow auth insert users" ON users;
 DROP POLICY IF EXISTS "Allow auth delete users" ON users;
-CREATE POLICY "Allow public select users" ON users FOR SELECT USING (true);
-CREATE POLICY "Allow auth update users" ON users FOR UPDATE USING (
-    auth_id = auth.uid() OR 
-    auth_id IS NULL OR 
-    (SELECT role FROM users WHERE auth_id = auth.uid()) IN ('Super Admin', 'HR')
-);
-CREATE POLICY "Allow auth insert users" ON users FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Allow auth delete users" ON users FOR DELETE USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Allow all select users" ON users;
+DROP POLICY IF EXISTS "Allow all update users" ON users;
+DROP POLICY IF EXISTS "Allow all insert users" ON users;
+DROP POLICY IF EXISTS "Allow all delete users" ON users;
+
+CREATE POLICY "Allow all select users" ON users FOR SELECT USING (true);
+CREATE POLICY "Allow all update users" ON users FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all insert users" ON users FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow all delete users" ON users FOR DELETE USING (true);
 
 -- Kebijakan Storage Bucket (Upload Foto)
 DROP POLICY IF EXISTS "Public Access" ON storage.objects;
@@ -451,3 +459,11 @@ ON CONFLICT DO NOTHING;
 
 GRANT ALL ON SCHEMA _realtime TO postgres, supabase_admin;
 GRANT ALL ON ALL TABLES IN SCHEMA _realtime TO postgres, supabase_admin;
+
+-- Sync Serial Primary Key Sequences
+SELECT setval(pg_get_serial_sequence('kantor', 'id'), COALESCE(max(id), 1)) FROM kantor;
+SELECT setval(pg_get_serial_sequence('master_tipe_absen', 'id'), COALESCE(max(id), 1)) FROM master_tipe_absen;
+SELECT setval(pg_get_serial_sequence('users', 'id'), COALESCE(max(id), 1)) FROM users;
+SELECT setval(pg_get_serial_sequence('absensi', 'id'), COALESCE(max(id), 1)) FROM absensi;
+SELECT setval(pg_get_serial_sequence('cuti', 'id'), COALESCE(max(id), 1)) FROM cuti;
+

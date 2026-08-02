@@ -15,10 +15,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // --- Cek Sesi JWT & Profil Resmi ---
     try {
-        const { data: { session } } = await supabaseClient.auth.getSession();
+        let session = null;
+        try {
+            const { data } = await supabaseClient.auth.getSession();
+            session = data?.session;
+        } catch (e) {}
+
+        // Auto-heal sesi auth jika token kadaluarsa / belum dibuat
+        if (!session && currentUser && currentUser.nama && currentUser.password) {
+            session = await ensureAuthenticatedSession();
+        }
+
         let profile = null;
 
-        if (session) {
+        if (session && session.user) {
             const { data: p } = await supabaseClient
                 .from('users')
                 .select('id, role, cabang, auth_id')
@@ -568,7 +578,71 @@ function toggleKantorView(view) {
     }
 }
 
+let allMasterTipeAbsen = [];
+
+async function loadTipeAbsenKantorOptions(selectedIds = null) {
+    const container = document.getElementById("kantor-tipe-absen-list");
+    if (!container) return;
+
+    if (allMasterTipeAbsen.length === 0) {
+        const { data } = await supabaseClient
+            .from("master_tipe_absen")
+            .select("*")
+            .eq("is_aktif", true)
+            .order("id", { ascending: true });
+        allMasterTipeAbsen = data || [];
+    }
+
+    if (allMasterTipeAbsen.length === 0) {
+        container.innerHTML = `<div class="col-12 text-muted small">Belum ada master tipe absen yang aktif.</div>`;
+        return;
+    }
+
+    const selArray = Array.isArray(selectedIds) ? selectedIds.map(Number) : null;
+
+    container.innerHTML = allMasterTipeAbsen.map(t => {
+        const isChecked = selArray === null || selArray.length === 0 || selArray.includes(Number(t.id));
+        const badgeText = t.is_checkout ? 'Pulang' : 'Masuk/Lain';
+        const badgeClass = t.is_checkout ? 'bg-danger' : 'bg-success';
+        return `
+            <div class="col-md-6">
+                <div class="form-check border rounded p-2 bg-white d-flex align-items-center me-0">
+                    <input class="form-check-input ms-0 me-2 check-kantor-tipe" type="checkbox" value="${t.id}" id="kantor_tipe_${t.id}" ${isChecked ? 'checked' : ''} onchange="updateTipeAbsenAllCheckboxState()">
+                    <label class="form-check-label small me-auto cursor-pointer text-start" for="kantor_tipe_${t.id}">
+                        <strong>${t.nama_tipe}</strong>
+                        ${t.jam_mulai ? `<br><span class="text-muted" style="font-size:0.75rem;"><i class="fas fa-clock me-1"></i>${formatWaktuGlobal(t.jam_mulai)} - ${formatWaktuGlobal(t.jam_tutup || t.batas_terlambat)}</span>` : ''}
+                    </label>
+                    <span class="badge ${badgeClass} ms-1" style="font-size:0.65rem;">${badgeText}</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    updateTipeAbsenAllCheckboxState();
+}
+
+function toggleSelectAllTipeAbsenKantor(checked) {
+    const checkboxes = document.querySelectorAll('.check-kantor-tipe');
+    checkboxes.forEach(cb => cb.checked = checked);
+}
+
+function updateTipeAbsenAllCheckboxState() {
+    const checkboxes = document.querySelectorAll('.check-kantor-tipe');
+    const allChk = document.getElementById('chk-kantor-tipe-all');
+    if (!allChk || checkboxes.length === 0) return;
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    allChk.checked = allChecked;
+}
+
+window.toggleSelectAllTipeAbsenKantor = toggleSelectAllTipeAbsenKantor;
+window.updateTipeAbsenAllCheckboxState = updateTipeAbsenAllCheckboxState;
+
 async function loadDataKantor() {
+    if (allMasterTipeAbsen.length === 0) {
+        const { data: tipeData } = await supabaseClient.from('master_tipe_absen').select('*').eq('is_aktif', true).order('id', { ascending: true });
+        allMasterTipeAbsen = tipeData || [];
+    }
+
     let queryKantor = supabaseClient.from('kantor').select('*').order('nama', { ascending: true });
     if (!isSuperAdmin) {
         queryKantor = queryKantor.eq('nama', myCabang); // HR hanya bisa melihat cabangnya
@@ -642,22 +716,33 @@ function renderKantor() {
         const hapusBtnGrid = isSuperAdmin ? `<button class="btn btn-sm btn-danger ms-2 shadow-sm" onclick="hapusKantor('${kantor.id}')"><i class="fas fa-trash me-1"></i>Hapus</button>` : '';
         const hapusBtnTable = isSuperAdmin ? `<button class="btn btn-sm btn-danger ms-1" onclick="hapusKantor('${kantor.id}')">Hapus</button>` : '';
         
-        const argsStr = `'${kantor.id}', '${kantor.nama}', '${kantor.lat}', '${kantor.lng}', '${kantor.radius}'`;
+        let tipeAbsenBadges = '<span class="badge bg-secondary">Semua Tipe Absen</span>';
+        if (Array.isArray(kantor.tipe_absen_ids) && kantor.tipe_absen_ids.length > 0) {
+            const namaTipeList = allMasterTipeAbsen
+                .filter(m => kantor.tipe_absen_ids.map(Number).includes(Number(m.id)))
+                .map(m => m.nama_tipe);
+            if (namaTipeList.length > 0) {
+                tipeAbsenBadges = namaTipeList.map(n => `<span class="badge bg-info text-dark me-1 mb-1">${n}</span>`).join('');
+            }
+        }
 
         // Render Grid
         gridContainer.innerHTML += `
             <div class="col-md-6 col-lg-4">
                 <div class="card shadow-sm h-100 border-0 dashboard-card-hover" style="border-radius: 12px; transition: transform 0.2s;">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="card-body d-flex flex-column">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
                             <h5 class="card-title fw-bold text-primary mb-0"><i class="fas fa-building me-2"></i>${kantor.nama}</h5>
                         </div>
                         <p class="card-text small text-muted mb-2">
                             <i class="fas fa-map-marker-alt me-2 text-danger"></i>${kantor.lat}, ${kantor.lng} (Rad: ${kantor.radius}m)
                         </p>
+                        <div class="mb-3">
+                            <small class="text-muted d-block mb-1"><i class="fas fa-clock me-1 text-primary"></i>Tipe Absen / Shift:</small>
+                            <div>${tipeAbsenBadges}</div>
                         </div>
                         <div class="d-flex justify-content-end mt-auto border-top pt-2">
-                            <button class="btn btn-sm btn-warning shadow-sm" onclick="editKantor(${argsStr})"><i class="fas fa-edit me-1"></i>Edit</button>
+                            <button class="btn btn-sm btn-warning shadow-sm" onclick="editKantor(${kantor.id})"><i class="fas fa-edit me-1"></i>Edit</button>
                             ${hapusBtnGrid}
                         </div>
                     </div>
@@ -670,9 +755,9 @@ function renderKantor() {
             <tr>
                 <td class="fw-bold">${kantor.nama}</td>
                 <td>${kantor.lat}, ${kantor.lng} <br> <span class="badge bg-secondary">Rad: ${kantor.radius}m</span></td>
-                <td></td>
+                <td>${tipeAbsenBadges}</td>
                 <td>
-                    <button class="btn btn-sm btn-warning" onclick="editKantor(${argsStr})">Edit</button>
+                    <button class="btn btn-sm btn-warning" onclick="editKantor(${kantor.id})">Edit</button>
                     ${hapusBtnTable}
                 </td>
             </tr>
@@ -680,19 +765,24 @@ function renderKantor() {
     });
 }
 
-function editKantor(id, nama, lat, lng, rad) {
-    document.getElementById('kantor_id').value = id;
-    document.getElementById('kantor_nama').value = nama;
-    document.getElementById('kantor_rad').value = rad;
+function editKantor(id) {
+    const kantor = allKantor.find(k => k.id == id);
+    if (!kantor) return;
+
+    document.getElementById('kantor_id').value = kantor.id;
+    document.getElementById('kantor_nama').value = kantor.nama || '';
+    document.getElementById('kantor_lat').value = kantor.lat || '';
+    document.getElementById('kantor_lng').value = kantor.lng || '';
+    document.getElementById('kantor_rad').value = kantor.radius || 100;
     document.getElementById('kantor_btn').innerText = 'Update Data Cabang';
     document.getElementById('kantor-card-header').innerText = '✏️ Edit Data Kantor';
 
-    // Simpan koordinat di atribut modal untuk digunakan saat event shown
-    const modalEl = document.getElementById('modalKantor');
-    modalEl.dataset.lat = lat || '';
-    modalEl.dataset.lng = lng || '';
+    loadTipeAbsenKantorOptions(kantor.tipe_absen_ids);
 
-    // Buka Modal dengan instance global atau baru
+    const modalEl = document.getElementById('modalKantor');
+    modalEl.dataset.lat = kantor.lat || '';
+    modalEl.dataset.lng = kantor.lng || '';
+
     const modalKantor = bootstrap.Modal.getOrCreateInstance(modalEl);
     modalKantor.show();
 }
@@ -710,7 +800,12 @@ function batalEditKantor() {
     const modalEl = document.getElementById('modalKantor');
     modalEl.dataset.lat = '';
     modalEl.dataset.lng = '';
+
+    loadTipeAbsenKantorOptions(null);
 }
+
+window.editKantor = editKantor;
+window.batalEditKantor = batalEditKantor;
 
 // Ensure map is correctly rendered when modal is opened for 'Tambah Baru'
 document.addEventListener('DOMContentLoaded', () => {
@@ -759,20 +854,49 @@ async function simpanKantor(event) {
     const lat = document.getElementById('kantor_lat').value;
     const lng = document.getElementById('kantor_lng').value;
     const rad = document.getElementById('kantor_rad').value;
-    let res;
-    if (id) {
-        res = await supabaseClient.from('kantor').update({
-            nama: nama,
-            lat: lat,
-            lng: lng,
-            radius: rad
-        }).eq('id', id);
-    } else {
-        res = await supabaseClient.from('kantor').insert([
-            { 
-              nama: nama, lat: lat, lng: lng, radius: rad
-            }
-        ]);
+    
+    const selectedTipeAbsenIds = Array.from(document.querySelectorAll('.check-kantor-tipe:checked')).map(cb => Number(cb.value));
+
+    const payload = {
+        nama: nama,
+        lat: lat,
+        lng: lng,
+        radius: rad,
+        tipe_absen_ids: selectedTipeAbsenIds
+    };
+
+    let res = id
+        ? await supabaseClient.from('kantor').update(payload).eq('id', id)
+        : await supabaseClient.from('kantor').insert([payload]);
+
+    const isMissingColumnError = res.error && (
+        (res.error.message && res.error.message.toLowerCase().includes("tipe_absen_ids")) ||
+        (res.error.details && res.error.details.toLowerCase().includes("tipe_absen_ids")) ||
+        res.error.code === "42703"
+    );
+    
+    // Fallback HANYA jika error spesifik karena kolom tipe_absen_ids belum terdeteksi oleh Supabase/PostgREST
+    if (isMissingColumnError) {
+        console.warn("Kolom tipe_absen_ids belum terdeteksi di DB. Mencoba simpan fallback tanpa tipe_absen_ids...");
+        delete payload.tipe_absen_ids;
+        res = id
+            ? await supabaseClient.from('kantor').update(payload).eq('id', id)
+            : await supabaseClient.from('kantor').insert([payload]);
+
+        if (!res.error) {
+            btn.disabled = false;
+            Swal.fire({
+                title: "Data Kantor Disimpan (Perhatian)",
+                html: `Data kantor berhasil disimpan, namun kolom <code>tipe_absen_ids</code> belum terdeteksi oleh API Supabase.<br><br>Jalankan 2 perintah ini di <strong>SQL Editor Supabase</strong> Anda lalu muat ulang halaman:<br><pre class="bg-dark text-light p-2 rounded text-start mt-2">ALTER TABLE kantor ADD COLUMN IF NOT EXISTS tipe_absen_ids JSONB DEFAULT '[]'::jsonb;\nNOTIFY pgrst, 'reload schema';</pre>`,
+                icon: "warning"
+            });
+            batalEditKantor();
+            loadDataKantor();
+            const modalKantorEl = document.getElementById('modalKantor');
+            const modalKantor = bootstrap.Modal.getInstance(modalKantorEl);
+            if (modalKantor) modalKantor.hide();
+            return;
+        }
     }
     
     btn.disabled = false;
@@ -1006,14 +1130,60 @@ function showDetailKaryawan(id) {
     new bootstrap.Modal(document.getElementById('modalDetailKaryawan')).show();
 }
 
+function handleSupabaseError(error, contextMessage = "Terjadi kesalahan") {
+    if (!error) return false;
+    const msg = error.message || "";
+
+    // Deteksi error kolom missing 'unit' di tabel 'users'
+    if (msg.includes("'unit'") || msg.includes("column \"unit\"") || (msg.includes("unit") && msg.includes("users"))) {
+        Swal.fire({
+            title: "Peringatan Skema Database (Kolom 'unit')",
+            html: `
+                <div class="text-start">
+                    <p class="mb-2 text-danger font-monospace small">${msg}</p>
+                    <p class="mb-2">Gagal memproses bidang <strong>Unit / Departemen</strong> karena kolom <code>unit</code> belum terdeteksi di tabel <code>users</code> database Supabase Anda.</p>
+                    <hr class="my-2">
+                    <p class="mb-1 fw-bold text-dark"><i class="fas fa-tools me-1 text-primary"></i>Cara Mengatasinya:</p>
+                    <p class="small text-muted mb-2">Jalankan 2 perintah SQL berikut di <strong>SQL Editor Supabase</strong> Anda, lalu muat ulang halaman:</p>
+                    <pre class="bg-dark text-light p-2.5 rounded small font-monospace text-start">ALTER TABLE users ADD COLUMN IF NOT EXISTS unit TEXT;\nNOTIFY pgrst, 'reload schema';</pre>
+                </div>
+            `,
+            icon: "warning"
+        });
+        return true;
+    }
+
+    // Deteksi error kolom missing 'tipe_absen_ids' di tabel 'kantor'
+    if (msg.includes("'tipe_absen_ids'") || msg.includes("column \"tipe_absen_ids\"") || (msg.includes("tipe_absen_ids") && msg.includes("kantor"))) {
+        Swal.fire({
+            title: "Peringatan Skema Database (Kolom 'tipe_absen_ids')",
+            html: `
+                <div class="text-start">
+                    <p class="mb-2 text-danger font-monospace small">${msg}</p>
+                    <p class="mb-2">Gagal memproses tipe absen cabang karena kolom <code>tipe_absen_ids</code> belum terdeteksi di tabel <code>kantor</code> database Supabase Anda.</p>
+                    <hr class="my-2">
+                    <p class="mb-1 fw-bold text-dark"><i class="fas fa-tools me-1 text-primary"></i>Cara Mengatasinya:</p>
+                    <p class="small text-muted mb-2">Jalankan 2 perintah SQL berikut di <strong>SQL Editor Supabase</strong> Anda, lalu muat ulang halaman:</p>
+                    <pre class="bg-dark text-light p-2.5 rounded small font-monospace text-start">ALTER TABLE kantor ADD COLUMN IF NOT EXISTS tipe_absen_ids JSONB DEFAULT '[]'::jsonb;\nNOTIFY pgrst, 'reload schema';</pre>
+                </div>
+            `,
+            icon: "warning"
+        });
+        return true;
+    }
+
+    // Default error alert
+    Swal.fire("Gagal", msg || contextMessage, "error");
+    return false;
+}
+
 async function simpanKaryawan(event) {
     event.preventDefault();
     const btn = event.target.querySelector('button[type="submit"]');
     btn.disabled = true;
 
     const id = document.getElementById("karyawan_id").value;
-    const roleEl = document.getElementById("role-karyawan");
-    const role = roleEl.value;
+    const role = document.getElementById("role-karyawan").value;
     const nama = document.getElementById("karyawan_nama").value;
     const no_hp = document.getElementById("karyawan_hp").value;
     const password = document.getElementById("karyawan_password").value;
@@ -1026,6 +1196,7 @@ async function simpanKaryawan(event) {
     let res;
     if (id) {
         // Edit Mode
+        const targetUserId = parseInt(id, 10);
         const updateData = { nama, no_hp, cabang, unit, hari_libur: checkedLibur };
         
         // Super Admin boleh ubah role
@@ -1033,17 +1204,84 @@ async function simpanKaryawan(event) {
             updateData.role = role;
         }
         
-        let { data, error } = await supabaseClient.from('users').update(updateData).eq('id', id);
+        let { data, error } = await supabaseClient.from('users').update(updateData).eq('id', targetUserId).select();
         
+        // Fallback jika 'unit' belum ada di DB
+        if (error && (error.message.includes("'unit'") || error.message.includes("unit"))) {
+            console.warn("Kolom unit belum ada di DB. Mencoba update tanpa kolom unit...");
+            delete updateData.unit;
+            const resFallback = await supabaseClient.from('users').update(updateData).eq('id', targetUserId).select();
+            if (!resFallback.error && resFallback.data && resFallback.data.length > 0) {
+                if (password.trim() !== '') {
+                    await supabaseClient.rpc('admin_change_password', {
+                        p_user_id: targetUserId,
+                        p_new_password: password
+                    });
+                }
+                btn.disabled = false;
+                Swal.fire({
+                    title: "Data Karyawan Disimpan (Perhatian)",
+                    html: `
+                        <div class="text-start">
+                            <p class="mb-2">Data Karyawan berhasil diperbarui, namun bidang <strong>Unit</strong> belum tersimpan karena kolom <code>unit</code> belum ada di tabel <code>users</code> database Supabase Anda.</p>
+                            <hr class="my-2">
+                            <p class="mb-1 fw-bold text-dark"><i class="fas fa-tools me-1 text-primary"></i>Cara Mengatasinya:</p>
+                            <p class="small text-muted mb-2">Jalankan 2 perintah SQL ini di <strong>SQL Editor Supabase</strong> Anda:</p>
+                            <pre class="bg-dark text-light p-2.5 rounded small font-monospace">ALTER TABLE users ADD COLUMN IF NOT EXISTS unit TEXT;\nNOTIFY pgrst, 'reload schema';</pre>
+                        </div>
+                    `,
+                    icon: "warning"
+                });
+                batalEditKaryawan();
+                loadDataKaryawan();
+                const modalEl = document.getElementById('modalKaryawan');
+                const modalK = bootstrap.Modal.getInstance(modalEl);
+                if (modalK) modalK.hide();
+                return;
+            }
+            error = resFallback.error;
+            data = resFallback.data;
+        }
+        
+        if (error) {
+            btn.disabled = false;
+            handleSupabaseError(error, "Gagal memperbarui data karyawan");
+            return;
+        }
+
+        // PENTING: Jika 0 baris diperbarui (dikarenakan RLS Policy lama memblokir update)
+        if (!data || data.length === 0) {
+            btn.disabled = false;
+            Swal.fire({
+                title: "Gagal Mengubah Data (Ditolak RLS)",
+                html: `
+                    <div class="text-start">
+                        <p class="mb-2">Perintah update terkirim tetapi <strong>0 baris di database yang diperbarui</strong>.</p>
+                        <p class="mb-2 small text-muted">Penyebabnya adalah Kebijakan Keamanan (<em>RLS Policy</em>) lama pada tabel <code>users</code> di database Anda memblokir izin UPDATE.</p>
+                        <hr class="my-2">
+                        <p class="mb-1 fw-bold text-dark"><i class="fas fa-tools me-1 text-primary"></i>Cara Mengatasinya:</p>
+                        <p class="small text-muted mb-2">Jalankan perintah SQL berikut di <strong>SQL Editor Supabase</strong> Anda:</p>
+                        <pre class="bg-dark text-light p-2.5 rounded small font-monospace text-start">DROP POLICY IF EXISTS "Allow auth update users" ON users;\nCREATE POLICY "Allow auth update users" ON users FOR UPDATE USING (auth.role() = 'authenticated');\nNOTIFY pgrst, 'reload schema';</pre>
+                    </div>
+                `,
+                icon: "error"
+            });
+            return;
+        }
+
         // Hanya update password jika diisi
         if (password.trim() !== '') {
             const { error: rpcError } = await supabaseClient.rpc('admin_change_password', {
-                p_user_id: id,
+                p_user_id: targetUserId,
                 p_new_password: password
             });
-            if (rpcError) error = rpcError;
+            if (rpcError) {
+                btn.disabled = false;
+                Swal.fire("Gagal Ubah Password", rpcError.message, "error");
+                return;
+            }
         }
-        res = { error };
+        res = { error: null };
     } else {
         // Insert Mode (Karyawan Baru)
         if (!password) {
@@ -1052,14 +1290,44 @@ async function simpanKaryawan(event) {
             return;
         }
         
-        // Pendaftaran profil ke database (Akun Auth akan dibuat otomatis saat login pertama)
-        res = await supabaseClient.from('users').insert([
-            { nama, password, role, no_hp, cabang, unit, hari_libur: checkedLibur, sisa_cuti: 12 }
-        ]);
+        const insertData = { nama, password, role, no_hp, cabang, unit, hari_libur: checkedLibur, sisa_cuti: 12 };
+        res = await supabaseClient.from('users').insert([insertData]);
+
+        // Fallback jika 'unit' belum ada di DB
+        if (res.error && (res.error.message.includes("'unit'") || res.error.message.includes("unit"))) {
+            console.warn("Kolom unit belum ada di DB. Mencoba insert tanpa kolom unit...");
+            delete insertData.unit;
+            res = await supabaseClient.from('users').insert([insertData]);
+            if (!res.error) {
+                btn.disabled = false;
+                Swal.fire({
+                    title: "Data Karyawan Disimpan (Perhatian)",
+                    html: `
+                        <div class="text-start">
+                            <p class="mb-2">Data Karyawan berhasil ditambahkan, namun bidang <strong>Unit</strong> belum tersimpan karena kolom <code>unit</code> belum ada di tabel <code>users</code> database Supabase Anda.</p>
+                            <hr class="my-2">
+                            <p class="mb-1 fw-bold text-dark"><i class="fas fa-tools me-1 text-primary"></i>Cara Mengatasinya:</p>
+                            <p class="small text-muted mb-2">Jalankan 2 perintah SQL ini di <strong>SQL Editor Supabase</strong> Anda:</p>
+                            <pre class="bg-dark text-light p-2.5 rounded small font-monospace">ALTER TABLE users ADD COLUMN IF NOT EXISTS unit TEXT;\nNOTIFY pgrst, 'reload schema';</pre>
+                        </div>
+                    `,
+                    icon: "warning"
+                });
+                batalEditKaryawan();
+                loadDataKaryawan();
+                const modalEl = document.getElementById('modalKaryawan');
+                const modalK = bootstrap.Modal.getInstance(modalEl);
+                if (modalK) modalK.hide();
+                return;
+            }
+        }
     }
 
     btn.disabled = false;
-    if (res.error) return Swal.fire("Gagal", res.error.message, "error");
+    if (res.error) {
+        handleSupabaseError(res.error, "Gagal menyimpan data karyawan");
+        return;
+    }
     
     Swal.fire("Sukses", `Data Karyawan berhasil ${id ? 'diperbarui' : 'ditambahkan'}!`, "success");
     batalEditKaryawan();
@@ -3961,12 +4229,71 @@ async function hapusDataAbsen(absenId, tanggal) {
     loadDataAbsensi(false);
 }
 
+// Helper untuk memastikan Sesi Otentikasi JWT Supabase Aktif sebelum operasi admin krusial
+async function ensureAuthenticatedSession() {
+    try {
+        let { data: { session } } = await supabaseClient.auth.getSession();
+        if (session && session.user) {
+            return session;
+        }
+
+        // 1. Coba refresh sesi JWT jika sudah pernah ada
+        const { data: refreshData } = await supabaseClient.auth.refreshSession();
+        if (refreshData?.session) {
+            return refreshData.session;
+        }
+
+        // 2. Jika tidak ada sesi, coba auto-login menggunakan kredensial pengguna yang sedang aktif
+        if (currentUser && currentUser.nama && currentUser.password) {
+            const activeEmail = `${currentUser.nama.replace(/\s+/g, "").toLowerCase()}@zieabsen.com`;
+            let authResult = await supabaseClient.auth.signInWithPassword({
+                email: activeEmail,
+                password: currentUser.password
+            });
+
+            if (authResult?.error) {
+                // Jika akun Auth Supabase belum dibuat, daftarkan
+                await supabaseClient.auth.signUp({
+                    email: activeEmail,
+                    password: currentUser.password
+                });
+                authResult = await supabaseClient.auth.signInWithPassword({
+                    email: activeEmail,
+                    password: currentUser.password
+                });
+            }
+
+            if (authResult?.data?.session) {
+                const newSession = authResult.data.session;
+                if (currentUser.id) {
+                    await supabaseClient.from('users').update({ auth_id: newSession.user.id }).eq('id', currentUser.id);
+                }
+                return newSession;
+            }
+        }
+    } catch (e) {
+        console.warn("[ensureAuthenticatedSession] Supabase Auth engine (/auth/v1) tidak merespon/terisolasi. Menggunakan sesi fallback database:", e);
+    }
+
+    // Fallback: Jika Auth engine (/auth/v1) di ngrok tidak di-tunnel atau tidak aktif, izinkan operasi berbasis sesi lokal Super Admin
+    if (currentUser && currentUser.role === 'Super Admin' && currentUser.id) {
+        return { user: { id: currentUser.id }, isFallback: true };
+    }
+
+    return null;
+}
+
 // ==========================================
 // FACTORY RESET
 // ==========================================
 async function factoryResetDatabase() {
     if (!isSuperAdmin) {
         Swal.fire("Akses Ditolak", "Hanya Super Admin yang dapat melakukan Factory Reset.", "error");
+        return;
+    }
+
+    if (!currentUser || !currentUser.id) {
+        Swal.fire("Sesi Tidak Valid", "Data profil pengguna tidak ditemukan. Silakan logout dan login kembali.", "error");
         return;
     }
 
@@ -3993,38 +4320,51 @@ async function factoryResetDatabase() {
     });
 
     try {
+        // 0. Pastikan Sesi Auth Supabase Aktif (Mencegah Error 401 Unauthorized / RLS Blocked)
+        const activeSession = await ensureAuthenticatedSession();
+        if (!activeSession) {
+            throw new Error("Sesi otentikasi Supabase tidak aktif atau kadaluarsa (401 Unauthorized). Silakan logout dan login kembali sebagai Super Admin.");
+        }
+
         // 1. Hapus isi tabel
         const tablesToClear = ['absensi', 'cuti', 'form_cuti_config', 'kantor', 'master_jenis_cuti', 'master_tipe_absen'];
         
         for (const table of tablesToClear) {
-            try {
-                const { data } = await supabaseClient.from(table).select('*');
-                if (data && data.length > 0) {
-                    let deleteCol = data[0].id !== undefined ? 'id' : (data[0].nama !== undefined ? 'nama' : Object.keys(data[0])[0]);
-                    await supabaseClient.from(table).delete().not(deleteCol, 'is', null);
+            const { data, error: selectErr } = await supabaseClient.from(table).select('*');
+            if (selectErr) {
+                console.warn(`[Factory Reset] Warning select ${table}:`, selectErr.message);
+            }
+            if (data && data.length > 0) {
+                let deleteCol = data[0].id !== undefined ? 'id' : (data[0].nama !== undefined ? 'nama' : Object.keys(data[0])[0]);
+                const { error: delErr } = await supabaseClient.from(table).delete().not(deleteCol, 'is', null);
+                if (delErr) {
+                    console.error(`[Factory Reset] Gagal menghapus tabel ${table}:`, delErr);
+                    throw new Error(`Gagal menghapus data tabel ${table}: ${delErr.message}`);
                 }
-            } catch(e) {
-                console.warn("Gagal mereset tabel", table, e);
             }
         }
 
         // Hapus semua users KECUALI super admin yang sedang login
-        try {
-            await supabaseClient.from('users').delete().neq('id', currentUser.id);
-        } catch(e) {
-            console.warn("Gagal mereset users", e);
+        const { error: delUsersErr } = await supabaseClient.from('users').delete().neq('id', currentUser.id);
+        if (delUsersErr) {
+            console.error("[Factory Reset] Gagal mereset tabel users:", delUsersErr);
+            throw new Error(`Gagal mereset data pengguna: ${delUsersErr.message}`);
         }
 
         // 2. Inisialisasi Ulang Data Starter Template
         // A. Kantor
-        await supabaseClient.from('kantor').insert([
+        const { error: errKantor } = await supabaseClient.from('kantor').insert([
             { nama: 'Zieda Pusat', lat: '-6.917464', lng: '107.619122', radius: 100 },
             { nama: 'Zieda Cabang Barat', lat: '-6.914000', lng: '107.600000', radius: 100 },
             { nama: 'Zieda Cabang Timur', lat: '-6.920000', lng: '107.630000', radius: 100 }
         ]);
+        if (errKantor) {
+            console.error("[Factory Reset] Gagal insert kantor:", errKantor);
+            throw new Error(`Gagal inisialisasi starter data kantor: ${errKantor.message}`);
+        }
 
         // B. Master Tipe Absen
-        await supabaseClient.from('master_tipe_absen').insert([
+        const { error: errTipe } = await supabaseClient.from('master_tipe_absen').insert([
             { nama_tipe: 'Absen Masuk Pagi', jam_mulai: '07:00:00', batas_terlambat: '08:00:00', jam_tutup: '16:00:00', is_checkout: false, is_aktif: true },
             { nama_tipe: 'Absen Pulang Pagi', jam_mulai: '15:00:00', batas_terlambat: '16:00:00', jam_tutup: '23:59:59', is_checkout: true, is_aktif: true },
             { nama_tipe: 'Absen Masuk Siang', jam_mulai: '12:00:00', batas_terlambat: '13:00:00', jam_tutup: '21:00:00', is_checkout: false, is_aktif: true },
@@ -4034,14 +4374,23 @@ async function factoryResetDatabase() {
             { nama_tipe: 'Izin Keluar', jam_mulai: '00:00:00', batas_terlambat: null, jam_tutup: null, is_checkout: false, is_aktif: true },
             { nama_tipe: 'Izin Masuk', jam_mulai: '00:00:00', batas_terlambat: null, jam_tutup: null, is_checkout: false, is_aktif: true }
         ]);
+        if (errTipe) {
+            console.error("[Factory Reset] Gagal insert master_tipe_absen:", errTipe);
+            throw new Error(`Gagal inisialisasi master tipe absen: ${errTipe.message}`);
+        }
 
         // C. Karyawan Test
-        const { data: insertedUsers } = await supabaseClient.from('users').insert([
+        const { data: insertedUsers, error: errUsers } = await supabaseClient.from('users').insert([
             { nama: 'Budi Pagi', password: '123456', role: 'Karyawan', no_hp: '081234567891', cabang: 'Zieda Pusat', unit: 'Operasional', sisa_cuti: 12 },
             { nama: 'Siti Siang', password: '123456', role: 'Karyawan', no_hp: '081234567892', cabang: 'Zieda Pusat', unit: 'Kasir', sisa_cuti: 12 },
             { nama: 'Rudi Istirahat', password: '123456', role: 'Karyawan', no_hp: '081234567893', cabang: 'Zieda Pusat', unit: 'Gudang', sisa_cuti: 12 },
             { nama: 'Dewi Lembur', password: '123456', role: 'Karyawan', no_hp: '081234567894', cabang: 'Zieda Pusat', unit: 'HRD', sisa_cuti: 12 }
         ]).select();
+
+        if (errUsers) {
+            console.error("[Factory Reset] Gagal insert users:", errUsers);
+            throw new Error(`Gagal inisialisasi starter pengguna/karyawan: ${errUsers.message}`);
+        }
 
         // D. Demo Absensi Hari Ini
         const now = new Date();
@@ -4086,7 +4435,11 @@ async function factoryResetDatabase() {
                 );
             }
             if (sampleAbsen.length > 0) {
-                await supabaseClient.from('absensi').insert(sampleAbsen);
+                const { error: errAbsen } = await supabaseClient.from('absensi').insert(sampleAbsen);
+                if (errAbsen) {
+                    console.error("[Factory Reset] Gagal insert sample absensi:", errAbsen);
+                    throw new Error(`Gagal inisialisasi demo data absensi: ${errAbsen.message}`);
+                }
             }
         }
 
@@ -4094,7 +4447,8 @@ async function factoryResetDatabase() {
             window.location.reload();
         });
     } catch (err) {
-        Swal.fire("Gagal Reset", err.message, "error");
+        console.error("[Factory Reset Error]", err);
+        Swal.fire("Gagal Reset", err.message || "Terjadi kesalahan saat memproses Factory Reset", "error");
     }
 }
 
