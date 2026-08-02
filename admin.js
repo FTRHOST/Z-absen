@@ -27,8 +27,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         let profile = null;
+        const isValidUUID = (str) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
-        if (session && session.user) {
+        if (session && session.user && isValidUUID(session.user.id)) {
             const { data: p } = await supabaseClient
                 .from('users')
                 .select('id, role, cabang, auth_id')
@@ -47,7 +48,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             if (fallbackUser) {
                 profile = fallbackUser;
-                if (session && session.user) {
+                if (session && session.user && isValidUUID(session.user.id)) {
                     await supabaseClient.from('users').update({ auth_id: session.user.id }).eq('id', fallbackUser.id);
                 }
             }
@@ -266,17 +267,57 @@ async function loadDashboardStats() {
                 users: a.users,
                 waktu_masuk: a.waktu, // Set default to their first record
                 tipe_absen: a.tipe_absen,
-                terlambat: false
+                terlambat: false,
+                menit_terlambat: 0,
+                menit_lembur: 0,
+                keterangan_waktu: ''
             };
         }
         
-        if (a.tipe_absen === 'Masuk') {
+        if (a.tipe_absen === 'Masuk' || (a.tipe_absen && a.tipe_absen.toLowerCase().includes('masuk'))) {
             groupedHadir[a.user_id].waktu_masuk = a.waktu;
             groupedHadir[a.user_id].tipe_absen = a.tipe_absen;
         }
         
-        if (a.status === 'Terlambat') {
+        const isTerlambatRecord = a.status === 'Terlambat' || (a.keterangan_waktu && a.keterangan_waktu.toLowerCase().startsWith('terlambat'));
+        let mTelat = parseInt(a.menit_terlambat, 10) || 0;
+        if (!mTelat && isTerlambatRecord && a.keterangan_waktu) {
+            const matchJ = a.keterangan_waktu.match(/(\d+)\s*j(?:am)?/i);
+            const matchM = a.keterangan_waktu.match(/(\d+)\s*m(?:enit)?/i);
+            if (matchJ || matchM) {
+                const j = matchJ ? parseInt(matchJ[1], 10) : 0;
+                const m = matchM ? parseInt(matchM[1], 10) : 0;
+                mTelat = j * 60 + m;
+            } else {
+                const matchRaw = a.keterangan_waktu.match(/Terlambat\s+(\d+)/i);
+                if (matchRaw) mTelat = parseInt(matchRaw[1], 10);
+            }
+        }
+
+        if (isTerlambatRecord || mTelat > 0) {
             groupedHadir[a.user_id].terlambat = true;
+            if (mTelat > 0) {
+                groupedHadir[a.user_id].menit_terlambat = Math.max(groupedHadir[a.user_id].menit_terlambat || 0, mTelat);
+            }
+        }
+
+        const isLemburRecord = a.status === 'Lembur' || (a.keterangan_waktu && a.keterangan_waktu.toLowerCase().startsWith('lembur'));
+        let mLembur = parseInt(a.menit_lembur, 10) || 0;
+        if (!mLembur && isLemburRecord && a.keterangan_waktu) {
+            const matchJ = a.keterangan_waktu.match(/(\d+)\s*j(?:am)?/i);
+            const matchM = a.keterangan_waktu.match(/(\d+)\s*m(?:enit)?/i);
+            if (matchJ || matchM) {
+                const j = matchJ ? parseInt(matchJ[1], 10) : 0;
+                const m = matchM ? parseInt(matchM[1], 10) : 0;
+                mLembur = j * 60 + m;
+            }
+        }
+        if (mLembur > 0) {
+            groupedHadir[a.user_id].menit_lembur = Math.max(groupedHadir[a.user_id].menit_lembur || 0, mLembur);
+        }
+
+        if (a.keterangan_waktu) {
+            groupedHadir[a.user_id].keterangan_waktu = a.keterangan_waktu;
         }
     });
     
@@ -426,18 +467,48 @@ function showDashboardDetail(type) {
                 const cabang = item.users?.cabang || '-';
                 const tipe = `<span class="badge bg-primary">${item.tipe_absen || '-'}</span>`;
                 const waktu = `<span class="badge bg-light text-dark border">${item.waktu_masuk || '-'}</span>`;
-                const ket = item.keterangan_waktu || (item.terlambat ? 'Terlambat' : 'Tepat Waktu');
-                const badgeKet = item.terlambat 
-                    ? `<span class="badge bg-warning text-dark">${ket}</span>`
-                    : (item.menit_lembur > 0 ? `<span class="badge bg-success">${ket}</span>` : `<span class="badge bg-light text-dark border">${ket}</span>`);
                 
+                let statusBadges = [];
+                if (item.terlambat) {
+                    statusBadges.push(`<span class="badge bg-warning text-dark">Terlambat</span>`);
+                }
+                if (item.menit_lembur > 0) {
+                    statusBadges.push(`<span class="badge bg-info text-white">Lembur</span>`);
+                }
+                if (statusBadges.length === 0) {
+                    statusBadges.push(`<span class="badge bg-success">Tepat Waktu</span>`);
+                }
+                const badgeKet = statusBadges.join(' ');
+                
+                let totalLateMinutes = item.menit_terlambat || 0;
+                if (!totalLateMinutes && item.keterangan_waktu) {
+                    const matchJ = item.keterangan_waktu.match(/(\d+)\s*j(?:am)?/i);
+                    const matchM = item.keterangan_waktu.match(/(\d+)\s*m(?:enit)?/i);
+                    if (matchJ || matchM) {
+                        const j = matchJ ? parseInt(matchJ[1], 10) : 0;
+                        const m = matchM ? parseInt(matchM[1], 10) : 0;
+                        totalLateMinutes = j * 60 + m;
+                    } else {
+                        const matchRaw = item.keterangan_waktu.match(/Terlambat\s+(\d+)/i);
+                        if (matchRaw) totalLateMinutes = parseInt(matchRaw[1], 10);
+                    }
+                }
+
                 let telatTeks = `<span class="text-muted small">0 Menit</span>`;
-                if (item.menit_terlambat && item.menit_terlambat > 0) {
-                    const jam = Math.floor(item.menit_terlambat / 60);
-                    const m = item.menit_terlambat % 60;
-                    telatTeks = `<span class="badge bg-danger text-white">${jam > 0 ? jam + ' Jam ' : ''}${m} Menit</span>`;
+                if (totalLateMinutes > 0) {
+                    const jam = Math.floor(totalLateMinutes / 60);
+                    const m = totalLateMinutes % 60;
+                    let durasiStr = '';
+                    if (jam > 0 && m > 0) {
+                        durasiStr = `${jam} Jam ${m} Menit`;
+                    } else if (jam > 0) {
+                        durasiStr = `${jam} Jam`;
+                    } else {
+                        durasiStr = `${m} Menit`;
+                    }
+                    telatTeks = `<span class="badge bg-danger text-white">${durasiStr}</span>`;
                 } else if (item.terlambat) {
-                    telatTeks = `<span class="badge bg-danger text-white">Terlambat</span>`;
+                    telatTeks = `<span class="badge bg-danger text-white">> 0 Menit</span>`;
                 }
                 
                 trHtml = `<tr>
