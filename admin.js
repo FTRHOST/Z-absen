@@ -15,10 +15,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // --- Cek Sesi JWT & Profil Resmi ---
     try {
-        const { data: { session } } = await supabaseClient.auth.getSession();
+        let session = null;
+        try {
+            const { data } = await supabaseClient.auth.getSession();
+            session = data?.session;
+        } catch (e) {}
+
+        // Auto-heal sesi auth jika token kadaluarsa / belum dibuat
+        if (!session && currentUser && currentUser.nama && currentUser.password) {
+            session = await ensureAuthenticatedSession();
+        }
+
         let profile = null;
 
-        if (session) {
+        if (session && session.user) {
             const { data: p } = await supabaseClient
                 .from('users')
                 .select('id, role, cabang, auth_id')
@@ -4187,12 +4197,71 @@ async function hapusDataAbsen(absenId, tanggal) {
     loadDataAbsensi();
 }
 
+// Helper untuk memastikan Sesi Otentikasi JWT Supabase Aktif sebelum operasi admin krusial
+async function ensureAuthenticatedSession() {
+    try {
+        let { data: { session } } = await supabaseClient.auth.getSession();
+        if (session && session.user) {
+            return session;
+        }
+
+        // 1. Coba refresh sesi JWT jika sudah pernah ada
+        const { data: refreshData } = await supabaseClient.auth.refreshSession();
+        if (refreshData?.session) {
+            return refreshData.session;
+        }
+
+        // 2. Jika tidak ada sesi, coba auto-login menggunakan kredensial pengguna yang sedang aktif
+        if (currentUser && currentUser.nama && currentUser.password) {
+            const activeEmail = `${currentUser.nama.replace(/\s+/g, "").toLowerCase()}@zieabsen.com`;
+            let authResult = await supabaseClient.auth.signInWithPassword({
+                email: activeEmail,
+                password: currentUser.password
+            });
+
+            if (authResult?.error) {
+                // Jika akun Auth Supabase belum dibuat, daftarkan
+                await supabaseClient.auth.signUp({
+                    email: activeEmail,
+                    password: currentUser.password
+                });
+                authResult = await supabaseClient.auth.signInWithPassword({
+                    email: activeEmail,
+                    password: currentUser.password
+                });
+            }
+
+            if (authResult?.data?.session) {
+                const newSession = authResult.data.session;
+                if (currentUser.id) {
+                    await supabaseClient.from('users').update({ auth_id: newSession.user.id }).eq('id', currentUser.id);
+                }
+                return newSession;
+            }
+        }
+    } catch (e) {
+        console.warn("[ensureAuthenticatedSession] Supabase Auth engine (/auth/v1) tidak merespon/terisolasi. Menggunakan sesi fallback database:", e);
+    }
+
+    // Fallback: Jika Auth engine (/auth/v1) di ngrok tidak di-tunnel atau tidak aktif, izinkan operasi berbasis sesi lokal Super Admin
+    if (currentUser && currentUser.role === 'Super Admin' && currentUser.id) {
+        return { user: { id: currentUser.id }, isFallback: true };
+    }
+
+    return null;
+}
+
 // ==========================================
 // FACTORY RESET
 // ==========================================
 async function factoryResetDatabase() {
     if (!isSuperAdmin) {
         Swal.fire("Akses Ditolak", "Hanya Super Admin yang dapat melakukan Factory Reset.", "error");
+        return;
+    }
+
+    if (!currentUser || !currentUser.id) {
+        Swal.fire("Sesi Tidak Valid", "Data profil pengguna tidak ditemukan. Silakan logout dan login kembali.", "error");
         return;
     }
 
@@ -4219,38 +4288,51 @@ async function factoryResetDatabase() {
     });
 
     try {
+        // 0. Pastikan Sesi Auth Supabase Aktif (Mencegah Error 401 Unauthorized / RLS Blocked)
+        const activeSession = await ensureAuthenticatedSession();
+        if (!activeSession) {
+            throw new Error("Sesi otentikasi Supabase tidak aktif atau kadaluarsa (401 Unauthorized). Silakan logout dan login kembali sebagai Super Admin.");
+        }
+
         // 1. Hapus isi tabel
         const tablesToClear = ['absensi', 'cuti', 'form_cuti_config', 'kantor', 'master_jenis_cuti', 'master_tipe_absen'];
         
         for (const table of tablesToClear) {
-            try {
-                const { data } = await supabaseClient.from(table).select('*');
-                if (data && data.length > 0) {
-                    let deleteCol = data[0].id !== undefined ? 'id' : (data[0].nama !== undefined ? 'nama' : Object.keys(data[0])[0]);
-                    await supabaseClient.from(table).delete().not(deleteCol, 'is', null);
+            const { data, error: selectErr } = await supabaseClient.from(table).select('*');
+            if (selectErr) {
+                console.warn(`[Factory Reset] Warning select ${table}:`, selectErr.message);
+            }
+            if (data && data.length > 0) {
+                let deleteCol = data[0].id !== undefined ? 'id' : (data[0].nama !== undefined ? 'nama' : Object.keys(data[0])[0]);
+                const { error: delErr } = await supabaseClient.from(table).delete().not(deleteCol, 'is', null);
+                if (delErr) {
+                    console.error(`[Factory Reset] Gagal menghapus tabel ${table}:`, delErr);
+                    throw new Error(`Gagal menghapus data tabel ${table}: ${delErr.message}`);
                 }
-            } catch(e) {
-                console.warn("Gagal mereset tabel", table, e);
             }
         }
 
         // Hapus semua users KECUALI super admin yang sedang login
-        try {
-            await supabaseClient.from('users').delete().neq('id', currentUser.id);
-        } catch(e) {
-            console.warn("Gagal mereset users", e);
+        const { error: delUsersErr } = await supabaseClient.from('users').delete().neq('id', currentUser.id);
+        if (delUsersErr) {
+            console.error("[Factory Reset] Gagal mereset tabel users:", delUsersErr);
+            throw new Error(`Gagal mereset data pengguna: ${delUsersErr.message}`);
         }
 
         // 2. Inisialisasi Ulang Data Starter Template
         // A. Kantor
-        await supabaseClient.from('kantor').insert([
+        const { error: errKantor } = await supabaseClient.from('kantor').insert([
             { nama: 'Zieda Pusat', lat: '-6.917464', lng: '107.619122', radius: 100 },
             { nama: 'Zieda Cabang Barat', lat: '-6.914000', lng: '107.600000', radius: 100 },
             { nama: 'Zieda Cabang Timur', lat: '-6.920000', lng: '107.630000', radius: 100 }
         ]);
+        if (errKantor) {
+            console.error("[Factory Reset] Gagal insert kantor:", errKantor);
+            throw new Error(`Gagal inisialisasi starter data kantor: ${errKantor.message}`);
+        }
 
         // B. Master Tipe Absen
-        await supabaseClient.from('master_tipe_absen').insert([
+        const { error: errTipe } = await supabaseClient.from('master_tipe_absen').insert([
             { nama_tipe: 'Absen Masuk Pagi', jam_mulai: '07:00:00', batas_terlambat: '08:00:00', jam_tutup: '16:00:00', is_checkout: false, is_aktif: true },
             { nama_tipe: 'Absen Pulang Pagi', jam_mulai: '15:00:00', batas_terlambat: '16:00:00', jam_tutup: '23:59:59', is_checkout: true, is_aktif: true },
             { nama_tipe: 'Absen Masuk Siang', jam_mulai: '12:00:00', batas_terlambat: '13:00:00', jam_tutup: '21:00:00', is_checkout: false, is_aktif: true },
@@ -4260,14 +4342,23 @@ async function factoryResetDatabase() {
             { nama_tipe: 'Izin Keluar', jam_mulai: '00:00:00', batas_terlambat: null, jam_tutup: null, is_checkout: false, is_aktif: true },
             { nama_tipe: 'Izin Masuk', jam_mulai: '00:00:00', batas_terlambat: null, jam_tutup: null, is_checkout: false, is_aktif: true }
         ]);
+        if (errTipe) {
+            console.error("[Factory Reset] Gagal insert master_tipe_absen:", errTipe);
+            throw new Error(`Gagal inisialisasi master tipe absen: ${errTipe.message}`);
+        }
 
         // C. Karyawan Test
-        const { data: insertedUsers } = await supabaseClient.from('users').insert([
+        const { data: insertedUsers, error: errUsers } = await supabaseClient.from('users').insert([
             { nama: 'Budi Pagi', password: '123456', role: 'Karyawan', no_hp: '081234567891', cabang: 'Zieda Pusat', unit: 'Operasional', sisa_cuti: 12 },
             { nama: 'Siti Siang', password: '123456', role: 'Karyawan', no_hp: '081234567892', cabang: 'Zieda Pusat', unit: 'Kasir', sisa_cuti: 12 },
             { nama: 'Rudi Istirahat', password: '123456', role: 'Karyawan', no_hp: '081234567893', cabang: 'Zieda Pusat', unit: 'Gudang', sisa_cuti: 12 },
             { nama: 'Dewi Lembur', password: '123456', role: 'Karyawan', no_hp: '081234567894', cabang: 'Zieda Pusat', unit: 'HRD', sisa_cuti: 12 }
         ]).select();
+
+        if (errUsers) {
+            console.error("[Factory Reset] Gagal insert users:", errUsers);
+            throw new Error(`Gagal inisialisasi starter pengguna/karyawan: ${errUsers.message}`);
+        }
 
         // D. Demo Absensi Hari Ini
         const now = new Date();
@@ -4312,7 +4403,11 @@ async function factoryResetDatabase() {
                 );
             }
             if (sampleAbsen.length > 0) {
-                await supabaseClient.from('absensi').insert(sampleAbsen);
+                const { error: errAbsen } = await supabaseClient.from('absensi').insert(sampleAbsen);
+                if (errAbsen) {
+                    console.error("[Factory Reset] Gagal insert sample absensi:", errAbsen);
+                    throw new Error(`Gagal inisialisasi demo data absensi: ${errAbsen.message}`);
+                }
             }
         }
 
@@ -4320,7 +4415,8 @@ async function factoryResetDatabase() {
             window.location.reload();
         });
     } catch (err) {
-        Swal.fire("Gagal Reset", err.message, "error");
+        console.error("[Factory Reset Error]", err);
+        Swal.fire("Gagal Reset", err.message || "Terjadi kesalahan saat memproses Factory Reset", "error");
     }
 }
 
