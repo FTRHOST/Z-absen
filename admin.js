@@ -1185,6 +1185,7 @@ async function simpanKaryawan(event) {
     let res;
     if (id) {
         // Edit Mode
+        const targetUserId = parseInt(id, 10);
         const updateData = { nama, no_hp, cabang, unit, hari_libur: checkedLibur };
         
         // Super Admin boleh ubah role
@@ -1192,17 +1193,17 @@ async function simpanKaryawan(event) {
             updateData.role = role;
         }
         
-        let { data, error } = await supabaseClient.from('users').update(updateData).eq('id', id);
+        let { data, error } = await supabaseClient.from('users').update(updateData).eq('id', targetUserId).select();
         
         // Fallback jika 'unit' belum ada di DB
         if (error && (error.message.includes("'unit'") || error.message.includes("unit"))) {
             console.warn("Kolom unit belum ada di DB. Mencoba update tanpa kolom unit...");
             delete updateData.unit;
-            const resFallback = await supabaseClient.from('users').update(updateData).eq('id', id);
-            if (!resFallback.error) {
+            const resFallback = await supabaseClient.from('users').update(updateData).eq('id', targetUserId).select();
+            if (!resFallback.error && resFallback.data && resFallback.data.length > 0) {
                 if (password.trim() !== '') {
                     await supabaseClient.rpc('admin_change_password', {
-                        p_user_id: id,
+                        p_user_id: targetUserId,
                         p_new_password: password
                     });
                 }
@@ -1227,17 +1228,49 @@ async function simpanKaryawan(event) {
                 if (modalK) modalK.hide();
                 return;
             }
+            error = resFallback.error;
+            data = resFallback.data;
         }
         
+        if (error) {
+            btn.disabled = false;
+            handleSupabaseError(error, "Gagal memperbarui data karyawan");
+            return;
+        }
+
+        // PENTING: Jika 0 baris diperbarui (dikarenakan RLS Policy lama memblokir update)
+        if (!data || data.length === 0) {
+            btn.disabled = false;
+            Swal.fire({
+                title: "Gagal Mengubah Data (Ditolak RLS)",
+                html: `
+                    <div class="text-start">
+                        <p class="mb-2">Perintah update terkirim tetapi <strong>0 baris di database yang diperbarui</strong>.</p>
+                        <p class="mb-2 small text-muted">Penyebabnya adalah Kebijakan Keamanan (<em>RLS Policy</em>) lama pada tabel <code>users</code> di database Anda memblokir izin UPDATE.</p>
+                        <hr class="my-2">
+                        <p class="mb-1 fw-bold text-dark"><i class="fas fa-tools me-1 text-primary"></i>Cara Mengatasinya:</p>
+                        <p class="small text-muted mb-2">Jalankan perintah SQL berikut di <strong>SQL Editor Supabase</strong> Anda:</p>
+                        <pre class="bg-dark text-light p-2.5 rounded small font-monospace text-start">DROP POLICY IF EXISTS "Allow auth update users" ON users;\nCREATE POLICY "Allow auth update users" ON users FOR UPDATE USING (auth.role() = 'authenticated');\nNOTIFY pgrst, 'reload schema';</pre>
+                    </div>
+                `,
+                icon: "error"
+            });
+            return;
+        }
+
         // Hanya update password jika diisi
         if (password.trim() !== '') {
             const { error: rpcError } = await supabaseClient.rpc('admin_change_password', {
-                p_user_id: id,
+                p_user_id: targetUserId,
                 p_new_password: password
             });
-            if (rpcError) error = rpcError;
+            if (rpcError) {
+                btn.disabled = false;
+                Swal.fire("Gagal Ubah Password", rpcError.message, "error");
+                return;
+            }
         }
-        res = { error };
+        res = { error: null };
     } else {
         // Insert Mode (Karyawan Baru)
         if (!password) {
