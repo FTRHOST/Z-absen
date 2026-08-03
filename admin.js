@@ -3385,6 +3385,126 @@ async function prosesExport(event) {
                 });
             }
 
+            // Tambahkan Sheet: Info Tipe Absen
+            try {
+                const { data: listTipe } = await supabaseClient.from('master_tipe_absen').select('*').order('id', { ascending: true });
+                if (listTipe && listTipe.length > 0) {
+                    const tipeData = [];
+                    tipeData.push(['No', 'Nama Tipe Absen', 'Jam Mulai', 'Jam Tutup', 'Batas Terlambat', 'Jenis / Keterangan']);
+                    
+                    const tipeStyles = {};
+                    for (let c = 0; c < 6; c++) {
+                        tipeStyles[`0_${c}`] = {
+                            font: { bold: true },
+                            fill: { fgColor: { rgb: "E9ECEF" } },
+                            alignment: { horizontal: "center", vertical: "center" }
+                        };
+                    }
+                    
+                    listTipe.forEach((t, idx) => {
+                        const r = idx + 1;
+                        const no = idx + 1;
+                        const nama = t.nama_tipe || '-';
+                        const jMulai = t.jam_mulai ? formatWaktuGlobal(t.jam_mulai) : '-';
+                        const jTutup = t.jam_tutup ? formatWaktuGlobal(t.jam_tutup) : '-';
+                        const jTerlambat = t.batas_terlambat ? formatWaktuGlobal(t.batas_terlambat) : '-';
+                        const ket = t.is_checkout ? 'Pulang / Checkout' : 'Masuk / Checkin';
+                        
+                        tipeData.push([no, nama, jMulai, jTutup, jTerlambat, ket]);
+                        
+                        tipeStyles[`${r}_0`] = { alignment: { horizontal: "center", vertical: "center" } };
+                        tipeStyles[`${r}_1`] = { alignment: { horizontal: "left", vertical: "center" } };
+                        tipeStyles[`${r}_2`] = { alignment: { horizontal: "center", vertical: "center" } };
+                        tipeStyles[`${r}_3`] = { alignment: { horizontal: "center", vertical: "center" } };
+                        tipeStyles[`${r}_4`] = { alignment: { horizontal: "center", vertical: "center" } };
+                        tipeStyles[`${r}_5`] = { alignment: { horizontal: "center", vertical: "center" } };
+                    });
+                    
+                    const wsTipe = XLSX.utils.aoa_to_sheet(tipeData);
+                    for (let r = 0; r < tipeData.length; r++) {
+                        for (let c = 0; c < tipeData[r].length; c++) {
+                            const cellRef = XLSX.utils.encode_cell({ r, c });
+                            if (!wsTipe[cellRef]) wsTipe[cellRef] = { t: 's', v: tipeData[r][c] || '' };
+                            if (tipeStyles[`${r}_${c}`]) wsTipe[cellRef].s = tipeStyles[`${r}_${c}`];
+                        }
+                    }
+                    
+                    const colWidthsTipe = new Array(6).fill(0);
+                    tipeData.forEach(row => {
+                        row.forEach((val, cIdx) => {
+                            const len = val !== null && val !== undefined ? String(val).length : 0;
+                            if (len > colWidthsTipe[cIdx]) colWidthsTipe[cIdx] = len;
+                        });
+                    });
+                    wsTipe['!cols'] = colWidthsTipe.map((len, cIdx) => ({ wch: Math.max(len + 4, 14) }));
+                    
+                    XLSX.utils.book_append_sheet(wb, wsTipe, "Info Tipe Absen");
+                }
+            } catch(e) {
+                console.error("Gagal menambahkan Sheet Info Tipe Absen:", e);
+            }
+
+            // Tambahkan Sheet: Data Karyawan
+            try {
+                let qUserExport = supabaseClient.from('users').select('*').order('cabang', { ascending: true }).order('nama', { ascending: true });
+                if (!isSuperAdmin) {
+                    qUserExport = qUserExport.eq('cabang', myCabang);
+                }
+                const { data: listUserExport } = await qUserExport;
+                if (listUserExport && listUserExport.length > 0) {
+                    const userDataExport = [];
+                    userDataExport.push(['No', 'Nama Karyawan', 'Kantor / Cabang', 'Unit', 'Role / Akses']);
+                    
+                    const userStyles = {};
+                    for (let c = 0; c < 5; c++) {
+                        userStyles[`0_${c}`] = {
+                            font: { bold: true },
+                            fill: { fgColor: { rgb: "E9ECEF" } },
+                            alignment: { horizontal: "center", vertical: "center" }
+                        };
+                    }
+                    
+                    listUserExport.forEach((u, idx) => {
+                        const r = idx + 1;
+                        const no = idx + 1;
+                        const nama = u.nama || '-';
+                        const cabang = u.cabang || '-';
+                        const unitVal = u.unit || '-';
+                        const role = u.role || 'Karyawan';
+                        
+                        userDataExport.push([no, nama, cabang, unitVal, role]);
+                        
+                        userStyles[`${r}_0`] = { alignment: { horizontal: "center", vertical: "center" } };
+                        userStyles[`${r}_1`] = { alignment: { horizontal: "left", vertical: "center" } };
+                        userStyles[`${r}_2`] = { alignment: { horizontal: "center", vertical: "center" } };
+                        userStyles[`${r}_3`] = { alignment: { horizontal: "center", vertical: "center" } };
+                        userStyles[`${r}_4`] = { alignment: { horizontal: "center", vertical: "center" } };
+                    });
+                    
+                    const wsUser = XLSX.utils.aoa_to_sheet(userDataExport);
+                    for (let r = 0; r < userDataExport.length; r++) {
+                        for (let c = 0; c < userDataExport[r].length; c++) {
+                            const cellRef = XLSX.utils.encode_cell({ r, c });
+                            if (!wsUser[cellRef]) wsUser[cellRef] = { t: 's', v: userDataExport[r][c] || '' };
+                            if (userStyles[`${r}_${c}`]) wsUser[cellRef].s = userStyles[`${r}_${c}`];
+                        }
+                    }
+                    
+                    const colWidthsUser = new Array(5).fill(0);
+                    userDataExport.forEach(row => {
+                        row.forEach((val, cIdx) => {
+                            const len = val !== null && val !== undefined ? String(val).length : 0;
+                            if (len > colWidthsUser[cIdx]) colWidthsUser[cIdx] = len;
+                        });
+                    });
+                    wsUser['!cols'] = colWidthsUser.map((len, cIdx) => ({ wch: Math.max(len + 4, 16) }));
+                    
+                    XLSX.utils.book_append_sheet(wb, wsUser, "Data Karyawan");
+                }
+            } catch(e) {
+                console.error("Gagal menambahkan Sheet Data Karyawan:", e);
+            }
+
             const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
             const excelBlob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
             rootFolder.file("rekap_absen.xlsx", excelBlob);
