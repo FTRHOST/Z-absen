@@ -446,7 +446,25 @@
 
         const { data: cutiData } = await qCuti;
 
-        // Mapping Data Karyawan -> Tanggal -> Log 4 Waktu
+        // Tentukan daftar tipe_absen aktif untuk header baris
+        let activeTipeList = [];
+        if (masterTipeAbsenList && masterTipeAbsenList.length > 0) {
+          activeTipeList = masterTipeAbsenList.map(t => t.nama_tipe);
+        } else if (absenData && absenData.length > 0) {
+          const setTipe = new Set();
+          absenData.forEach(a => {
+            if (a.tipe_absen && (!a.status || !a.status.includes('TRASH'))) {
+              setTipe.add(a.tipe_absen);
+            }
+          });
+          activeTipeList = Array.from(setTipe);
+        }
+
+        if (activeTipeList.length === 0) {
+          activeTipeList = ['Masuk', 'Istirahat Keluar', 'Istirahat Masuk', 'Pulang'];
+        }
+
+        // Mapping Data Karyawan -> Tanggal -> Tipe Absen
         let cardsHtml = '';
 
         usersData.forEach((u, uIdx) => {
@@ -455,10 +473,7 @@
           // Pre-fill dates
           datesList.forEach(d => {
             userAbsenMap[d] = {
-              masuk: null,
-              istKeluar: null,
-              istMasuk: null,
-              pulang: null,
+              byTipe: {},
               terlambatMins: 0,
               lemburMins: 0,
               statusList: []
@@ -470,27 +485,18 @@
             absenData.filter(a => a.user_id === u.id).forEach(a => {
               if (a.status && a.status.includes('TRASH')) return;
               if (userAbsenMap[a.tanggal]) {
-                const tipe = (a.tipe_absen || '').toLowerCase();
+                const tipe = a.tipe_absen || 'Unknown';
                 const waktuFormatted = a.waktu ? formatTimeHM(a.waktu) : null;
 
                 if (a.menit_terlambat) userAbsenMap[a.tanggal].terlambatMins += (a.menit_terlambat || 0);
                 if (a.menit_lembur) userAbsenMap[a.tanggal].lemburMins += (a.menit_lembur || 0);
                 if (a.status) userAbsenMap[a.tanggal].statusList.push(a.status);
 
-                // Mapping 4 Baris Waktu Sesuai PRD Section 5.2
-                if (tipe.includes('izin keluar')) {
-                  userAbsenMap[a.tanggal].istKeluar = waktuFormatted;
-                } else if (tipe.includes('izin masuk') || tipe.includes('izin kembali')) {
-                  userAbsenMap[a.tanggal].istMasuk = waktuFormatted;
-                } else if (tipe.includes('istirahat') && tipe.includes('keluar')) {
-                  userAbsenMap[a.tanggal].istKeluar = waktuFormatted;
-                } else if (tipe.includes('istirahat') && (tipe.includes('masuk') || tipe.includes('kembali'))) {
-                  userAbsenMap[a.tanggal].istMasuk = waktuFormatted;
-                } else if (tipe.includes('pulang') || tipe.includes('checkout') || (tipe.includes('lembur') && tipe.includes('keluar'))) {
-                  userAbsenMap[a.tanggal].pulang = waktuFormatted;
-                } else if (tipe.includes('masuk') || tipe.includes('checkin')) {
-                  if (!userAbsenMap[a.tanggal].masuk) {
-                    userAbsenMap[a.tanggal].masuk = waktuFormatted;
+                if (waktuFormatted) {
+                  if (!userAbsenMap[a.tanggal].byTipe[tipe]) {
+                    userAbsenMap[a.tanggal].byTipe[tipe] = waktuFormatted;
+                  } else if (!userAbsenMap[a.tanggal].byTipe[tipe].includes(waktuFormatted)) {
+                    userAbsenMap[a.tanggal].byTipe[tipe] += `, ${waktuFormatted}`;
                   }
                 }
               }
@@ -511,49 +517,75 @@
           let totalLemburMins = 0;
           let totalTelatMins = 0;
 
-          // Process Each Day Calculations
-          const dailyHtmlData = datesList.map(d => {
-            const dayObj = userAbsenMap[d];
-            const t1 = dayObj.masuk;
-            const t2 = dayObj.istKeluar;
-            const t3 = dayObj.istMasuk;
-            const t4 = dayObj.pulang;
+          const dailyNetMinsMap = {};
 
-            // Hitung Jumlah Hari (1.0 jika masuk, 0.5 jika setengah hari)
-            if (t1) {
-              const isHalfDay = dayObj.statusList.some(s => s.toLowerCase().includes('setengah hari') || s.toLowerCase().includes('half day'));
-              totalHariHadir += (isHalfDay ? 0.5 : 1.0);
+          datesList.forEach(d => {
+            const dayObj = userAbsenMap[d];
+            let minMasuk = null;
+            let maxPulang = null;
+            let istKeluar = null;
+            let istMasuk = null;
+            let hasMasuk = false;
+
+            Object.keys(dayObj.byTipe).forEach(tipe => {
+              const timeStr = dayObj.byTipe[tipe];
+              const tLower = tipe.toLowerCase();
+              const pMins = parseMins(timeStr);
+
+              if (pMins !== null) {
+                if (tLower.includes('istirahat') && tLower.includes('keluar')) {
+                  istKeluar = pMins;
+                } else if (tLower.includes('istirahat') && (tLower.includes('masuk') || tLower.includes('kembali'))) {
+                  istMasuk = pMins;
+                } else if (tLower.includes('pulang') || tLower.includes('checkout') || (tLower.includes('lembur') && tLower.includes('keluar'))) {
+                  if (maxPulang === null || pMins > maxPulang) maxPulang = pMins;
+                } else if (tLower.includes('masuk') || tLower.includes('checkin')) {
+                  hasMasuk = true;
+                  if (minMasuk === null || pMins < minMasuk) minMasuk = pMins;
+                }
+              }
+            });
+
+            if (hasMasuk) {
+              const isHalf = dayObj.statusList.some(s => s.toLowerCase().includes('setengah hari') || s.toLowerCase().includes('half day'));
+              totalHariHadir += (isHalf ? 0.5 : 1.0);
             }
 
-            // Hitung Jam Harian (Waktu 5: (t4 - t1) - (t3 - t2))
-            const m1 = parseMins(t1);
-            const m2 = parseMins(t2);
-            const m3 = parseMins(t3);
-            const m4 = parseMins(t4);
-
             let breakM = 0;
-            if (m3 !== null && m2 !== null && m3 > m2) {
-              breakM = m3 - m2;
+            if (istMasuk !== null && istKeluar !== null && istMasuk > istKeluar) {
+              breakM = istMasuk - istKeluar;
             }
 
             let netDailyMins = 0;
-            if (m4 !== null && m1 !== null && m4 >= m1) {
-              netDailyMins = (m4 - m1) - breakM;
+            if (maxPulang !== null && minMasuk !== null && maxPulang >= minMasuk) {
+              netDailyMins = (maxPulang - minMasuk) - breakM;
               if (netDailyMins < 0) netDailyMins = 0;
             }
 
+            dailyNetMinsMap[d] = netDailyMins;
             totalJamKerjaMins += netDailyMins;
             totalLemburMins += dayObj.lemburMins;
             totalTelatMins += dayObj.terlambatMins;
-
-            return {
-              t1: t1 || '-',
-              t2: t2 || '-',
-              t3: t3 || '-',
-              t4: t4 || '-',
-              t5: netDailyMins > 0 ? formatHMM(netDailyMins) : '-'
-            };
           });
+
+          // Build Dynamic Rows for activeTipeList
+          let tableRowsHtml = '';
+          activeTipeList.forEach(tipe => {
+            tableRowsHtml += `
+              <tr>
+                <td class="row-label ps-2">${tipe}</td>
+                ${datesList.map(d => `<td>${userAbsenMap[d].byTipe[tipe] || '-'}</td>`).join('')}
+              </tr>
+            `;
+          });
+
+          // Summary Row (Total Jam)
+          tableRowsHtml += `
+            <tr>
+              <td class="row-label ps-2 fw-bold text-dark">Total Jam</td>
+              ${datesList.map(d => `<td class="row-total-jam">${dailyNetMinsMap[d] > 0 ? formatHMM(dailyNetMinsMap[d]) : '-'}</td>`).join('')}
+            </tr>
+          `;
 
           // Build Card HTML for Employee
           cardsHtml += `
@@ -568,7 +600,7 @@
                 </div>
               </div>
 
-              <!-- TABEL LOG 4 WAKTU + TOTAL JAM -->
+              <!-- TABEL DINAMIS SESUAI TIPE ABSEN -->
               <table class="table-timesheet">
                 <thead>
                   <tr>
@@ -577,26 +609,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td class="row-label ps-2">Waktu 1 (Absen Masuk)</td>
-                    ${dailyHtmlData.map(dh => `<td>${dh.t1}</td>`).join('')}
-                  </tr>
-                  <tr>
-                    <td class="row-label ps-2">Waktu 2 (Istirahat Keluar)</td>
-                    ${dailyHtmlData.map(dh => `<td>${dh.t2}</td>`).join('')}
-                  </tr>
-                  <tr>
-                    <td class="row-label ps-2">Waktu 3 (Istirahat Masuk)</td>
-                    ${dailyHtmlData.map(dh => `<td>${dh.t3}</td>`).join('')}
-                  </tr>
-                  <tr>
-                    <td class="row-label ps-2">Waktu 4 (Absen Pulang)</td>
-                    ${dailyHtmlData.map(dh => `<td>${dh.t4}</td>`).join('')}
-                  </tr>
-                  <tr>
-                    <td class="row-label ps-2 fw-bold text-dark">Waktu 5 (Total Jam)</td>
-                    ${dailyHtmlData.map(dh => `<td class="row-total-jam">${dh.t5}</td>`).join('')}
-                  </tr>
+                  ${tableRowsHtml}
                 </tbody>
               </table>
 
