@@ -3198,6 +3198,29 @@ async function prosesExport(event) {
             } catch(e) {}
         }
 
+        // Ambil seluruh karyawan agar karyawan yang 0 absen tetap muncul di sheet cabang
+        let qAllUsers = supabaseClient.from('users').select('id, nama, cabang').order('nama', { ascending: true });
+        if (!isSuperAdmin) {
+            qAllUsers = qAllUsers.eq('cabang', myCabang);
+        }
+        const { data: allUsersData } = await qAllUsers;
+
+        if (allUsersData && allUsersData.length > 0) {
+            allUsersData.forEach(u => {
+                const namaUser = u.nama || 'Unknown';
+                const cabangUser = u.cabang || 'Tanpa Cabang';
+                if (!branchMap[cabangUser]) {
+                    branchMap[cabangUser] = {};
+                }
+                branchMap[cabangUser][namaUser] = {
+                    nama: namaUser,
+                    cabang: cabangUser,
+                    absensi: {},
+                    hasAbsen: false
+                };
+            });
+        }
+
         data.forEach(row => {
             const namaUser = row.users ? row.users.nama : 'Unknown';
             const cabangUser = row.users ? row.users.cabang || 'Tanpa Cabang' : 'Tanpa Cabang';
@@ -3209,9 +3232,12 @@ async function prosesExport(event) {
                 branchMap[cabangUser][namaUser] = {
                     nama: namaUser,
                     cabang: cabangUser,
-                    absensi: {}
+                    absensi: {},
+                    hasAbsen: false
                 };
             }
+            
+            branchMap[cabangUser][namaUser].hasAbsen = true;
             
             const tipe = row.tipe_absen || 'Unknown';
             if (!tipeAbsenList.includes(tipe)) {
@@ -3274,11 +3300,15 @@ async function prosesExport(event) {
                         nameRow[0] = userObj.nama;
                         matrixData.push(nameRow);
                         
-                        // Style Baris Nama Karyawan (Background #FFFF00, Bold, Rata Tengah di Kolom A)
+                        // Warna nama: #FFFF00 (Kuning) jika ada absen, #808080 (Abu-abu) jika 0 absen
+                        const nameBgColor = userObj.hasAbsen ? "FFFF00" : "808080";
+                        const nameFontColor = userObj.hasAbsen ? "000000" : "FFFFFF";
+                        
+                        // Style Baris Nama Karyawan
                         for (let c = 0; c <= datesList.length; c++) {
                             cellStylesMap[`${currentRowIdx}_${c}`] = {
-                                font: { bold: true },
-                                fill: { fgColor: { rgb: "FFFF00" } },
+                                font: { bold: true, color: { rgb: nameFontColor } },
+                                fill: { fgColor: { rgb: nameBgColor } },
                                 alignment: { horizontal: "center", vertical: "center" }
                             };
                         }
