@@ -217,6 +217,8 @@
       .table-timesheet td {
         border: 1px solid #000000 !important;
         color: #000000 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
       }
 
       .table-timesheet th {
@@ -487,6 +489,18 @@
               if (userAbsenMap[a.tanggal]) {
                 const tipe = a.tipe_absen || 'Unknown';
                 const waktuFormatted = a.waktu ? formatTimeHM(a.waktu) : null;
+                const statusStr = (a.status || '').toLowerCase();
+                const tipeStr = (tipe || '').toLowerCase();
+
+                const isTerlambat = statusStr.includes('terlambat');
+                const isLembur = tipeStr.includes('lembur') || statusStr.includes('lembur');
+
+                let bgColor = '';
+                if (isTerlambat) {
+                  bgColor = '#FFA6A6'; // Terlambat: #FFA6A6
+                } else if (isLembur) {
+                  bgColor = '#AFD095'; // Lembur: #AFD095
+                }
 
                 if (a.menit_terlambat) userAbsenMap[a.tanggal].terlambatMins += (a.menit_terlambat || 0);
                 if (a.menit_lembur) userAbsenMap[a.tanggal].lemburMins += (a.menit_lembur || 0);
@@ -494,9 +508,18 @@
 
                 if (waktuFormatted) {
                   if (!userAbsenMap[a.tanggal].byTipe[tipe]) {
-                    userAbsenMap[a.tanggal].byTipe[tipe] = waktuFormatted;
-                  } else if (!userAbsenMap[a.tanggal].byTipe[tipe].includes(waktuFormatted)) {
-                    userAbsenMap[a.tanggal].byTipe[tipe] += `, ${waktuFormatted}`;
+                    userAbsenMap[a.tanggal].byTipe[tipe] = {
+                      time: waktuFormatted,
+                      bgColor: bgColor
+                    };
+                  } else {
+                    const existing = userAbsenMap[a.tanggal].byTipe[tipe];
+                    if (!existing.time.includes(waktuFormatted)) {
+                      existing.time += `, ${waktuFormatted}`;
+                    }
+                    if (bgColor && !existing.bgColor) {
+                      existing.bgColor = bgColor;
+                    }
                   }
                 }
               }
@@ -528,7 +551,8 @@
             let hasMasuk = false;
 
             Object.keys(dayObj.byTipe).forEach(tipe => {
-              const timeStr = dayObj.byTipe[tipe];
+              const cellObj = dayObj.byTipe[tipe];
+              const timeStr = cellObj ? cellObj.time : null;
               const tLower = tipe.toLowerCase();
               const pMins = parseMins(timeStr);
 
@@ -574,7 +598,14 @@
             tableRowsHtml += `
               <tr>
                 <td class="row-label ps-2">${tipe}</td>
-                ${datesList.map(d => `<td>${userAbsenMap[d].byTipe[tipe] || '-'}</td>`).join('')}
+                ${datesList.map(d => {
+                  const cellObj = userAbsenMap[d].byTipe[tipe];
+                  if (cellObj && cellObj.time) {
+                    const styleAttr = cellObj.bgColor ? `style="background-color: ${cellObj.bgColor}; font-weight: 600;"` : '';
+                    return `<td ${styleAttr}>${cellObj.time}</td>`;
+                  }
+                  return `<td>-</td>`;
+                }).join('')}
               </tr>
             `;
           });
