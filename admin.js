@@ -3188,6 +3188,16 @@ async function prosesExport(event) {
             tipeAbsenList = globalMasterTipeAbsen.filter(t => t.is_aktif).map(t => t.nama_tipe);
         }
 
+        // Ensure currentFormatWaktu is loaded
+        if (!window.currentFormatWaktu) {
+            try {
+                const { data: setRes } = await supabaseClient.from('settings').select('format_waktu').single();
+                if (setRes && setRes.format_waktu) {
+                    window.currentFormatWaktu = setRes.format_waktu;
+                }
+            } catch(e) {}
+        }
+
         data.forEach(row => {
             const namaUser = row.users ? row.users.nama : 'Unknown';
             const cabangUser = row.users ? row.users.cabang || 'Tanpa Cabang' : 'Tanpa Cabang';
@@ -3213,7 +3223,7 @@ async function prosesExport(event) {
             }
             
             branchMap[cabangUser][namaUser].absensi[row.tanggal][tipe] = {
-                waktu: row.waktu || '-',
+                waktu: row.waktu ? formatWaktuGlobal(row.waktu) : '-',
                 status: row.status || '-',
                 jarak: row.lokasi || '-',
                 foto: row.foto || ''
