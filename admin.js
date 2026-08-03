@@ -3248,12 +3248,27 @@ async function prosesExport(event) {
                 branchMap[cabangUser][namaUser].absensi[row.tanggal] = {};
             }
             
-            branchMap[cabangUser][namaUser].absensi[row.tanggal][tipe] = {
-                waktu: row.waktu ? formatWaktuGlobal(row.waktu) : '-',
-                status: row.status || '-',
-                jarak: row.lokasi || '-',
-                foto: row.foto || ''
-            };
+            const existing = branchMap[cabangUser][namaUser].absensi[row.tanggal][tipe];
+            const formattedTime = row.waktu ? formatWaktuGlobal(row.waktu) : '-';
+
+            if (!existing) {
+                branchMap[cabangUser][namaUser].absensi[row.tanggal][tipe] = {
+                    waktu: formattedTime,
+                    status: row.status || '-',
+                    jarak: row.lokasi || '-',
+                    foto: row.foto || ''
+                };
+            } else {
+                // Jika ada 2x absen tipe sama di tanggal yang sama (misal 2x istirahat)
+                if (existing.waktu === '-' || !existing.waktu) {
+                    existing.waktu = formattedTime;
+                } else if (formattedTime !== '-' && !existing.waktu.includes(formattedTime)) {
+                    existing.waktu += `, ${formattedTime}`;
+                }
+                if (row.status && !existing.status.includes(row.status)) {
+                    existing.status += ` | ${row.status}`;
+                }
+            }
         });
 
         // 3. Generate Excel File (Per Sheet = Nama Cabang)
@@ -3360,6 +3375,133 @@ async function prosesExport(event) {
                             currentRowIdx++;
                         });
                         
+                        // Baris Total Jam Kerja (Bold & Rata Tengah)
+                        const workHoursRow = new Array(datesList.length + 1).fill('');
+                        workHoursRow[0] = 'Total Jam Kerja';
+
+                        cellStylesMap[`${currentRowIdx}_0`] = {
+                            font: { bold: true },
+                            fill: { fgColor: { rgb: "F8F9FA" } },
+                            alignment: { horizontal: "center", vertical: "center" }
+                        };
+
+                        datesList.forEach((d, dIdx) => {
+                            const c = dIdx + 1;
+                            const dayAbsen = userObj.absensi[d];
+                            
+                            let jamKerjaStr = '-';
+                            if (dayAbsen) {
+                                let minMasukMins = null;
+                                let maxPulangMins = null;
+                                let waktuIzinKeluar = null;
+                                let waktuIzinMasuk = null;
+                                let waktuIstirahatKeluarList = [];
+                                let waktuIstirahatMasukList = [];
+
+                                const parseT = (tStr) => {
+                                    if (!tStr) return null;
+                                    const firstTime = String(tStr).split(',')[0].trim();
+                                    const p = firstTime.split(':');
+                                    if (p.length < 2) return null;
+                                    return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+                                };
+
+                                const parseTLast = (tStr) => {
+                                    if (!tStr) return null;
+                                    const parts = String(tStr).split(',');
+                                    const lastTime = parts[parts.length - 1].trim();
+                                    const p = lastTime.split(':');
+                                    if (p.length < 2) return null;
+                                    return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+                                };
+
+                                const formatM = (m) => {
+                                    if (m <= 0) return '0j 0m';
+                                    return `${Math.floor(m / 60)}j ${m % 60}m`;
+                                };
+
+                                tipeAbsenList.forEach(tipe => {
+                                    const a = dayAbsen[tipe];
+                                    if (a && a.waktu && a.waktu !== '-') {
+                                        const tipeLower = tipe.toLowerCase();
+                                        if (tipeLower.includes('izin keluar')) {
+                                            waktuIzinKeluar = a.waktu;
+                                        } else if (tipeLower.includes('izin masuk') || tipeLower.includes('izin kembali')) {
+                                            waktuIzinMasuk = a.waktu;
+                                        } else if (tipeLower.includes('istirahat')) {
+                                            const times = String(a.waktu).split(',').map(t => t.trim());
+                                            if (tipeLower.includes('keluar')) {
+                                                times.forEach(t => {
+                                                    const parsed = parseT(t);
+                                                    if (parsed !== null) waktuIstirahatKeluarList.push(parsed);
+                                                });
+                                            } else if (tipeLower.includes('masuk') || tipeLower.includes('kembali')) {
+                                                times.forEach(t => {
+                                                    const parsed = parseT(t);
+                                                    if (parsed !== null) waktuIstirahatMasukList.push(parsed);
+                                                });
+                                            }
+                                        } else {
+                                            let masterMatch = null;
+                                            if (typeof globalMasterTipeAbsen !== 'undefined') {
+                                                masterMatch = globalMasterTipeAbsen.find(t => t.nama_tipe === tipe);
+                                            }
+                                            const isCheckout = (masterMatch && masterMatch.is_checkout) || 
+                                                              tipeLower.includes('pulang') || 
+                                                              tipeLower.includes('checkout') || 
+                                                              (tipeLower.includes('lembur') && (tipeLower.includes('keluar') || tipeLower.includes('selesai')));
+                                            
+                                            if (isCheckout) {
+                                                const pMins = parseTLast(a.waktu);
+                                                if (pMins !== null) {
+                                                    if (maxPulangMins === null || pMins > maxPulangMins) {
+                                                        maxPulangMins = pMins;
+                                                    }
+                                                }
+                                            } else {
+                                                const mMins = parseT(a.waktu);
+                                                if (mMins !== null) {
+                                                    if (minMasukMins === null || mMins < minMasukMins) {
+                                                        minMasukMins = mMins;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                });
+
+                                if (minMasukMins !== null && maxPulangMins !== null) {
+                                    let diffMins = maxPulangMins - minMasukMins;
+                                    if (diffMins < 0) diffMins += 1440; // Lintas tengah malam
+                                    
+                                    // Hitung total menit izin
+                                    let izinMins = 0;
+                                    if (waktuIzinKeluar && waktuIzinMasuk) {
+                                        const kMins = parseT(waktuIzinKeluar);
+                                        const mMinsIzin = parseT(waktuIzinMasuk);
+                                        if (kMins && mMinsIzin && mMinsIzin > kMins) {
+                                            izinMins = mMinsIzin - kMins;
+                                        }
+                                    }
+                                    
+                                    let totalKerjaMins = diffMins - izinMins;
+                                    if (totalKerjaMins < 0) totalKerjaMins = 0;
+                                    jamKerjaStr = formatM(totalKerjaMins);
+                                }
+                            }
+
+                            workHoursRow[c] = jamKerjaStr;
+
+                            cellStylesMap[`${currentRowIdx}_${c}`] = {
+                                font: { bold: true },
+                                fill: { fgColor: { rgb: "F8F9FA" } },
+                                alignment: { horizontal: "center", vertical: "center" }
+                            };
+                        });
+
+                        matrixData.push(workHoursRow);
+                        currentRowIdx++;
+
                         // Baris Kosong Pemisah Karyawan
                         matrixData.push(new Array(datesList.length + 1).fill(''));
                         currentRowIdx++;
