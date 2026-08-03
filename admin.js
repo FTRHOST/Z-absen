@@ -5678,3 +5678,123 @@ async function prosesRestoreModular() {
     }
 }
 window.prosesRestoreModular = prosesRestoreModular;
+
+// ==========================================
+// FORM GAJI MINGGUAN (TIMESHEET PRINT/PDF)
+// ==========================================
+async function bukaModalFormGaji() {
+    setPresetTanggalGaji('7hari');
+    
+    // Populate Cabang Dropdown
+    const selectCabang = document.getElementById('gaji_cabang');
+    if (selectCabang) {
+        selectCabang.innerHTML = '<option value="">Semua Cabang</option>';
+        let kantorList = (typeof globalKantorList !== 'undefined' && globalKantorList) ? globalKantorList : [];
+        
+        if (kantorList.length === 0 && typeof supabaseClient !== 'undefined') {
+            try {
+                const { data } = await supabaseClient.from('kantor').select('nama').order('nama');
+                if (data) kantorList = data;
+            } catch(e) {}
+        }
+
+        kantorList.forEach(k => {
+            const namaKantor = k.nama || k.nama_kantor || '';
+            if (namaKantor) {
+                const opt = document.createElement('option');
+                opt.value = namaKantor;
+                opt.textContent = namaKantor;
+                selectCabang.appendChild(opt);
+            }
+        });
+        
+        // Jika admin cabang, kunci pilihan cabang
+        const currentUserData = localStorage.getItem('userLogin');
+        if (currentUserData) {
+            try {
+                const u = JSON.parse(currentUserData);
+                if (u.role !== 'Super Admin' && u.cabang) {
+                    selectCabang.value = u.cabang;
+                    selectCabang.disabled = true;
+                }
+            } catch(e) {}
+        }
+    }
+
+    const modalEl = document.getElementById('modalFormGaji');
+    if (modalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        try {
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        } catch(e) {
+            console.error('Modal error:', e);
+        }
+    }
+}
+
+function setPresetTanggalGaji(presetType) {
+    const today = new Date();
+    let dStart = new Date();
+    let dEnd = new Date();
+
+    if (presetType === '7hari') {
+        dStart.setDate(today.getDate() - 6);
+        dEnd = today;
+    } else if (presetType === 'mingguini') {
+        const day = today.getDay(); // 0: Sun, 1: Mon...
+        const diffToMon = (day === 0 ? -6 : 1 - day);
+        dStart.setDate(today.getDate() + diffToMon);
+        dEnd = new Date(dStart);
+        dEnd.setDate(dStart.getDate() + 6);
+    }
+
+    const formatYMD = (d) => d.toISOString().split('T')[0];
+    
+    const inpMulai = document.getElementById('gaji_mulai');
+    const inpSelesai = document.getElementById('gaji_selesai');
+    if (inpMulai) inpMulai.value = formatYMD(dStart);
+    if (inpSelesai) inpSelesai.value = formatYMD(dEnd);
+}
+
+function prosesCetakFormGaji(event) {
+    if (event) event.preventDefault();
+
+    const tglMulai = document.getElementById('gaji_mulai').value;
+    const tglSelesai = document.getElementById('gaji_selesai').value;
+    const cabang = document.getElementById('gaji_cabang').value;
+
+    if (!tglMulai || !tglSelesai) {
+        Swal.fire('Perhatian', 'Silakan pilih tanggal mulai dan tanggal selesai.', 'warning');
+        return;
+    }
+
+    const dStart = new Date(tglMulai);
+    const dEnd = new Date(tglSelesai);
+    const diffTime = dEnd - dStart;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+    if (diffDays <= 0) {
+        Swal.fire('Perhatian', 'Tanggal selesai harus sama atau setelah tanggal mulai.', 'warning');
+        return;
+    }
+
+    if (diffDays > 7) {
+        Swal.fire('Rentang Melebihi Limit', `Form Gaji Mingguan khusus untuk 1 minggu (maksimal 7 hari). Rentang yang Anda pilih adalah ${diffDays} hari.`, 'warning');
+        return;
+    }
+
+    // Close Modal
+    const modalEl = document.getElementById('modalFormGaji');
+    if (modalEl) {
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+    }
+
+    // Open print-gaji.html in new tab
+    const url = `print-gaji.html?mulai=${encodeURIComponent(tglMulai)}&selesai=${encodeURIComponent(tglSelesai)}&cabang=${encodeURIComponent(cabang)}`;
+    window.open(url, '_blank');
+}
+
+window.bukaModalFormGaji = bukaModalFormGaji;
+window.setPresetTanggalGaji = setPresetTanggalGaji;
+window.prosesCetakFormGaji = prosesCetakFormGaji;

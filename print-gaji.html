@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Form Gaji Mingguan (Timesheet) - Zieda Absen</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --primary-color: #1e293b;
+      --border-color: #334155;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+      padding: 0;
+      margin: 0;
+    }
+
+    /* BAR KONTROL DI ATAS (HANYA DITAMPILKAN DI SCREEN) */
+    .control-bar {
+      background: #ffffff;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 12px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+
+    /* CONTAINER PRINTABLE */
+    .print-container {
+      max-width: 1100px;
+      margin: 20px auto;
+      padding: 0 15px;
+    }
+
+    /* KARTU KARYAWAN (BLOK SCAN LOG GAJI) */
+    .employee-card {
+      background: #ffffff;
+      border: 1.5px solid #1e293b;
+      border-radius: 6px;
+      margin-bottom: 24px;
+      padding: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .emp-header-bar {
+      background-color: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      padding: 6px 12px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .emp-title {
+      font-weight: 700;
+      color: #0f172a;
+      font-size: 15px;
+    }
+
+    /* TABEL MATRIX 7 HARI */
+    .table-timesheet {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+
+    .table-timesheet th,
+    .table-timesheet td {
+      border: 1px solid #64748b;
+      padding: 5px 6px;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    .table-timesheet th {
+      background-color: #e2e8f0 !important;
+      font-weight: 700;
+      color: #0f172a;
+      font-size: 11.5px;
+    }
+
+    .table-timesheet td.row-label {
+      text-align: left;
+      font-weight: 600;
+      background-color: #f8fafc;
+      white-space: nowrap;
+      width: 170px;
+    }
+
+    .table-timesheet td.row-total-jam {
+      font-weight: 700;
+      background-color: #f1f5f9;
+      color: #0f172a;
+    }
+
+    /* FOOTER & REKAP CARD */
+    .summary-footer {
+      display: grid;
+      grid-template-columns: 1fr 240px;
+      gap: 12px;
+      align-items: stretch;
+      margin-top: 8px;
+    }
+
+    .rekap-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      padding: 8px;
+      border-radius: 4px;
+    }
+
+    .rekap-item {
+      text-align: center;
+      padding: 4px;
+      border: 1px solid #e2e8f0;
+      border-radius: 3px;
+      background: #ffffff;
+    }
+
+    .rekap-item .label {
+      font-size: 10px;
+      color: #475569;
+      text-transform: uppercase;
+      font-weight: 600;
+      display: block;
+    }
+
+    .rekap-item .value {
+      font-size: 13px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 2px;
+    }
+
+    .notes-box {
+      grid-column: span 4;
+      font-size: 11px;
+      color: #334155;
+      text-align: left;
+      border-top: 1px dashed #cbd5e1;
+      padding-top: 4px;
+      margin-top: 4px;
+    }
+
+    /* KOTAK TANDA TANGAN */
+    .signature-container {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      padding: 6px 12px;
+      background: #ffffff;
+    }
+
+    .sig-box {
+      flex: 1;
+      text-align: center;
+      font-size: 10.5px;
+    }
+
+    .sig-space {
+      height: 38px;
+    }
+
+    .sig-name {
+      font-weight: 600;
+      border-top: 1px solid #64748b;
+      padding-top: 2px;
+      font-size: 10px;
+    }
+
+    /* MEDIA PRINT RULES */
+    @media print {
+      body {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+      }
+
+      .no-print {
+        display: none !important;
+      }
+
+      .print-container {
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      .employee-card {
+        box-shadow: none !important;
+        border: 1.5px solid #000000 !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        margin-bottom: 16px !important;
+        padding: 10px !important;
+      }
+
+      .table-timesheet th,
+      .table-timesheet td {
+        border: 1px solid #000000 !important;
+        color: #000000 !important;
+      }
+
+      .table-timesheet th {
+        background-color: #e2e8f0 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .emp-header-bar,
+      .rekap-grid,
+      .signature-container {
+        border: 1px solid #000000 !important;
+        background-color: #ffffff !important;
+      }
+
+      @page {
+        size: A4 portrait;
+        margin: 8mm;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- CONTROL BAR / NAVIGATION (TIDAK IKUT DICETAK) -->
+  <div class="control-bar no-print">
+    <div class="container-fluid d-flex flex-wrap align-items-center justify-content-between gap-3">
+      <div class="d-flex align-items-center gap-2">
+        <a href="admin.html" class="btn btn-outline-secondary btn-sm fw-bold">
+          <i class="fas fa-arrow-left me-1"></i> Kembali ke Admin
+        </a>
+        <h6 class="mb-0 fw-bold ms-2 text-primary">
+          <i class="fas fa-print me-2"></i>Cetak Form Gaji Mingguan
+        </h6>
+      </div>
+
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <div class="d-flex align-items-center gap-1">
+          <label class="small text-muted mb-0 fw-semibold">Mulai:</label>
+          <input type="date" id="filter_mulai" class="form-control form-control-sm w-auto">
+        </div>
+        <div class="d-flex align-items-center gap-1">
+          <label class="small text-muted mb-0 fw-semibold">Selesai:</label>
+          <input type="date" id="filter_selesai" class="form-control form-control-sm w-auto">
+        </div>
+        <div class="d-flex align-items-center gap-1">
+          <label class="small text-muted mb-0 fw-semibold">Cabang:</label>
+          <select id="filter_cabang" class="form-select form-select-sm w-auto">
+            <option value="">Semua Cabang</option>
+          </select>
+        </div>
+        <button onclick="loadFormGajiData()" class="btn btn-primary btn-sm fw-bold shadow-sm">
+          <i class="fas fa-sync me-1"></i> Tampilkan
+        </button>
+        <button onclick="window.print()" class="btn btn-success btn-sm fw-bold shadow-sm ms-2">
+          <i class="fas fa-print me-1"></i> Cetak / Save PDF
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRINT CONTAINER -->
+  <div class="print-container">
+    
+    <!-- DOKUMEN HEADER -->
+    <div class="text-center mb-3 pb-2 border-bottom border-2 border-dark">
+      <h4 class="fw-bold mb-1 tracking-wide text-uppercase" style="letter-spacing: 1px;">ZIEDA ABSEN - SCAN LOG (GAJI MINGGUAN)</h4>
+      <p class="mb-0 small text-secondary fw-semibold" id="doc-subtitle">
+        Periode: - | Cabang: Semua Cabang
+      </p>
+    </div>
+
+    <!-- SPINNER LOADING -->
+    <div id="loading-spinner" class="text-center py-5">
+      <div class="spinner-border text-primary me-2" role="status"></div>
+      <span class="fw-semibold text-secondary">Mengambil data absensi & kalkulasi timesheet mingguan...</span>
+    </div>
+
+    <!-- CONTAINER KARTU KARYAWAN -->
+    <div id="employee-cards-container"></div>
+  </div>
+
+  <!-- SCRIPTS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="env.js"></script>
+  <script src="config.js"></script>
+
+  <script>
+    // Global State
+    let masterCabangList = [];
+    let masterTipeAbsenList = [];
+
+    // Deteksi Parameter URL
+    const urlParams = new URLSearchParams(window.location.search);
+    let paramMulai = urlParams.get('mulai');
+    let paramSelesai = urlParams.get('selesai');
+    let paramCabang = urlParams.get('cabang') || '';
+
+    // Set Default Dates (7 Hari / 1 Minggu) jika tidak ada di URL
+    if (!paramMulai || !paramSelesai) {
+      const today = new Date();
+      const sixDaysAgo = new Date();
+      sixDaysAgo.setDate(today.getDate() - 6);
+
+      paramSelesai = today.toISOString().split('T')[0];
+      paramMulai = sixDaysAgo.toISOString().split('T')[0];
+    }
+
+    document.getElementById('filter_mulai').value = paramMulai;
+    document.getElementById('filter_selesai').value = paramSelesai;
+
+    // Direct Login Check
+    const userData = localStorage.getItem('userLogin');
+    let currentUser = null;
+    if (userData) {
+      try { currentUser = JSON.parse(userData); } catch(e) {}
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      await loadMasterData();
+      await loadFormGajiData();
+    });
+
+    async function loadMasterData() {
+      try {
+        // Load Cabang
+        const { data: cData } = await supabaseClient.from('kantor').select('nama').order('nama');
+        if (cData) {
+          masterCabangList = cData.map(c => c.nama || c.nama_kantor || '');
+          const selCabang = document.getElementById('filter_cabang');
+          selCabang.innerHTML = '<option value="">Semua Cabang</option>';
+          masterCabangList.forEach(c => {
+            if (c) {
+              const opt = document.createElement('option');
+              opt.value = c;
+              opt.textContent = c;
+              if (c === paramCabang) opt.selected = true;
+              selCabang.appendChild(opt);
+            }
+          });
+        }
+
+        // Load Tipe Absen
+        const { data: tData } = await supabaseClient.from('tipe_absen').select('*').order('id');
+        if (tData) masterTipeAbsenList = tData;
+      } catch (e) {
+        console.error('Error loading master data:', e);
+      }
+    }
+
+    async function loadFormGajiData() {
+      const spinner = document.getElementById('loading-spinner');
+      const container = document.getElementById('employee-cards-container');
+      
+      spinner.style.display = 'block';
+      container.innerHTML = '';
+
+      const tglMulai = document.getElementById('filter_mulai').value;
+      const tglSelesai = document.getElementById('filter_selesai').value;
+      const cabangSelected = document.getElementById('filter_cabang').value;
+
+      // Validasi Selisih Hari Max 7 Hari (1 Minggu)
+      const dStart = new Date(tglMulai);
+      const dEnd = new Date(tglSelesai);
+      const diffTime = dEnd - dStart;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+      if (diffDays <= 0) {
+        spinner.style.display = 'none';
+        container.innerHTML = `<div class="alert alert-danger text-center">Tanggal Selesai harus sama atau setelah Tanggal Mulai.</div>`;
+        return;
+      }
+
+      if (diffDays > 7) {
+        spinner.style.display = 'none';
+        container.innerHTML = `<div class="alert alert-warning text-center">Rentang tanggal Form Gaji Mingguan maksimal 7 hari (1 minggu). Anda memilih ${diffDays} hari. Silakan sesuaikan filter tanggal.</div>`;
+        return;
+      }
+
+      // Update Subtitle
+      document.getElementById('doc-subtitle').innerText = 
+        `Periode: ${formatTanggalIndo(tglMulai)} s/d ${formatTanggalIndo(tglSelesai)} | Cabang: ${cabangSelected || 'Semua Cabang'}`;
+
+      // Buat List Tanggal (Array 7 hari)
+      const datesList = [];
+      let curr = new Date(dStart);
+      while (curr <= dEnd) {
+        datesList.push(curr.toISOString().split('T')[0]);
+        curr.setDate(curr.getDate() + 1);
+      }
+
+      try {
+        // Query Karyawan
+        let qUsers = supabaseClient.from('users').select('id, nama, cabang, unit, role').order('nama');
+        if (cabangSelected) {
+          qUsers = qUsers.eq('cabang', cabangSelected);
+        } else if (currentUser && currentUser.role !== 'Super Admin' && currentUser.cabang) {
+          qUsers = qUsers.eq('cabang', currentUser.cabang);
+        }
+
+        const { data: usersData, error: uErr } = await qUsers;
+        if (uErr) throw uErr;
+
+        if (!usersData || usersData.length === 0) {
+          spinner.style.display = 'none';
+          container.innerHTML = `<div class="alert alert-info text-center">Tidak ada data karyawan ditemukan pada cabang yang dipilih.</div>`;
+          return;
+        }
+
+        // Query Absensi pada rentang tanggal
+        let qAbsen = supabaseClient
+          .from('absensi')
+          .select('id, user_id, tanggal, waktu, tipe_absen, status, menit_terlambat, menit_lembur, is_trash')
+          .gte('tanggal', tglMulai)
+          .lte('tanggal', tglSelesai)
+          .is('is_trash', false);
+
+        const { data: absenData, error: aErr } = await qAbsen;
+        if (aErr) throw aErr;
+
+        // Query Cuti / Izin pada rentang tanggal
+        let qCuti = supabaseClient
+          .from('cuti')
+          .select('id, user_id, tanggal_mulai, tanggal_selesai, jenis_cuti, alasan, status_persetujuan')
+          .lte('tanggal_mulai', tglSelesai)
+          .gte('tanggal_selesai', tglMulai)
+          .eq('status_persetujuan', 'Disetujui');
+
+        const { data: cutiData } = await qCuti;
+
+        // Mapping Data Karyawan -> Tanggal -> Log 4 Waktu
+        let cardsHtml = '';
+
+        usersData.forEach((u, uIdx) => {
+          const userAbsenMap = {};
+          
+          // Pre-fill dates
+          datesList.forEach(d => {
+            userAbsenMap[d] = {
+              masuk: null,
+              istKeluar: null,
+              istMasuk: null,
+              pulang: null,
+              terlambatMins: 0,
+              lemburMins: 0,
+              statusList: []
+            };
+          });
+
+          // Populate Attendance for user
+          if (absenData) {
+            absenData.filter(a => a.user_id === u.id).forEach(a => {
+              if (userAbsenMap[a.tanggal]) {
+                const tipe = (a.tipe_absen || '').toLowerCase();
+                const waktuFormatted = a.waktu ? formatTimeHM(a.waktu) : null;
+
+                if (a.menit_terlambat) userAbsenMap[a.tanggal].terlambatMins += (a.menit_terlambat || 0);
+                if (a.menit_lembur) userAbsenMap[a.tanggal].lemburMins += (a.menit_lembur || 0);
+                if (a.status) userAbsenMap[a.tanggal].statusList.push(a.status);
+
+                // Mapping 4 Baris Waktu Sesuai PRD Section 5.2
+                if (tipe.includes('izin keluar')) {
+                  userAbsenMap[a.tanggal].istKeluar = waktuFormatted;
+                } else if (tipe.includes('izin masuk') || tipe.includes('izin kembali')) {
+                  userAbsenMap[a.tanggal].istMasuk = waktuFormatted;
+                } else if (tipe.includes('istirahat') && tipe.includes('keluar')) {
+                  userAbsenMap[a.tanggal].istKeluar = waktuFormatted;
+                } else if (tipe.includes('istirahat') && (tipe.includes('masuk') || tipe.includes('kembali'))) {
+                  userAbsenMap[a.tanggal].istMasuk = waktuFormatted;
+                } else if (tipe.includes('pulang') || tipe.includes('checkout') || (tipe.includes('lembur') && tipe.includes('keluar'))) {
+                  userAbsenMap[a.tanggal].pulang = waktuFormatted;
+                } else if (tipe.includes('masuk') || tipe.includes('checkin')) {
+                  if (!userAbsenMap[a.tanggal].masuk) {
+                    userAbsenMap[a.tanggal].masuk = waktuFormatted;
+                  }
+                }
+              }
+            });
+          }
+
+          // Cuti / Izin Note for User
+          const userCutiNotes = [];
+          if (cutiData) {
+            cutiData.filter(c => c.user_id === u.id).forEach(c => {
+              userCutiNotes.push(`${c.jenis_cuti} (${formatTanggalIndo(c.tanggal_mulai)} - ${formatTanggalIndo(c.tanggal_selesai)})`);
+            });
+          }
+
+          // Kalkulasi Rekap Mingguan Karyawan
+          let totalHariHadir = 0;
+          let totalJamKerjaMins = 0;
+          let totalLemburMins = 0;
+          let totalTelatMins = 0;
+
+          // Process Each Day Calculations
+          const dailyHtmlData = datesList.map(d => {
+            const dayObj = userAbsenMap[d];
+            const t1 = dayObj.masuk;
+            const t2 = dayObj.istKeluar;
+            const t3 = dayObj.istMasuk;
+            const t4 = dayObj.pulang;
+
+            // Hitung Jumlah Hari (1.0 jika masuk, 0.5 jika setengah hari)
+            if (t1) {
+              const isHalfDay = dayObj.statusList.some(s => s.toLowerCase().includes('setengah hari') || s.toLowerCase().includes('half day'));
+              totalHariHadir += (isHalfDay ? 0.5 : 1.0);
+            }
+
+            // Hitung Jam Harian (Waktu 5: (t4 - t1) - (t3 - t2))
+            const m1 = parseMins(t1);
+            const m2 = parseMins(t2);
+            const m3 = parseMins(t3);
+            const m4 = parseMins(t4);
+
+            let breakM = 0;
+            if (m3 !== null && m2 !== null && m3 > m2) {
+              breakM = m3 - m2;
+            }
+
+            let netDailyMins = 0;
+            if (m4 !== null && m1 !== null && m4 >= m1) {
+              netDailyMins = (m4 - m1) - breakM;
+              if (netDailyMins < 0) netDailyMins = 0;
+            }
+
+            totalJamKerjaMins += netDailyMins;
+            totalLemburMins += dayObj.lemburMins;
+            totalTelatMins += dayObj.terlambatMins;
+
+            return {
+              t1: t1 || '-',
+              t2: t2 || '-',
+              t3: t3 || '-',
+              t4: t4 || '-',
+              t5: netDailyMins > 0 ? formatHMM(netDailyMins) : '-'
+            };
+          });
+
+          // Build Card HTML for Employee
+          cardsHtml += `
+            <div class="employee-card">
+              <div class="emp-header-bar">
+                <div>
+                  <span class="emp-title">${u.nama || 'Tanpa Nama'}</span>
+                  <span class="ms-2 text-secondary font-monospace">(${u.unit || u.role || 'Karyawan'})</span>
+                </div>
+                <div class="fw-semibold text-dark">
+                  Cabang: <span class="text-primary fw-bold">${u.cabang || 'Pusat'}</span>
+                </div>
+              </div>
+
+              <!-- TABEL LOG 4 WAKTU + TOTAL JAM -->
+              <table class="table-timesheet">
+                <thead>
+                  <tr>
+                    <th class="row-label text-start ps-2">Waktu / Hari</th>
+                    ${datesList.map(d => `<th>${formatHariTanggalHeader(d)}</th>`).join('')}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="row-label ps-2">Waktu 1 (Absen Masuk)</td>
+                    ${dailyHtmlData.map(dh => `<td>${dh.t1}</td>`).join('')}
+                  </tr>
+                  <tr>
+                    <td class="row-label ps-2">Waktu 2 (Istirahat Keluar)</td>
+                    ${dailyHtmlData.map(dh => `<td>${dh.t2}</td>`).join('')}
+                  </tr>
+                  <tr>
+                    <td class="row-label ps-2">Waktu 3 (Istirahat Masuk)</td>
+                    ${dailyHtmlData.map(dh => `<td>${dh.t3}</td>`).join('')}
+                  </tr>
+                  <tr>
+                    <td class="row-label ps-2">Waktu 4 (Absen Pulang)</td>
+                    ${dailyHtmlData.map(dh => `<td>${dh.t4}</td>`).join('')}
+                  </tr>
+                  <tr>
+                    <td class="row-label ps-2 fw-bold text-dark">Waktu 5 (Total Jam)</td>
+                    ${dailyHtmlData.map(dh => `<td class="row-total-jam">${dh.t5}</td>`).join('')}
+                  </tr>
+                </tbody>
+              </table>
+
+              <!-- RINGKASAN REKAP & TANDA TANGAN -->
+              <div class="summary-footer">
+                <div class="rekap-grid">
+                  <div class="rekap-item">
+                    <span class="label">Jumlah Hari</span>
+                    <div class="value">${totalHariHadir} Hari</div>
+                  </div>
+                  <div class="rekap-item">
+                    <span class="label">Jumlah Jam/Mnt</span>
+                    <div class="value">${formatJamMnt(totalJamKerjaMins)}</div>
+                  </div>
+                  <div class="rekap-item">
+                    <span class="label">Total Lembur</span>
+                    <div class="value text-success">${formatJamMnt(totalLemburMins)}</div>
+                  </div>
+                  <div class="rekap-item">
+                    <span class="label">Total Telat</span>
+                    <div class="value text-danger">${formatJamMnt(totalTelatMins)}</div>
+                  </div>
+                  ${userCutiNotes.length > 0 ? `
+                    <div class="notes-box">
+                      <strong>Catatan Cuti/Izin:</strong> ${userCutiNotes.join('; ')}
+                    </div>
+                  ` : ''}
+                </div>
+
+                <div class="signature-container">
+                  <div class="sig-box">
+                    <div>Tanda Tangan Karyawan</div>
+                    <div class="sig-space"></div>
+                    <div class="sig-name">${u.nama}</div>
+                  </div>
+                  <div class="sig-box">
+                    <div>Mengetahui (HRD/Kasir)</div>
+                    <div class="sig-space"></div>
+                    <div class="sig-name">( ............................ )</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+
+        spinner.style.display = 'none';
+        container.innerHTML = cardsHtml;
+
+      } catch (err) {
+        console.error('Error loadFormGajiData:', err);
+        spinner.style.display = 'none';
+        container.innerHTML = `<div class="alert alert-danger text-center">Gagal memuat data form gaji: ${err.message}</div>`;
+      }
+    }
+
+    // Helper Functions
+    function formatTimeHM(timeStr) {
+      if (!timeStr) return '-';
+      const parts = String(timeStr).trim().split(':');
+      if (parts.length < 2) return timeStr;
+      return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+    }
+
+    function parseMins(timeStr) {
+      if (!timeStr || timeStr === '-') return null;
+      const p = String(timeStr).trim().split(':');
+      if (p.length < 2) return null;
+      return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+    }
+
+    function formatHMM(mins) {
+      if (mins === null || mins <= 0) return '-';
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return `${h}:${m < 10 ? '0' : ''}${m}`;
+    }
+
+    function formatJamMnt(totalMins) {
+      if (!totalMins || totalMins <= 0) return '0 Jam 0 Mnt';
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      if (h === 0) return `${m} Mnt`;
+      return `${h} Jam ${m} Mnt`;
+    }
+
+    function formatTanggalIndo(dateStr) {
+      if (!dateStr) return '-';
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      const parts = dateStr.split('-');
+      if (parts.length !== 3) return dateStr;
+      return `${parseInt(parts[2], 10)} ${months[parseInt(parts[1], 10) - 1]} ${parts[0]}`;
+    }
+
+    function formatHariTanggalHeader(dateStr) {
+      if (!dateStr) return '-';
+      const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const d = new Date(dateStr + 'T00:00:00');
+      const dayName = days[d.getDay()];
+      const parts = dateStr.split('-');
+      const ddMm = `${parts[2]}/${parts[1]}`;
+      return `${dayName}<br><span style="font-weight:400; font-size:10px;">${ddMm}</span>`;
+    }
+  </script>
+</body>
+</html>
