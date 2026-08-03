@@ -194,6 +194,8 @@
         color: #000000 !important;
         margin: 0 !important;
         padding: 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
 
       .no-print,
@@ -211,30 +213,45 @@
       .employee-card {
         box-shadow: none !important;
         border: 1.5px solid #000000 !important;
-        margin-bottom: 12px !important;
+        margin-bottom: 16px !important;
         padding: 8px !important;
-        break-inside: avoid;
-        page-break-inside: avoid;
+        page-break-inside: auto !important;
+        break-inside: auto !important;
+        display: block !important;
+      }
+
+      .summary-footer {
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 10px !important;
+      }
+
+      .rekap-grid {
+        flex: 1 !important;
+      }
+
+      .signature-container {
+        width: 240px !important;
       }
 
       .table-timesheet th,
       .table-timesheet td {
         border: 1px solid #000000 !important;
         color: #000000 !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
 
       .table-timesheet th {
         background-color: #e2e8f0 !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
 
       .emp-header-bar {
         border: 1px solid #000000 !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
 
       .rekap-grid,
@@ -245,7 +262,7 @@
 
       @page {
         size: A4 portrait;
-        margin: 8mm;
+        margin: 10mm 8mm;
       }
     }
   </style>
@@ -387,14 +404,6 @@
             if (c === paramCabang) opt.selected = true;
             selCabang.appendChild(opt);
           });
-        }
-
-        // Load Tipe Absen (opsional jika tabel ada)
-        try {
-          const { data: tData } = await supabaseClient.from('tipe_absen').select('*').order('id');
-          if (tData) masterTipeAbsenList = tData;
-        } catch(tErr) {
-          console.warn('Tabel tipe_absen belum tersedia:', tErr);
         }
       } catch (e) {
         console.error('Error loading master data:', e);
@@ -736,11 +745,8 @@
                 </div>
 
                 <div class="signature-container">
-                  <div class="sig-box">
-                    <div class="sig-space d-flex align-items-center justify-content-center" style="height: 48px;">
-                      ${userFaceUrl ? `<img src="${userFaceUrl}" style="max-height: 44px; max-width: 85px; object-fit: contain; border-radius: 4px;" alt="Foto ${u.nama}">` : ''}
-                    </div>
-                    <div class="sig-name">${u.nama}</div>
+                  <div class="sig-box d-flex align-items-center justify-content-center" style="min-height: 52px; padding: 4px;">
+                    ${userFaceUrl ? `<img src="${userFaceUrl}" style="max-height: 48px; max-width: 100px; object-fit: contain; border-radius: 4px;" alt="Foto ${u.nama}" onerror="this.style.display='none'">` : `<span class="text-muted small">${u.nama}</span>`}
                   </div>
                   <div class="sig-box">
                     <div>Mengetahui</div>
