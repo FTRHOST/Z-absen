@@ -429,10 +429,9 @@
         // Query Absensi pada rentang tanggal
         let qAbsen = supabaseClient
           .from('absensi')
-          .select('id, user_id, tanggal, waktu, tipe_absen, status, menit_terlambat, menit_lembur, is_trash')
+          .select('id, user_id, tanggal, waktu, tipe_absen, status, menit_terlambat, menit_lembur')
           .gte('tanggal', tglMulai)
-          .lte('tanggal', tglSelesai)
-          .is('is_trash', false);
+          .lte('tanggal', tglSelesai);
 
         const { data: absenData, error: aErr } = await qAbsen;
         if (aErr) throw aErr;
@@ -469,6 +468,7 @@
           // Populate Attendance for user
           if (absenData) {
             absenData.filter(a => a.user_id === u.id).forEach(a => {
+              if (a.status && a.status.includes('TRASH')) return;
               if (userAbsenMap[a.tanggal]) {
                 const tipe = (a.tipe_absen || '').toLowerCase();
                 const waktuFormatted = a.waktu ? formatTimeHM(a.waktu) : null;
