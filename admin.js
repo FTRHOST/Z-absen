@@ -3166,8 +3166,23 @@ async function prosesExport(event) {
         const folderName = `${tglMulai.split('-').reverse().join('-')}_sd_${tglSelesai.split('-').reverse().join('-')}`;
         const rootFolder = zip.folder(folderName);
         
-        // 1. Group Data & Get Unique Tipe Absen
-        const grouped = {};
+        // 1. Hitung Rentang Tanggal
+        const datesList = [];
+        const [sY, sM, sD] = tglMulai.split('-').map(Number);
+        const [eY, eM, eD] = tglSelesai.split('-').map(Number);
+        let currDate = new Date(Date.UTC(sY, sM - 1, sD));
+        const endDate = new Date(Date.UTC(eY, eM - 1, eD));
+
+        while (currDate <= endDate) {
+            const yyyy = currDate.getUTCFullYear();
+            const mm = String(currDate.getUTCMonth() + 1).padStart(2, '0');
+            const dd = String(currDate.getUTCDate()).padStart(2, '0');
+            datesList.push(`${yyyy}-${mm}-${dd}`);
+            currDate.setUTCDate(currDate.getUTCDate() + 1);
+        }
+
+        // 2. Group Data (Cabang -> Nama Karyawan -> Tanggal -> Tipe Absen)
+        const branchMap = {};
         let tipeAbsenList = [];
         if (typeof globalMasterTipeAbsen !== 'undefined' && globalMasterTipeAbsen.length > 0) {
             tipeAbsenList = globalMasterTipeAbsen.filter(t => t.is_aktif).map(t => t.nama_tipe);
@@ -3175,12 +3190,13 @@ async function prosesExport(event) {
 
         data.forEach(row => {
             const namaUser = row.users ? row.users.nama : 'Unknown';
-            const cabangUser = row.users ? row.users.cabang : '-';
-            const key = `${row.tanggal}_${namaUser}`;
+            const cabangUser = row.users ? row.users.cabang || 'Tanpa Cabang' : 'Tanpa Cabang';
             
-            if (!grouped[key]) {
-                grouped[key] = {
-                    tanggal: row.tanggal,
+            if (!branchMap[cabangUser]) {
+                branchMap[cabangUser] = {};
+            }
+            if (!branchMap[cabangUser][namaUser]) {
+                branchMap[cabangUser][namaUser] = {
                     nama: namaUser,
                     cabang: cabangUser,
                     absensi: {}
@@ -3192,7 +3208,11 @@ async function prosesExport(event) {
                 tipeAbsenList.push(tipe);
             }
             
-            grouped[key].absensi[tipe] = {
+            if (!branchMap[cabangUser][namaUser].absensi[row.tanggal]) {
+                branchMap[cabangUser][namaUser].absensi[row.tanggal] = {};
+            }
+            
+            branchMap[cabangUser][namaUser].absensi[row.tanggal][tipe] = {
                 waktu: row.waktu || '-',
                 status: row.status || '-',
                 jarak: row.lokasi || '-',
@@ -3200,78 +3220,249 @@ async function prosesExport(event) {
             };
         });
 
-        // 2. Build 2-Tier Header
-        const nTypes = tipeAbsenList.length;
-        const emptyCols = nTypes > 1 ? ','.repeat(nTypes - 1) : '';
-        
-        let headerRow1 = "Tanggal,Nama,Cabang";
-        headerRow1 += `,"Waktu"${emptyCols}`;
-        headerRow1 += `,"Status Kehadiran"${emptyCols}`;
-        headerRow1 += `,"Lokasi / Jarak"${emptyCols}`;
-        
-        let headerRow2 = ",,";
-        tipeAbsenList.forEach(t => headerRow2 += `,"${t}"`); // Waktu
-        tipeAbsenList.forEach(t => headerRow2 += `,"${t}"`); // Status
-        tipeAbsenList.forEach(t => headerRow2 += `,"${t}"`); // Jarak
-        
-        let csvContent = headerRow1 + "\n" + headerRow2 + "\n";
+        // 3. Generate Excel File (Per Sheet = Nama Cabang)
+        if (typeof XLSX !== 'undefined') {
+            const wb = XLSX.utils.book_new();
+            const sortedCabangs = Object.keys(branchMap).sort();
+            const usedSheetNames = new Set();
 
-        // 2. Siapkan Folder Media jika dicentang
-        let mediaFolder;
-        if (isMedia) {
-            mediaFolder = rootFolder.folder("media");
-        }
+            if (sortedCabangs.length === 0) {
+                const headerRow = [''];
+                datesList.forEach(d => headerRow.push(parseInt(d.split('-')[2], 10)));
+                const ws = XLSX.utils.aoa_to_sheet([headerRow]);
+                XLSX.utils.book_append_sheet(wb, ws, "Rekap Absen");
+            } else {
+                sortedCabangs.forEach(cabangName => {
+                    const userGroupMap = branchMap[cabangName];
+                    const matrixData = [];
+                    const cellStylesMap = {}; // key: "r_c"
 
-        // 3. Process Export Rows
-        for (const key in grouped) {
-            const g = grouped[key];
-            const safeName = `"${g.nama}"`;
-            const safeCabang = `"${g.cabang}"`;
-            let rowCsv = `${g.tanggal},${safeName},${safeCabang}`;
-            
-            tipeAbsenList.forEach(tipe => {
-                const a = g.absensi[tipe];
-                rowCsv += a ? `,${a.waktu}` : ',-';
-            });
-            tipeAbsenList.forEach(tipe => {
-                const a = g.absensi[tipe];
-                rowCsv += a ? `,${a.status}` : ',-';
-            });
-            tipeAbsenList.forEach(tipe => {
-                const a = g.absensi[tipe];
-                rowCsv += a ? `,"${a.jarak}"` : ',-';
-            });
-            
-            csvContent += rowCsv + "\n";
+                    // Baris Header 1: Kolom A kosong, diikuti angka tanggal (1, 2, 3...)
+                    const headerRow = [''];
+                    datesList.forEach(d => {
+                        headerRow.push(parseInt(d.split('-')[2], 10));
+                    });
+                    matrixData.push(headerRow);
 
-            // Proses Foto jika diceklis
-            if (isMedia) {
-                const userFolder = mediaFolder.folder(g.nama);
-                const simpanFoto = async (url, namaFile) => {
-                    if (url && url.startsWith('http')) {
-                        try {
-                            const response = await fetch(url);
-                            const blob = await response.blob();
-                            userFolder.file(namaFile, blob);
-                        } catch (err) {
-                            console.error("Gagal mendownload foto:", url, err);
+                    // Style Baris Header Tanggal
+                    for (let c = 0; c <= datesList.length; c++) {
+                        cellStylesMap[`0_${c}`] = {
+                            font: { bold: true },
+                            fill: { fgColor: { rgb: "E9ECEF" } },
+                            alignment: { horizontal: "center", vertical: "center" }
+                        };
+                    }
+
+                    let currentRowIdx = 1;
+                    const userNames = Object.keys(userGroupMap).sort();
+
+                    userNames.forEach(namaUser => {
+                        const userObj = userGroupMap[namaUser];
+                        
+                        // Baris Nama Karyawan
+                        const nameRow = new Array(datesList.length + 1).fill('');
+                        nameRow[0] = userObj.nama;
+                        matrixData.push(nameRow);
+                        
+                        // Style Baris Nama Karyawan (Background #FFFF00, Bold, Rata Tengah di Kolom A)
+                        for (let c = 0; c <= datesList.length; c++) {
+                            cellStylesMap[`${currentRowIdx}_${c}`] = {
+                                font: { bold: true },
+                                fill: { fgColor: { rgb: "FFFF00" } },
+                                alignment: { horizontal: "center", vertical: "center" }
+                            };
+                        }
+                        currentRowIdx++;
+                        
+                        // Baris Tipe Absen
+                        tipeAbsenList.forEach(tipe => {
+                            const typeRow = new Array(datesList.length + 1).fill('');
+                            typeRow[0] = tipe;
+                            
+                            // Style Kolom A untuk Judul Tipe Absen
+                            cellStylesMap[`${currentRowIdx}_0`] = {
+                                font: { bold: true },
+                                alignment: { horizontal: "left", vertical: "center" }
+                            };
+                            
+                            datesList.forEach((d, dIdx) => {
+                                const c = dIdx + 1;
+                                const dayAbsen = userObj.absensi[d];
+                                const a = dayAbsen ? dayAbsen[tipe] : null;
+                                
+                                if (a && a.waktu && a.waktu !== '-') {
+                                    typeRow[c] = a.waktu;
+                                    
+                                    const statusStr = (a.status || '').toLowerCase();
+                                    const tipeStr = tipe.toLowerCase();
+                                    const isTerlambat = statusStr.includes('terlambat');
+                                    const isLembur = tipeStr.includes('lembur') || statusStr.includes('lembur');
+                                    
+                                    let bgColor = null;
+                                    if (isTerlambat) {
+                                        bgColor = "FFA6A6"; // Terlambat: #FFA6A6
+                                    } else if (isLembur) {
+                                        bgColor = "AFD095"; // Lembur: #AFD095
+                                    }
+                                    
+                                    cellStylesMap[`${currentRowIdx}_${c}`] = {
+                                        alignment: { horizontal: "center", vertical: "center" },
+                                        ...(bgColor ? { fill: { fgColor: { rgb: bgColor } } } : {})
+                                    };
+                                } else {
+                                    cellStylesMap[`${currentRowIdx}_${c}`] = {
+                                        alignment: { horizontal: "center", vertical: "center" }
+                                    };
+                                }
+                            });
+                            
+                            matrixData.push(typeRow);
+                            currentRowIdx++;
+                        });
+                        
+                        // Baris Kosong Pemisah Karyawan
+                        matrixData.push(new Array(datesList.length + 1).fill(''));
+                        currentRowIdx++;
+                    });
+
+                    const ws = XLSX.utils.aoa_to_sheet(matrixData);
+
+                    // Terapkan style ke sel worksheet & buatkan sel objek jika belum ada
+                    for (let r = 0; r < matrixData.length; r++) {
+                        for (let c = 0; c < matrixData[r].length; c++) {
+                            const cellRef = XLSX.utils.encode_cell({ r, c });
+                            if (!ws[cellRef]) {
+                                ws[cellRef] = { t: 's', v: matrixData[r][c] || '' };
+                            }
+                            if (cellStylesMap[`${r}_${c}`]) {
+                                ws[cellRef].s = cellStylesMap[`${r}_${c}`];
+                            }
                         }
                     }
-                };
-                
-                // Sequential download to prevent overload
-                for (const tipe of tipeAbsenList) {
-                    const a = g.absensi[tipe];
-                    if (a && a.foto) {
-                        const cleanTipe = tipe.replace(/ /g, '_');
-                        await simpanFoto(a.foto, `${g.tanggal}_${cleanTipe}.png`);
+
+                    // Auto-fit Ukuran Kolom (A1:An menyesuaikan isi teks agar tidak terpotong)
+                    const colWidths = new Array(datesList.length + 1).fill(0);
+                    matrixData.forEach(row => {
+                        row.forEach((val, colIdx) => {
+                            const strVal = val !== null && val !== undefined ? String(val) : '';
+                            if (strVal.length > colWidths[colIdx]) {
+                                colWidths[colIdx] = strVal.length;
+                            }
+                        });
+                    });
+
+                    ws['!cols'] = colWidths.map((len, colIdx) => {
+                        if (colIdx === 0) {
+                            return { wch: Math.max(len + 4, 20) };
+                        }
+                        return { wch: Math.max(len + 3, 8) };
+                    });
+
+                    // Nama Sheet yang aman untuk Excel
+                    let safeSheetName = (cabangName || 'Tanpa Cabang')
+                        .replace(/[:\\/?*\[\]]/g, '')
+                        .trim()
+                        .substring(0, 31) || 'Sheet1';
+                    
+                    let sheetName = safeSheetName;
+                    let counter = 1;
+                    while (usedSheetNames.has(sheetName)) {
+                        sheetName = `${safeSheetName.substring(0, 28)}_${counter++}`;
+                    }
+                    usedSheetNames.add(sheetName);
+
+                    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                });
+            }
+
+            const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            const excelBlob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+            rootFolder.file("rekap_absen.xlsx", excelBlob);
+        } else {
+            // Fallback CSV jika SheetJS tidak tersedia
+            const sortedCabangs = Object.keys(branchMap).sort();
+            let allCsv = "";
+            sortedCabangs.forEach(cabangName => {
+                allCsv += `--- CABANG: ${cabangName} ---\n`;
+                const userGroupMap = branchMap[cabangName];
+                const matrixData = [];
+                const headerRow = [''];
+                datesList.forEach(d => headerRow.push(parseInt(d.split('-')[2], 10)));
+                matrixData.push(headerRow);
+
+                const userNames = Object.keys(userGroupMap).sort();
+                userNames.forEach(namaUser => {
+                    const userObj = userGroupMap[namaUser];
+                    const nameRow = new Array(datesList.length + 1).fill('');
+                    nameRow[0] = userObj.nama;
+                    matrixData.push(nameRow);
+                    tipeAbsenList.forEach(tipe => {
+                        const typeRow = new Array(datesList.length + 1).fill('');
+                        typeRow[0] = tipe;
+                        datesList.forEach((d, dIdx) => {
+                            const dayAbsen = userObj.absensi[d];
+                            if (dayAbsen && dayAbsen[tipe] && dayAbsen[tipe].waktu) {
+                                typeRow[dIdx + 1] = dayAbsen[tipe].waktu;
+                            }
+                        });
+                        matrixData.push(typeRow);
+                    });
+                    matrixData.push(new Array(datesList.length + 1).fill(''));
+                });
+
+                let csvMatrix = matrixData.map(row => row.map(cell => {
+                    if (cell === null || cell === undefined) return '""';
+                    const str = String(cell);
+                    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                        return `"${str.replace(/"/g, '""')}"`;
+                    }
+                    return str;
+                }).join(',')).join('\n');
+                allCsv += csvMatrix + "\n\n";
+            });
+            rootFolder.file("rekap_absen.csv", allCsv);
+        }
+
+        // 4. Proses Foto jika dicentang
+        if (isMedia) {
+            const mediaFolder = rootFolder.folder("media");
+            const simpanFoto = async (url, folder, namaFile) => {
+                if (url && url.startsWith('http')) {
+                    try {
+                        const response = await fetch(url);
+                        if (response.ok) {
+                            const blob = await response.blob();
+                            folder.file(namaFile, blob);
+                        }
+                    } catch (err) {
+                        console.error("Gagal mendownload foto:", url, err);
+                    }
+                }
+            };
+
+            const sortedCabangs = Object.keys(branchMap).sort();
+            for (const cabangName of sortedCabangs) {
+                const userGroupMap = branchMap[cabangName];
+                const userNames = Object.keys(userGroupMap).sort();
+                for (const namaUser of userNames) {
+                    const userObj = userGroupMap[namaUser];
+                    const userFolder = mediaFolder.folder(userObj.nama);
+                    
+                    for (const d of datesList) {
+                        const dayAbsen = userObj.absensi[d];
+                        if (dayAbsen) {
+                            for (const tipe of tipeAbsenList) {
+                                const a = dayAbsen[tipe];
+                                if (a && a.foto) {
+                                    const cleanTipe = tipe.replace(/ /g, '_');
+                                    await simpanFoto(a.foto, userFolder, `${d}_${cleanTipe}.png`);
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
-
-        // Simpan CSV ke root folder zip
-        rootFolder.file("rekap_absen.csv", csvContent);
 
         // 4. AMBIL DATA CUTI / IZIN
         let queryCuti = supabaseClient.from('cuti').select('*, users!inner(nama, cabang)')
