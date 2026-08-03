@@ -192,9 +192,12 @@
       body {
         background-color: #ffffff !important;
         color: #000000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
       }
 
-      .no-print {
+      .no-print,
+      #loading-spinner {
         display: none !important;
       }
 
@@ -202,15 +205,16 @@
         max-width: 100% !important;
         margin: 0 !important;
         padding: 0 !important;
+        display: block !important;
       }
 
       .employee-card {
         box-shadow: none !important;
         border: 1.5px solid #000000 !important;
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
-        margin-bottom: 16px !important;
-        padding: 10px !important;
+        margin-bottom: 12px !important;
+        padding: 8px !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
       }
 
       .table-timesheet th,
@@ -227,7 +231,12 @@
         print-color-adjust: exact;
       }
 
-      .emp-header-bar,
+      .emp-header-bar {
+        border: 1px solid #000000 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
       .rekap-grid,
       .signature-container {
         border: 1px solid #000000 !important;
@@ -269,6 +278,9 @@
           <select id="filter_cabang" class="form-select form-select-sm w-auto">
             <option value="">Semua Cabang</option>
           </select>
+        <div class="d-flex align-items-center gap-1 ms-1">
+          <input class="form-check-input" type="checkbox" id="show_zero_absen" checked onchange="loadFormGajiData()">
+          <label class="small text-muted mb-0 fw-semibold" for="show_zero_absen">Tampilkan Karyawan 0 Absen</label>
         </div>
         <button onclick="loadFormGajiData()" class="btn btn-primary btn-sm fw-bold shadow-sm">
           <i class="fas fa-sync me-1"></i> Tampilkan
@@ -327,9 +339,6 @@
       paramMulai = sixDaysAgo.toISOString().split('T')[0];
     }
 
-    document.getElementById('filter_mulai').value = paramMulai;
-    document.getElementById('filter_selesai').value = paramSelesai;
-
     // Direct Login Check
     const userData = localStorage.getItem('userLogin');
     let currentUser = null;
@@ -338,6 +347,11 @@
     }
 
     window.addEventListener('DOMContentLoaded', async () => {
+      const elMulai = document.getElementById('filter_mulai');
+      const elSelesai = document.getElementById('filter_selesai');
+      if (elMulai) elMulai.value = paramMulai;
+      if (elSelesai) elSelesai.value = paramSelesai;
+
       await loadMasterData();
       await loadFormGajiData();
     });
@@ -375,9 +389,13 @@
           });
         }
 
-        // Load Tipe Absen
-        const { data: tData } = await supabaseClient.from('tipe_absen').select('*').order('id');
-        if (tData) masterTipeAbsenList = tData;
+        // Load Tipe Absen (opsional jika tabel ada)
+        try {
+          const { data: tData } = await supabaseClient.from('tipe_absen').select('*').order('id');
+          if (tData) masterTipeAbsenList = tData;
+        } catch(tErr) {
+          console.warn('Tabel tipe_absen belum tersedia:', tErr);
+        }
       } catch (e) {
         console.error('Error loading master data:', e);
       }
@@ -426,7 +444,7 @@
 
       try {
         // Query Karyawan
-        let qUsers = supabaseClient.from('users').select('id, nama, cabang, unit, role').order('nama');
+        let qUsers = supabaseClient.from('users').select('id, nama, cabang, unit, role, foto_wajah').order('nama');
         if (cabangSelected) {
           qUsers = qUsers.eq('cabang', cabangSelected);
         } else if (currentUser && currentUser.role !== 'Super Admin' && currentUser.cabang) {
@@ -442,6 +460,8 @@
           return;
         }
 
+        const showZeroAbsen = document.getElementById('show_zero_absen') ? document.getElementById('show_zero_absen').checked : true;
+
         // Query Absensi pada rentang tanggal
         let qAbsen = supabaseClient
           .from('absensi')
@@ -452,15 +472,22 @@
         const { data: absenData, error: aErr } = await qAbsen;
         if (aErr) throw aErr;
 
-        // Query Cuti / Izin pada rentang tanggal
-        let qCuti = supabaseClient
-          .from('cuti')
-          .select('id, user_id, tanggal_mulai, tanggal_selesai, jenis_cuti, alasan, status_persetujuan')
-          .lte('tanggal_mulai', tglSelesai)
-          .gte('tanggal_selesai', tglMulai)
-          .eq('status_persetujuan', 'Disetujui');
+        // Query Cuti / Izin pada rentang tanggal (Resilient & Fault-tolerant)
+        let cutiData = [];
+        try {
+          let qCuti = supabaseClient
+            .from('cuti')
+            .select('id, user_id, tanggal_mulai, tanggal_selesai, alasan, status_pengajuan')
+            .lte('tanggal_mulai', tglSelesai)
+            .gte('tanggal_selesai', tglMulai);
 
-        const { data: cutiData } = await qCuti;
+          const { data: cRes, error: cErr } = await qCuti;
+          if (!cErr && cRes) {
+            cutiData = cRes.filter(c => !c.status_pengajuan || c.status_pengajuan.toLowerCase().includes('setuju') || c.status_pengajuan.toLowerCase().includes('acc') || c.status_pengajuan.toLowerCase().includes('menunggu'));
+          }
+        } catch (cErr) {
+          console.warn('Catatan cuti tidak dapat dimuat:', cErr);
+        }
 
         // Mapping Data Karyawan -> Tanggal -> Tipe Absen
         let cardsHtml = '';
@@ -548,11 +575,24 @@
             empTipeList = ['Masuk', 'Istirahat Keluar', 'Istirahat Masuk', 'Pulang'];
           }
 
+          // Cek Kehadiran (Minimal 1 kali)
+          let hasAbsen = false;
+          datesList.forEach(d => {
+            if (userAbsenMap[d] && Object.keys(userAbsenMap[d].byTipe).length > 0) {
+              hasAbsen = true;
+            }
+          });
+
+          // Filter: Jika tidak tercentang dan karyawan 0 absen, skip rendering
+          if (!showZeroAbsen && !hasAbsen) return;
+
+          const headerBgColor = hasAbsen ? '#FFFF00' : '#F1F5F9';
+
           // Cuti / Izin Note for User
           const userCutiNotes = [];
           if (cutiData) {
             cutiData.filter(c => c.user_id === u.id).forEach(c => {
-              userCutiNotes.push(`${c.jenis_cuti} (${formatTanggalIndo(c.tanggal_mulai)} - ${formatTanggalIndo(c.tanggal_selesai)})`);
+              userCutiNotes.push(`${c.alasan || 'Izin/Cuti'} (${formatTanggalIndo(c.tanggal_mulai)} - ${formatTanggalIndo(c.tanggal_selesai)})`);
             });
           }
 
@@ -632,24 +672,27 @@
             `;
           });
 
-          // Summary Row (Total Jam)
+          // Summary Row (Total Jam) - Title Rata Tengah
           tableRowsHtml += `
             <tr>
-              <td class="row-label ps-2 fw-bold text-dark">Total Jam</td>
+              <td class="row-label text-center fw-bold text-dark">Total Jam</td>
               ${datesList.map(d => `<td class="row-total-jam">${dailyNetMinsMap[d] > 0 ? formatHMM(dailyNetMinsMap[d]) : '-'}</td>`).join('')}
             </tr>
           `;
 
+          // Foto Pendaftaran / Wajah Karyawan
+          const userFaceUrl = typeof fixStorageUrl === 'function' ? fixStorageUrl(u.foto_wajah || '') : (u.foto_wajah || '');
+
           // Build Card HTML for Employee
           cardsHtml += `
             <div class="employee-card">
-              <div class="emp-header-bar">
+              <div class="emp-header-bar" style="background-color: ${headerBgColor} !important; color: #000000;">
                 <div>
                   <span class="emp-title">${u.nama || 'Tanpa Nama'}</span>
                   <span class="ms-2 text-secondary font-monospace">(${u.unit || u.role || 'Karyawan'})</span>
                 </div>
                 <div class="fw-semibold text-dark">
-                  Cabang: <span class="text-primary fw-bold">${u.cabang || 'Pusat'}</span>
+                  Cabang: <span class="fw-bold">${u.cabang || 'Pusat'}</span>
                 </div>
               </div>
 
@@ -657,7 +700,7 @@
               <table class="table-timesheet">
                 <thead>
                   <tr>
-                    <th class="row-label text-start ps-2">Waktu / Hari</th>
+                    <th class="row-label text-center">Absen/Hari</th>
                     ${datesList.map(d => `<th>${formatHariTanggalHeader(d)}</th>`).join('')}
                   </tr>
                 </thead>
@@ -694,14 +737,15 @@
 
                 <div class="signature-container">
                   <div class="sig-box">
-                    <div>Tanda Tangan Karyawan</div>
-                    <div class="sig-space"></div>
+                    <div class="sig-space d-flex align-items-center justify-content-center" style="height: 48px;">
+                      ${userFaceUrl ? `<img src="${userFaceUrl}" style="max-height: 44px; max-width: 85px; object-fit: contain; border-radius: 4px;" alt="Foto ${u.nama}">` : ''}
+                    </div>
                     <div class="sig-name">${u.nama}</div>
                   </div>
                   <div class="sig-box">
-                    <div>Mengetahui (HRD/Kasir)</div>
+                    <div>Mengetahui</div>
                     <div class="sig-space"></div>
-                    <div class="sig-name">( ............................ )</div>
+                    <div class="sig-name">( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )</div>
                   </div>
                 </div>
               </div>
