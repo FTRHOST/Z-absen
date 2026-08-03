@@ -295,6 +295,7 @@
           <select id="filter_cabang" class="form-select form-select-sm w-auto">
             <option value="">Semua Cabang</option>
           </select>
+        </div>
         <div class="d-flex align-items-center gap-1 ms-1">
           <input class="form-check-input" type="checkbox" id="show_zero_absen" checked onchange="loadFormGajiData()">
           <label class="small text-muted mb-0 fw-semibold" for="show_zero_absen">Tampilkan Karyawan 0 Absen</label>
@@ -404,6 +405,12 @@
             if (c === paramCabang) opt.selected = true;
             selCabang.appendChild(opt);
           });
+        }
+
+        // Load Master Tipe Absen
+        let { data: tData, error: tErr } = await supabaseClient.from('master_tipe_absen').select('*').order('id', { ascending: true });
+        if (!tErr && tData) {
+          masterTipeAbsenList = tData;
         }
       } catch (e) {
         console.error('Error loading master data:', e);
@@ -529,7 +536,7 @@
 
           // Populate Attendance for user
           if (absenData) {
-            absenData.filter(a => a.user_id === u.id).forEach(a => {
+            absenData.filter(a => String(a.user_id) === String(u.id)).forEach(a => {
               if (a.status && a.status.includes('TRASH')) return;
               if (userAbsenMap[a.tanggal]) {
                 const tipe = a.tipe_absen || 'Unknown';
