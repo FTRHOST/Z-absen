@@ -3375,9 +3375,9 @@ async function prosesExport(event) {
                             currentRowIdx++;
                         });
                         
-                        // Baris Total Jam Kerja (Bold & Rata Tengah)
+                        // Baris Total Jam (Bold & Rata Tengah)
                         const workHoursRow = new Array(datesList.length + 1).fill('');
-                        workHoursRow[0] = 'Total Jam Kerja';
+                        workHoursRow[0] = 'Total Jam';
 
                         cellStylesMap[`${currentRowIdx}_0`] = {
                             font: { bold: true },
@@ -3539,6 +3539,10 @@ async function prosesExport(event) {
                         }
                         return { wch: Math.max(len + 3, 8) };
                     });
+
+                    // Freeze Header Tanggal (Baris 1) & Freeze Kolom A (Tipe Absen / Nama) saat di-scroll
+                    ws['!freeze'] = { xSplit: 1, ySplit: 1, topLeftCell: 'B2', activePane: 'bottomRight', state: 'frozen' };
+                    ws['!views'] = [{ state: 'frozen', xSplit: 1, ySplit: 1, topLeftCell: 'B2', activePane: 'bottomRight' }];
 
                     // Nama Sheet yang aman untuk Excel
                     let safeSheetName = (cabangName || 'Tanpa Cabang')
