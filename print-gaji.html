@@ -342,22 +342,36 @@
       await loadFormGajiData();
     });
 
+    let masterKantorMap = {};
+
     async function loadMasterData() {
       try {
-        // Load Cabang
-        const { data: cData } = await supabaseClient.from('kantor').select('nama').order('nama');
+        // Load Cabang (termasuk tipe_absen_ids per kantor)
+        let qKantor = supabaseClient.from('kantor').select('id, nama, tipe_absen_ids').order('nama');
+        let { data: cData, error: cErr } = await qKantor;
+        
+        // Fallback jika kolom tipe_absen_ids belum terdeteksi
+        if (cErr) {
+          const { data: fallbackData } = await supabaseClient.from('kantor').select('id, nama').order('nama');
+          cData = fallbackData;
+        }
+
         if (cData) {
-          masterCabangList = cData.map(c => c.nama || c.nama_kantor || '');
+          masterKantorMap = {};
+          cData.forEach(k => {
+            const kName = k.nama || k.nama_kantor || '';
+            if (kName) masterKantorMap[kName] = k;
+          });
+          masterCabangList = Object.keys(masterKantorMap);
+
           const selCabang = document.getElementById('filter_cabang');
           selCabang.innerHTML = '<option value="">Semua Cabang</option>';
           masterCabangList.forEach(c => {
-            if (c) {
-              const opt = document.createElement('option');
-              opt.value = c;
-              opt.textContent = c;
-              if (c === paramCabang) opt.selected = true;
-              selCabang.appendChild(opt);
-            }
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.textContent = c;
+            if (c === paramCabang) opt.selected = true;
+            selCabang.appendChild(opt);
           });
         }
 
@@ -448,28 +462,23 @@
 
         const { data: cutiData } = await qCuti;
 
-        // Tentukan daftar tipe_absen aktif untuk header baris
-        let activeTipeList = [];
-        if (masterTipeAbsenList && masterTipeAbsenList.length > 0) {
-          activeTipeList = masterTipeAbsenList.map(t => t.nama_tipe);
-        } else if (absenData && absenData.length > 0) {
-          const setTipe = new Set();
-          absenData.forEach(a => {
-            if (a.tipe_absen && (!a.status || !a.status.includes('TRASH'))) {
-              setTipe.add(a.tipe_absen);
-            }
-          });
-          activeTipeList = Array.from(setTipe);
-        }
-
-        if (activeTipeList.length === 0) {
-          activeTipeList = ['Masuk', 'Istirahat Keluar', 'Istirahat Masuk', 'Pulang'];
-        }
-
         // Mapping Data Karyawan -> Tanggal -> Tipe Absen
         let cardsHtml = '';
 
         usersData.forEach((u, uIdx) => {
+          // Tentukan tipe_absen aktif khusus untuk kantor/cabang karyawan ini
+          let empTipeList = [];
+          const kObj = masterKantorMap[u.cabang];
+
+          if (kObj && Array.isArray(kObj.tipe_absen_ids) && kObj.tipe_absen_ids.length > 0 && masterTipeAbsenList && masterTipeAbsenList.length > 0) {
+            const activeIds = kObj.tipe_absen_ids.map(Number);
+            empTipeList = masterTipeAbsenList
+              .filter(t => activeIds.includes(Number(t.id)))
+              .map(t => t.nama_tipe);
+          } else if (masterTipeAbsenList && masterTipeAbsenList.length > 0) {
+            empTipeList = masterTipeAbsenList.map(t => t.nama_tipe);
+          }
+
           const userAbsenMap = {};
           
           // Pre-fill dates
@@ -524,6 +533,19 @@
                 }
               }
             });
+          }
+
+          // Sertakan tipe_absen yang benar-benar ada di transaksi karyawan ini
+          datesList.forEach(d => {
+            Object.keys(userAbsenMap[d].byTipe).forEach(t => {
+              if (!empTipeList.includes(t)) {
+                empTipeList.push(t);
+              }
+            });
+          });
+
+          if (empTipeList.length === 0) {
+            empTipeList = ['Masuk', 'Istirahat Keluar', 'Istirahat Masuk', 'Pulang'];
           }
 
           // Cuti / Izin Note for User
@@ -592,9 +614,9 @@
             totalTelatMins += dayObj.terlambatMins;
           });
 
-          // Build Dynamic Rows for activeTipeList
+          // Build Dynamic Rows for empTipeList (Khusus Kantor Karyawan Ini)
           let tableRowsHtml = '';
-          activeTipeList.forEach(tipe => {
+          empTipeList.forEach(tipe => {
             tableRowsHtml += `
               <tr>
                 <td class="row-label ps-2">${tipe}</td>
