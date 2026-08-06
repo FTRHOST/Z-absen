@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1100, initial-scale=0.35">
+  <title>Form Gaji Mingguan (Timesheet) - Zieda Absen</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <style>
+    :root {
+      --primary-color: #1e293b;
+      --border-color: #334155;
+    }
+    
+    html, body {
+      min-width: 1100px !important;
+      width: 100% !important;
+      overflow-x: auto !important;
+    }
+
+    /* BAR KONTROL DI ATAS (HANYA DITAMPILKAN DI SCREEN) */
+    .control-bar {
+      background: #ffffff;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 12px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      min-width: 1100px !important;
+    }
+
+    /* CONTAINER PRINTABLE */
+    .print-container {
+      width: 1100px !important;
+      min-width: 1100px !important;
+      max-width: 1100px !important;
+      margin: 20px auto;
+      padding: 0 15px;
+    }
+
+    /* KARTU KARYAWAN (BLOK SCAN LOG GAJI) */
+    .employee-card {
+      background: #ffffff;
+      border: 1.5px solid #1e293b;
+      border-radius: 6px;
+      margin-bottom: 24px;
+      padding: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .emp-header-bar {
+      background-color: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      padding: 6px 12px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .emp-title {
+      font-weight: 700;
+      color: #0f172a;
+      font-size: 15px;
+    }
+
+    /* TABEL MATRIX 7 HARI */
+    .table-timesheet {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+
+    .table-timesheet th,
+    .table-timesheet td {
+      border: 1px solid #64748b;
+      padding: 5px 6px;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    .table-timesheet th {
+      background-color: #e2e8f0 !important;
+      font-weight: 700;
+      color: #0f172a;
+      font-size: 11.5px;
+    }
+
+    .table-timesheet td.row-label {
+      text-align: left;
+      font-weight: 600;
+      background-color: #f8fafc;
+      white-space: nowrap;
+      width: 170px;
+    }
+
+    .table-timesheet td.row-total-jam {
+      font-weight: 700;
+      background-color: #f1f5f9;
+      color: #0f172a;
+    }
+
+    /* FOOTER & REKAP CARD */
+    .summary-footer {
+      display: grid;
+      grid-template-columns: 1fr 240px;
+      gap: 12px;
+      align-items: stretch;
+      margin-top: 8px;
+    }
+
+    .rekap-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      padding: 8px;
+      border-radius: 4px;
+    }
+
+    .rekap-item {
+      text-align: center;
+      padding: 4px;
+      border: 1px solid #e2e8f0;
+      border-radius: 3px;
+      background: #ffffff;
+    }
+
+    .rekap-item .label {
+      font-size: 10px;
+      color: #475569;
+      text-transform: uppercase;
+      font-weight: 600;
+      display: block;
+    }
+
+    .rekap-item .value {
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 2px;
+    }
+
+    .notes-box {
+      grid-column: span 4;
+      font-size: 11px;
+      color: #334155;
+      text-align: left;
+      border-top: 1px dashed #cbd5e1;
+      padding-top: 4px;
+      margin-top: 4px;
+    }
+
+    /* KOTAK TANDA TANGAN */
+    .signature-container {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      padding: 6px 12px;
+      background: #ffffff;
+    }
+
+    .sig-box {
+      flex: 1;
+      text-align: center;
+      font-size: 10.5px;
+    }
+
+    .sig-space {
+      height: 38px;
+    }
+
+    .sig-name {
+      font-weight: 600;
+      border-top: 1px solid #64748b;
+      padding-top: 2px;
+      font-size: 10px;
+    }
+
+    /* MEDIA PRINT RULES */
+    @media print {
+      body {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      .no-print,
+      #loading-spinner {
+        display: none !important;
+      }
+
+      .print-container {
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: block !important;
+      }
+
+      .employee-card {
+        box-shadow: none !important;
+        border: 1.5px solid #000000 !important;
+        margin-bottom: 16px !important;
+        padding: 8px !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        display: block !important;
+      }
+
+      .summary-footer {
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 10px !important;
+      }
+
+      .rekap-grid {
+        flex: 1 !important;
+      }
+
+      .signature-container {
+        width: 240px !important;
+      }
+
+      .table-timesheet th,
+      .table-timesheet td {
+        border: 1px solid #000000 !important;
+        color: #000000 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      .table-timesheet th {
+        background-color: #e2e8f0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      .emp-header-bar {
+        border: 1px solid #000000 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      .rekap-grid,
+      .signature-container {
+        border: 1px solid #000000 !important;
+        background-color: #ffffff !important;
+      }
+
+      thead {
+        display: table-header-group !important;
+      }
+
+      @page {
+        size: A4 portrait;
+        margin: 10mm 8mm;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- CONTROL BAR / NAVIGATION (TIDAK IKUT DICETAK) -->
+  <div class="control-bar no-print">
+    <div class="container-fluid d-flex flex-wrap align-items-center justify-content-between gap-3">
+      <div class="d-flex align-items-center gap-2">
+        <a href="admin.html" class="btn btn-outline-secondary btn-sm fw-bold">
+          <i class="fas fa-arrow-left me-1"></i> Kembali ke Admin
+        </a>
+        <h6 class="mb-0 fw-bold ms-2 text-primary">
+          <i class="fas fa-print me-2"></i>Cetak Form Gaji Mingguan
+        </h6>
+      </div>
+
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <div class="d-flex align-items-center gap-1">
+          <label class="small text-muted mb-0 fw-semibold">Mulai:</label>
+          <input type="date" id="filter_mulai" class="form-control form-control-sm w-auto">
+        </div>
+        <div class="d-flex align-items-center gap-1">
+          <label class="small text-muted mb-0 fw-semibold">Selesai:</label>
+          <input type="date" id="filter_selesai" class="form-control form-control-sm w-auto">
+        </div>
+        <div class="d-flex align-items-center gap-1">
+          <label class="small text-muted mb-0 fw-semibold">Cabang:</label>
+          <select id="filter_cabang" class="form-select form-select-sm w-auto">
+            <option value="">Semua Cabang</option>
+          </select>
+        </div>
+        <div class="d-flex align-items-center gap-1 ms-1">
+          <input class="form-check-input" type="checkbox" id="show_zero_absen" checked onchange="loadFormGajiData()">
+          <label class="small text-muted mb-0 fw-semibold" for="show_zero_absen">Tampilkan Karyawan 0 Absen</label>
+        </div>
+        <button onclick="loadFormGajiData()" class="btn btn-primary btn-sm fw-bold shadow-sm">
+          <i class="fas fa-sync me-1"></i> Tampilkan
+        </button>
+        <button onclick="window.print()" class="btn btn-success btn-sm fw-bold shadow-sm ms-2">
+          <i class="fas fa-print me-1"></i> Cetak / Save PDF
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRINT CONTAINER -->
+  <div class="print-container">
+    <table style="width: 100%; border-collapse: collapse; border: none; background: transparent;">
+      <thead>
+        <tr style="border: none;">
+          <th style="border: none; padding: 0; background: transparent; font-weight: normal; text-align: left;">
+            <!-- DOKUMEN HEADER -->
+            <div class="d-flex align-items-center mb-3 pb-2 border-bottom border-2 border-dark">
+              <div style="width: 80px;">
+                <img id="app-logo-header" src="" alt="" style="max-width: 100%; max-height: 60px; display: none;">
+              </div>
+              <div class="flex-grow-1 text-center">
+                <h4 class="fw-bold mb-1 tracking-wide text-uppercase" style="letter-spacing: 1px;">ZIEDA ABSEN - SCAN LOG (GAJI MINGGUAN)</h4>
+                <p class="mb-0 small text-secondary fw-semibold" id="doc-subtitle">
+                  Periode: - | Cabang: Semua Cabang
+                </p>
+              </div>
+              <div style="width: 80px;"></div>
+            </div>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border: none;">
+          <td style="border: none; padding: 0; background: transparent;">
+            <!-- SPINNER LOADING -->
+            <div id="loading-spinner" class="text-center py-5">
+              <div class="spinner-border text-primary me-2" role="status"></div>
+              <span class="fw-semibold text-secondary">Mengambil data absensi & kalkulasi timesheet mingguan...</span>
+            </div>
+
+            <!-- CONTAINER KARTU KARYAWAN -->
+            <div id="employee-cards-container"></div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SCRIPTS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="env.js"></script>
+  <script src="config.js"></script>
+
+  <script>
+    // Global State
+    let masterCabangList = [];
+    let masterTipeAbsenList = [];
+
+    // Deteksi Parameter URL
+    const urlParams = new URLSearchParams(window.location.search);
+    let paramMulai = urlParams.get('mulai');
+    let paramSelesai = urlParams.get('selesai');
+    let paramCabang = urlParams.get('cabang') || '';
+
+    // Set Default Dates (7 Hari / 1 Minggu) jika tidak ada di URL
+    if (!paramMulai || !paramSelesai) {
+      const today = new Date();
+      const sixDaysAgo = new Date();
+      sixDaysAgo.setDate(today.getDate() - 6);
+
+      paramSelesai = today.toISOString().split('T')[0];
+      paramMulai = sixDaysAgo.toISOString().split('T')[0];
+    }
+
+    // Direct Login Check
+    const userData = localStorage.getItem('userLogin');
+    let currentUser = null;
+    if (userData) {
+      try { currentUser = JSON.parse(userData); } catch(e) {}
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      const elMulai = document.getElementById('filter_mulai');
+      const elSelesai = document.getElementById('filter_selesai');
+      if (elMulai) elMulai.value = paramMulai;
+      if (elSelesai) elSelesai.value = paramSelesai;
+
+      await loadMasterData();
+      await loadFormGajiData();
+    });
+
+    let masterKantorMap = {};
+
+    async function loadMasterData() {
+      try {
+        // Load Cabang (termasuk tipe_absen_ids per kantor)
+        let qKantor = supabaseClient.from('kantor').select('id, nama, tipe_absen_ids').order('nama');
+        let { data: cData, error: cErr } = await qKantor;
+        
+        // Fallback jika kolom tipe_absen_ids belum terdeteksi
+        if (cErr) {
+          const { data: fallbackData } = await supabaseClient.from('kantor').select('id, nama').order('nama');
+          cData = fallbackData;
+        }
+
+        if (cData) {
+          masterKantorMap = {};
+          cData.forEach(k => {
+            const kName = k.nama || k.nama_kantor || '';
+            if (kName) masterKantorMap[kName] = k;
+          });
+          masterCabangList = Object.keys(masterKantorMap);
+
+          const selCabang = document.getElementById('filter_cabang');
+          selCabang.innerHTML = '<option value="">Semua Cabang</option>';
+          masterCabangList.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.textContent = c;
+            if (c === paramCabang) opt.selected = true;
+            selCabang.appendChild(opt);
+          });
+        }
+
+        // Load Master Tipe Absen
+        let { data: tData, error: tErr } = await supabaseClient.from('master_tipe_absen').select('*').order('id', { ascending: true });
+        if (!tErr && tData) {
+          masterTipeAbsenList = tData;
+        }
+
+        // Load App Settings for Logo
+        let { data: sData, error: sErr } = await supabaseClient.from('app_settings').select('logo_url').eq('id', 1).maybeSingle();
+        if (!sErr && sData && sData.logo_url) {
+          const logoEl = document.getElementById('app-logo-header');
+          if (logoEl) {
+            logoEl.src = sData.logo_url;
+            logoEl.style.display = 'block';
+          }
+        }
+      } catch (e) {
+        console.error('Error loading master data:', e);
+      }
+    }
+
+    async function loadFormGajiData() {
+      const spinner = document.getElementById('loading-spinner');
+      const container = document.getElementById('employee-cards-container');
+      
+      spinner.style.display = 'block';
+      container.innerHTML = '';
+
+      const tglMulai = document.getElementById('filter_mulai').value;
+      const tglSelesai = document.getElementById('filter_selesai').value;
+      const cabangSelected = document.getElementById('filter_cabang').value;
+
+      // Validasi Selisih Hari Max 7 Hari (1 Minggu)
+      const dStart = new Date(tglMulai);
+      const dEnd = new Date(tglSelesai);
+      const diffTime = dEnd - dStart;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+      if (diffDays <= 0) {
+        spinner.style.display = 'none';
+        container.innerHTML = `<div class="alert alert-danger text-center">Tanggal Selesai harus sama atau setelah Tanggal Mulai.</div>`;
+        return;
+      }
+
+      if (diffDays > 7) {
+        spinner.style.display = 'none';
+        container.innerHTML = `<div class="alert alert-warning text-center">Rentang tanggal Form Gaji Mingguan maksimal 7 hari (1 minggu). Anda memilih ${diffDays} hari. Silakan sesuaikan filter tanggal.</div>`;
+        return;
+      }
+
+      // Update Subtitle
+      document.getElementById('doc-subtitle').innerText = 
+        `Periode: ${formatTanggalIndo(tglMulai)} s/d ${formatTanggalIndo(tglSelesai)} | Cabang: ${cabangSelected || 'Semua Cabang'}`;
+
+      // Buat List Tanggal (Array 7 hari)
+      const datesList = [];
+      let curr = new Date(dStart);
+      while (curr <= dEnd) {
+        datesList.push(curr.toISOString().split('T')[0]);
+        curr.setDate(curr.getDate() + 1);
+      }
+
+      try {
+        // Query Karyawan
+        let qUsers = supabaseClient.from('users').select('id, nama, cabang, unit, role, foto_wajah').order('nama');
+        if (cabangSelected) {
+          qUsers = qUsers.eq('cabang', cabangSelected);
+        } else if (currentUser && currentUser.role !== 'Super Admin' && currentUser.cabang) {
+          qUsers = qUsers.eq('cabang', currentUser.cabang);
+        }
+
+        const { data: usersData, error: uErr } = await qUsers;
+        if (uErr) throw uErr;
+
+        if (!usersData || usersData.length === 0) {
+          spinner.style.display = 'none';
+          container.innerHTML = `<div class="alert alert-info text-center">Tidak ada data karyawan ditemukan pada cabang yang dipilih.</div>`;
+          return;
+        }
+
+        const showZeroAbsen = document.getElementById('show_zero_absen') ? document.getElementById('show_zero_absen').checked : true;
+
+        // Query Absensi pada rentang tanggal
+        let qAbsen = supabaseClient
+          .from('absensi')
+          .select('id, user_id, tanggal, waktu, tipe_absen, status, menit_terlambat, menit_lembur, keterangan_waktu')
+          .gte('tanggal', tglMulai)
+          .lte('tanggal', tglSelesai);
+
+        const { data: absenData, error: aErr } = await qAbsen;
+        if (aErr) throw aErr;
+
+        // Query Cuti / Izin pada rentang tanggal (Resilient & Fault-tolerant)
+        let cutiData = [];
+        try {
+          let qCuti = supabaseClient
+            .from('cuti')
+            .select('id, user_id, tanggal_mulai, tanggal_selesai, alasan, status_pengajuan')
+            .lte('tanggal_mulai', tglSelesai)
+            .gte('tanggal_selesai', tglMulai);
+
+          const { data: cRes, error: cErr } = await qCuti;
+          if (!cErr && cRes) {
+            cutiData = cRes.filter(c => !c.status_pengajuan || c.status_pengajuan.toLowerCase().includes('setuju') || c.status_pengajuan.toLowerCase().includes('acc') || c.status_pengajuan.toLowerCase().includes('menunggu'));
+          }
+        } catch (cErr) {
+          console.warn('Catatan cuti tidak dapat dimuat:', cErr);
+        }
+
+        // Mapping Data Karyawan -> Tanggal -> Tipe Absen
+        let cardsHtml = '';
+
+        usersData.forEach((u, uIdx) => {
+          // Tentukan tipe_absen aktif khusus untuk kantor/cabang karyawan ini
+          let empTipeList = [];
+          const kObj = masterKantorMap[u.cabang];
+
+          if (kObj && Array.isArray(kObj.tipe_absen_ids) && kObj.tipe_absen_ids.length > 0 && masterTipeAbsenList && masterTipeAbsenList.length > 0) {
+            const activeIds = kObj.tipe_absen_ids.map(Number);
+            empTipeList = masterTipeAbsenList
+              .filter(t => activeIds.includes(Number(t.id)))
+              .map(t => t.nama_tipe);
+          } else if (masterTipeAbsenList && masterTipeAbsenList.length > 0) {
+            empTipeList = masterTipeAbsenList.map(t => t.nama_tipe);
+          }
+
+          const userAbsenMap = {};
+          
+          // Pre-fill dates
+          datesList.forEach(d => {
+            userAbsenMap[d] = {
+              byTipe: {},
+              terlambatMins: 0,
+              lemburMins: 0,
+              statusList: []
+            };
+          });
+
+          // Populate Attendance for user
+          if (absenData) {
+            absenData.filter(a => String(a.user_id) === String(u.id)).forEach(a => {
+              if (a.status && a.status.includes('TRASH')) return;
+              if (userAbsenMap[a.tanggal]) {
+                const tipe = a.tipe_absen || 'Unknown';
+                const waktuFormatted = a.waktu ? formatTimeHM(a.waktu) : null;
+                const statusStr = (a.status || '').toLowerCase();
+                const tipeStr = (tipe || '').toLowerCase();
+                const ketStr = (a.keterangan_waktu || '').toLowerCase();
+
+                let limitMin = null;
+                if (masterTipeAbsenList && masterTipeAbsenList.length > 0) {
+                  const mObj = masterTipeAbsenList.find(m => m.nama_tipe === tipe) || masterTipeAbsenList.find(m => m.is_checkout);
+                  if (mObj && (mObj.is_checkout || tipeStr.includes('pulang') || tipeStr.includes('checkout'))) {
+                    const endStr = mObj.batas_terlambat || (mObj.jam_tutup && mObj.jam_tutup !== '23:59:59' ? mObj.jam_tutup : null);
+                    if (endStr) limitMin = parseMins(endStr);
+                  }
+                }
+                const wMin = parseMins(a.waktu);
+                const isExceedingEnd = (limitMin !== null && wMin !== null && wMin > limitMin);
+
+                const isTerlambat = statusStr.includes('terlambat') || (a.menit_terlambat && a.menit_terlambat > 0);
+                const isLembur = tipeStr.includes('lembur') || statusStr.includes('lembur') || (a.menit_lembur && a.menit_lembur > 0) || ketStr.includes('lembur') || isExceedingEnd;
+
+                let bgColor = '';
+                if (isTerlambat) {
+                  bgColor = '#FFA6A6'; // Terlambat: #FFA6A6
+                } else if (isLembur) {
+                  bgColor = '#AFD095'; // Lembur: #AFD095
+                }
+
+                let mLembur = a.menit_lembur || 0;
+                if (!mLembur && isExceedingEnd) {
+                  mLembur = wMin - limitMin;
+                }
+                if (!mLembur && ketStr.includes('lembur')) {
+                  const matchJ = ketStr.match(/(\d+)\s*j(?:am)?/i);
+                  const matchM = ketStr.match(/(\d+)\s*m(?:enit)?/i);
+                  if (matchJ || matchM) {
+                    const j = matchJ ? parseInt(matchJ[1], 10) : 0;
+                    const m = matchM ? parseInt(matchM[1], 10) : 0;
+                    mLembur = j * 60 + m;
+                  }
+                }
+
+                if (a.menit_terlambat) userAbsenMap[a.tanggal].terlambatMins += (a.menit_terlambat || 0);
+                if (mLembur > 0) userAbsenMap[a.tanggal].lemburMins = Math.max(userAbsenMap[a.tanggal].lemburMins || 0, mLembur);
+                if (a.status) userAbsenMap[a.tanggal].statusList.push(a.status);
+
+                if (waktuFormatted) {
+                  if (!userAbsenMap[a.tanggal].byTipe[tipe]) {
+                    userAbsenMap[a.tanggal].byTipe[tipe] = {
+                      time: waktuFormatted,
+                      bgColor: bgColor
+                    };
+                  } else {
+                    const existing = userAbsenMap[a.tanggal].byTipe[tipe];
+                    if (!existing.time.includes(waktuFormatted)) {
+                      existing.time += `, ${waktuFormatted}`;
+                    }
+                    if (bgColor && !existing.bgColor) {
+                      existing.bgColor = bgColor;
+                    }
+                  }
+                }
+              }
+            });
+          }
+
+          // Sertakan tipe_absen yang benar-benar ada di transaksi karyawan ini
+          datesList.forEach(d => {
+            Object.keys(userAbsenMap[d].byTipe).forEach(t => {
+              if (!empTipeList.includes(t)) {
+                empTipeList.push(t);
+              }
+            });
+          });
+
+          if (empTipeList.length === 0) {
+            empTipeList = ['Masuk', 'Istirahat Keluar', 'Istirahat Masuk', 'Pulang'];
+          }
+
+          // Cek Kehadiran (Minimal 1 kali)
+          let hasAbsen = false;
+          datesList.forEach(d => {
+            if (userAbsenMap[d] && Object.keys(userAbsenMap[d].byTipe).length > 0) {
+              hasAbsen = true;
+            }
+          });
+
+          // Filter: Jika tidak tercentang dan karyawan 0 absen, skip rendering
+          if (!showZeroAbsen && !hasAbsen) return;
+
+          const headerBgColor = hasAbsen ? '#FFFF00' : '#F1F5F9';
+
+          // Cuti / Izin Note for User
+          const userCutiNotes = [];
+          if (cutiData) {
+            cutiData.filter(c => c.user_id === u.id).forEach(c => {
+              userCutiNotes.push(`${c.alasan || 'Izin/Cuti'} (${formatTanggalIndo(c.tanggal_mulai)} - ${formatTanggalIndo(c.tanggal_selesai)})`);
+            });
+          }
+
+          // Kalkulasi Rekap Mingguan Karyawan
+          let totalHariHadir = 0;
+          let totalJamKerjaMins = 0;
+          let totalLemburMins = 0;
+          let totalTelatMins = 0;
+
+          const dailyNetMinsMap = {};
+
+          datesList.forEach(d => {
+            const dayObj = userAbsenMap[d];
+            let minMasuk = null;
+            let maxPulang = null;
+            let istKeluar = null;
+            let istMasuk = null;
+            let hasMasuk = false;
+
+            Object.keys(dayObj.byTipe).forEach(tipe => {
+              const cellObj = dayObj.byTipe[tipe];
+              const timeStr = cellObj ? cellObj.time : null;
+              const tLower = tipe.toLowerCase();
+              const pMins = parseMins(timeStr);
+
+              if (pMins !== null) {
+                if (tLower.includes('istirahat') && tLower.includes('keluar')) {
+                  istKeluar = pMins;
+                } else if (tLower.includes('istirahat') && (tLower.includes('masuk') || tLower.includes('kembali'))) {
+                  istMasuk = pMins;
+                } else if (tLower.includes('pulang') || tLower.includes('checkout') || (tLower.includes('lembur') && tLower.includes('keluar'))) {
+                  if (maxPulang === null || pMins > maxPulang) maxPulang = pMins;
+                } else if (tLower.includes('masuk') || tLower.includes('checkin')) {
+                  hasMasuk = true;
+                  if (minMasuk === null || pMins < minMasuk) minMasuk = pMins;
+                }
+              }
+            });
+
+            if (hasMasuk) {
+              const isHalf = dayObj.statusList.some(s => s.toLowerCase().includes('setengah hari') || s.toLowerCase().includes('half day'));
+              totalHariHadir += (isHalf ? 0.5 : 1.0);
+            }
+
+            let breakM = 0;
+            if (istMasuk !== null && istKeluar !== null && istMasuk > istKeluar) {
+              breakM = istMasuk - istKeluar;
+            }
+
+            let netDailyMins = 0;
+            if (maxPulang !== null && minMasuk !== null && maxPulang >= minMasuk) {
+              netDailyMins = (maxPulang - minMasuk) - breakM;
+              if (netDailyMins < 0) netDailyMins = 0;
+            }
+
+            let dailyCalcLembur = 0;
+            Object.keys(dayObj.byTipe).forEach(tipeKey => {
+              const cellObj = dayObj.byTipe[tipeKey];
+              if (cellObj && cellObj.time && cellObj.time !== '-') {
+                const tLower = tipeKey.toLowerCase();
+                const mObj = masterTipeAbsenList ? masterTipeAbsenList.find(m => m.nama_tipe === tipeKey) : null;
+                if (mObj && (mObj.is_checkout || tLower.includes('pulang') || tLower.includes('checkout'))) {
+                  const endStr = mObj.batas_terlambat || (mObj.jam_tutup && mObj.jam_tutup !== '23:59:59' ? mObj.jam_tutup : null);
+                  if (endStr) {
+                    const limitMin = parseMins(endStr);
+                    const pMins = parseMins(cellObj.time);
+                    if (limitMin && pMins && pMins > limitMin) {
+                      dailyCalcLembur += (pMins - limitMin);
+                    }
+                  }
+                }
+              }
+            });
+
+            if (dailyCalcLembur > dayObj.lemburMins) {
+              dayObj.lemburMins = dailyCalcLembur;
+            }
+
+            dailyNetMinsMap[d] = netDailyMins;
+            totalJamKerjaMins += netDailyMins;
+            totalLemburMins += dayObj.lemburMins;
+            totalTelatMins += dayObj.terlambatMins;
+          });
+
+          // Build Dynamic Rows for empTipeList (Khusus Kantor Karyawan Ini)
+          let tableRowsHtml = '';
+          empTipeList.forEach(tipe => {
+            tableRowsHtml += `
+              <tr>
+                <td class="row-label ps-2">${tipe}</td>
+                ${datesList.map(d => {
+                  const cellObj = userAbsenMap[d].byTipe[tipe];
+                  if (cellObj && cellObj.time) {
+                    const styleAttr = cellObj.bgColor ? `style="background-color: ${cellObj.bgColor}; font-weight: 600;"` : '';
+                    return `<td ${styleAttr}>${cellObj.time}</td>`;
+                  }
+                  return `<td>-</td>`;
+                }).join('')}
+              </tr>
+            `;
+          });
+
+          // Summary Row (Total Jam) - Title Rata Tengah
+          tableRowsHtml += `
+            <tr>
+              <td class="row-label text-center fw-bold text-dark">Total Jam</td>
+              ${datesList.map(d => `<td class="row-total-jam">${dailyNetMinsMap[d] > 0 ? formatHMM(dailyNetMinsMap[d]) : '-'}</td>`).join('')}
+            </tr>
+          `;
+
+          // Foto Pendaftaran / Wajah Karyawan
+          const userFaceUrl = typeof fixStorageUrl === 'function' ? fixStorageUrl(u.foto_wajah || '') : (u.foto_wajah || '');
+
+          // Build Card HTML for Employee
+          cardsHtml += `
+            <div class="employee-card">
+              <div class="emp-header-bar" style="background-color: ${headerBgColor} !important; color: #000000;">
+                <div>
+                  <span class="emp-title">${u.nama || 'Tanpa Nama'}</span>
+                  <span class="ms-2 text-secondary font-monospace">(${u.unit || u.role || 'Karyawan'})</span>
+                </div>
+                <div class="fw-semibold text-dark">
+                  Cabang: <span class="fw-bold">${u.cabang || 'Pusat'}</span>
+                </div>
+              </div>
+
+              <!-- TABEL DINAMIS SESUAI TIPE ABSEN -->
+              <table class="table-timesheet">
+                <thead>
+                  <tr>
+                    <th class="row-label text-center">Absen/Hari</th>
+                    ${datesList.map(d => `<th>${formatHariTanggalHeader(d)}</th>`).join('')}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${tableRowsHtml}
+                </tbody>
+              </table>
+
+              <!-- RINGKASAN REKAP & TANDA TANGAN -->
+              <div class="summary-footer">
+                <div class="rekap-grid">
+                  <div class="rekap-item">
+                    <span class="label">Jumlah Hari</span>
+                    <div class="value">${totalHariHadir} Hari</div>
+                  </div>
+                  <div class="rekap-item">
+                    <span class="label">Jumlah Jam/Mnt</span>
+                    <div class="value">${formatJamMnt(totalJamKerjaMins)}</div>
+                  </div>
+                  <div class="rekap-item">
+                    <span class="label">Total Lembur</span>
+                    <div class="value text-success">${formatJamMnt(totalLemburMins)}</div>
+                  </div>
+                  <div class="rekap-item">
+                    <span class="label">Total Telat</span>
+                    <div class="value text-danger">${formatJamMnt(totalTelatMins)}</div>
+                  </div>
+                  ${userCutiNotes.length > 0 ? `
+                    <div class="notes-box">
+                      <strong>Catatan Cuti/Izin:</strong> ${userCutiNotes.join('; ')}
+                    </div>
+                  ` : ''}
+                </div>
+
+                <div class="signature-container">
+                  <div class="sig-box d-flex align-items-center justify-content-center" style="min-height: 52px; padding: 4px;">
+                    ${userFaceUrl ? `<img src="${userFaceUrl}" style="max-height: 69px; max-width: 139px; object-fit: contain; border-radius: 4px;" alt="Foto ${u.nama}" onerror="this.style.display='none'">` : `<span class="text-muted small">${u.nama}</span>`}
+                  </div>
+                  <div class="sig-box">
+                    <div>Mengetahui</div>
+                    <div class="sig-space"></div>
+                    <div class="sig-name">( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+
+        spinner.style.display = 'none';
+        container.innerHTML = cardsHtml;
+
+      } catch (err) {
+        console.error('Error loadFormGajiData:', err);
+        spinner.style.display = 'none';
+        container.innerHTML = `<div class="alert alert-danger text-center">Gagal memuat data form gaji: ${err.message}</div>`;
+      }
+    }
+
+    // Helper Functions
+    function formatTimeHM(timeStr) {
+      if (!timeStr) return '-';
+      const parts = String(timeStr).trim().split(':');
+      if (parts.length < 2) return timeStr;
+      return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+    }
+
+    function parseMins(timeStr) {
+      if (!timeStr || timeStr === '-') return null;
+      const p = String(timeStr).trim().split(':');
+      if (p.length < 2) return null;
+      return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+    }
+
+    function formatHMM(mins) {
+      if (mins === null || mins <= 0) return '-';
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return `${h}:${m < 10 ? '0' : ''}${m}`;
+    }
+
+    function formatJamMnt(totalMins) {
+      if (!totalMins || totalMins <= 0) return '0 Jam 0 Mnt';
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      if (h === 0) return `${m} Mnt`;
+      return `${h} Jam ${m} Mnt`;
+    }
+
+    function formatTanggalIndo(dateStr) {
+      if (!dateStr) return '-';
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      const parts = dateStr.split('-');
+      if (parts.length !== 3) return dateStr;
+      return `${parseInt(parts[2], 10)} ${months[parseInt(parts[1], 10) - 1]} ${parts[0]}`;
+    }
+
+    function formatHariTanggalHeader(dateStr) {
+      if (!dateStr) return '-';
+      const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const d = new Date(dateStr + 'T00:00:00');
+      const dayName = days[d.getDay()];
+      const parts = dateStr.split('-');
+      const ddMm = `${parts[2]}/${parts[1]}`;
+      return `${dayName}<br><span style="font-weight:400; font-size:10px;">${ddMm}</span>`;
+    }
+  </script>
+</body>
+</html>

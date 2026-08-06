@@ -27,8 +27,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         let profile = null;
+        const isValidUUID = (str) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
-        if (session && session.user) {
+        if (session && session.user && isValidUUID(session.user.id)) {
             const { data: p } = await supabaseClient
                 .from('users')
                 .select('id, role, cabang, auth_id')
@@ -47,7 +48,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             if (fallbackUser) {
                 profile = fallbackUser;
-                if (session && session.user) {
+                if (session && session.user && isValidUUID(session.user.id)) {
                     await supabaseClient.from('users').update({ auth_id: session.user.id }).eq('id', fallbackUser.id);
                 }
             }
@@ -267,17 +268,57 @@ async function loadDashboardStats() {
                 users: a.users,
                 waktu_masuk: a.waktu, // Set default to their first record
                 tipe_absen: a.tipe_absen,
-                terlambat: false
+                terlambat: false,
+                menit_terlambat: 0,
+                menit_lembur: 0,
+                keterangan_waktu: ''
             };
         }
         
-        if (a.tipe_absen === 'Masuk') {
+        if (a.tipe_absen === 'Masuk' || (a.tipe_absen && a.tipe_absen.toLowerCase().includes('masuk'))) {
             groupedHadir[a.user_id].waktu_masuk = a.waktu;
             groupedHadir[a.user_id].tipe_absen = a.tipe_absen;
         }
         
-        if (a.status === 'Terlambat') {
+        const isTerlambatRecord = a.status === 'Terlambat' || (a.keterangan_waktu && a.keterangan_waktu.toLowerCase().startsWith('terlambat'));
+        let mTelat = parseInt(a.menit_terlambat, 10) || 0;
+        if (!mTelat && isTerlambatRecord && a.keterangan_waktu) {
+            const matchJ = a.keterangan_waktu.match(/(\d+)\s*j(?:am)?/i);
+            const matchM = a.keterangan_waktu.match(/(\d+)\s*m(?:enit)?/i);
+            if (matchJ || matchM) {
+                const j = matchJ ? parseInt(matchJ[1], 10) : 0;
+                const m = matchM ? parseInt(matchM[1], 10) : 0;
+                mTelat = j * 60 + m;
+            } else {
+                const matchRaw = a.keterangan_waktu.match(/Terlambat\s+(\d+)/i);
+                if (matchRaw) mTelat = parseInt(matchRaw[1], 10);
+            }
+        }
+
+        if (isTerlambatRecord || mTelat > 0) {
             groupedHadir[a.user_id].terlambat = true;
+            if (mTelat > 0) {
+                groupedHadir[a.user_id].menit_terlambat = Math.max(groupedHadir[a.user_id].menit_terlambat || 0, mTelat);
+            }
+        }
+
+        const isLemburRecord = a.status === 'Lembur' || (a.keterangan_waktu && a.keterangan_waktu.toLowerCase().startsWith('lembur'));
+        let mLembur = parseInt(a.menit_lembur, 10) || 0;
+        if (!mLembur && isLemburRecord && a.keterangan_waktu) {
+            const matchJ = a.keterangan_waktu.match(/(\d+)\s*j(?:am)?/i);
+            const matchM = a.keterangan_waktu.match(/(\d+)\s*m(?:enit)?/i);
+            if (matchJ || matchM) {
+                const j = matchJ ? parseInt(matchJ[1], 10) : 0;
+                const m = matchM ? parseInt(matchM[1], 10) : 0;
+                mLembur = j * 60 + m;
+            }
+        }
+        if (mLembur > 0) {
+            groupedHadir[a.user_id].menit_lembur = Math.max(groupedHadir[a.user_id].menit_lembur || 0, mLembur);
+        }
+
+        if (a.keterangan_waktu) {
+            groupedHadir[a.user_id].keterangan_waktu = a.keterangan_waktu;
         }
     });
     
@@ -427,18 +468,48 @@ function showDashboardDetail(type) {
                 const cabang = item.users?.cabang || '-';
                 const tipe = `<span class="badge bg-primary">${item.tipe_absen || '-'}</span>`;
                 const waktu = `<span class="badge bg-light text-dark border">${item.waktu_masuk || '-'}</span>`;
-                const ket = item.keterangan_waktu || (item.terlambat ? 'Terlambat' : 'Tepat Waktu');
-                const badgeKet = item.terlambat 
-                    ? `<span class="badge bg-warning text-dark">${ket}</span>`
-                    : (item.menit_lembur > 0 ? `<span class="badge bg-success">${ket}</span>` : `<span class="badge bg-light text-dark border">${ket}</span>`);
                 
+                let statusBadges = [];
+                if (item.terlambat) {
+                    statusBadges.push(`<span class="badge bg-warning text-dark">Terlambat</span>`);
+                }
+                if (item.menit_lembur > 0) {
+                    statusBadges.push(`<span class="badge bg-info text-white">Lembur</span>`);
+                }
+                if (statusBadges.length === 0) {
+                    statusBadges.push(`<span class="badge bg-success">Tepat Waktu</span>`);
+                }
+                const badgeKet = statusBadges.join(' ');
+                
+                let totalLateMinutes = item.menit_terlambat || 0;
+                if (!totalLateMinutes && item.keterangan_waktu) {
+                    const matchJ = item.keterangan_waktu.match(/(\d+)\s*j(?:am)?/i);
+                    const matchM = item.keterangan_waktu.match(/(\d+)\s*m(?:enit)?/i);
+                    if (matchJ || matchM) {
+                        const j = matchJ ? parseInt(matchJ[1], 10) : 0;
+                        const m = matchM ? parseInt(matchM[1], 10) : 0;
+                        totalLateMinutes = j * 60 + m;
+                    } else {
+                        const matchRaw = item.keterangan_waktu.match(/Terlambat\s+(\d+)/i);
+                        if (matchRaw) totalLateMinutes = parseInt(matchRaw[1], 10);
+                    }
+                }
+
                 let telatTeks = `<span class="text-muted small">0 Menit</span>`;
-                if (item.menit_terlambat && item.menit_terlambat > 0) {
-                    const jam = Math.floor(item.menit_terlambat / 60);
-                    const m = item.menit_terlambat % 60;
-                    telatTeks = `<span class="badge bg-danger text-white">${jam > 0 ? jam + ' Jam ' : ''}${m} Menit</span>`;
+                if (totalLateMinutes > 0) {
+                    const jam = Math.floor(totalLateMinutes / 60);
+                    const m = totalLateMinutes % 60;
+                    let durasiStr = '';
+                    if (jam > 0 && m > 0) {
+                        durasiStr = `${jam} Jam ${m} Menit`;
+                    } else if (jam > 0) {
+                        durasiStr = `${jam} Jam`;
+                    } else {
+                        durasiStr = `${m} Menit`;
+                    }
+                    telatTeks = `<span class="badge bg-danger text-white">${durasiStr}</span>`;
                 } else if (item.terlambat) {
-                    telatTeks = `<span class="badge bg-danger text-white">Terlambat</span>`;
+                    telatTeks = `<span class="badge bg-danger text-white">> 0 Menit</span>`;
                 }
                 
                 trHtml = `<tr>
@@ -1755,7 +1826,43 @@ function showDetailAbsensi(tanggal, dateStrParam) {
         tipeAbsenList.forEach(tipe => {
             const list = g.absensi[tipe] || [];
             if (list.length > 0) {
-                const timeBadges = list.map(a => `<span class="badge bg-light text-dark border d-block mb-1">${formatWaktuGlobal(a.waktu)}</span>`).join('');
+                const timeBadges = list.map(a => {
+                    const statusStr = (a.status || '').toLowerCase();
+                    const tipeStr = (tipe || '').toLowerCase();
+                    const ketStr = (a.keterangan_waktu || '').toLowerCase();
+
+                    let limitMin = null;
+                    if (typeof globalMasterTipeAbsen !== 'undefined' && globalMasterTipeAbsen) {
+                        const mObj = globalMasterTipeAbsen.find(m => m.nama_tipe === tipe) || globalMasterTipeAbsen.find(m => m.is_checkout);
+                        if (mObj && (mObj.is_checkout || tipeStr.includes('pulang') || tipeStr.includes('checkout'))) {
+                            const endStr = mObj.batas_terlambat || (mObj.jam_tutup && mObj.jam_tutup !== '23:59:59' ? mObj.jam_tutup : null);
+                            if (endStr) limitMin = parseT(endStr);
+                        }
+                    }
+                    const wMin = parseT(a.waktu);
+                    const isExceedingEnd = (limitMin !== null && wMin !== null && wMin > limitMin);
+
+                    const isLemburRecord = a.status === "Lembur" || 
+                                           (a.menit_lembur && parseInt(a.menit_lembur, 10) > 0) || 
+                                           tipeStr.includes('lembur') || 
+                                           statusStr.includes('lembur') || 
+                                           ketStr.includes('lembur') || 
+                                           isExceedingEnd;
+
+                    const isTerlambatRecord = a.status === "Terlambat" || 
+                                              (a.menit_terlambat && parseInt(a.menit_terlambat, 10) > 0) || 
+                                              statusStr.includes('terlambat') || 
+                                              ketStr.includes('terlambat');
+
+                    let badgeClass = "bg-light text-dark border";
+                    if (isLemburRecord) {
+                        badgeClass = "bg-success text-white";
+                    } else if (isTerlambatRecord) {
+                        badgeClass = "bg-warning text-dark";
+                    }
+
+                    return `<span class="badge ${badgeClass} d-block mb-1" title="${a.keterangan_waktu || a.status}">${formatWaktuGlobal(a.waktu)}</span>`;
+                }).join('');
                 trHtml += `<td class="align-middle">${timeBadges}</td>`;
             } else {
                 trHtml += `<td class="align-middle text-muted">-</td>`;
@@ -1768,8 +1875,34 @@ function showDetailAbsensi(tanggal, dateStrParam) {
             if (list.length > 0) {
                 let statusHtml = '';
                 list.forEach(a => {
+                    const statusStr = (a.status || '').toLowerCase();
+                    const tipeStr = (tipe || '').toLowerCase();
+                    const ketStr = (a.keterangan_waktu || '').toLowerCase();
+
+                    let limitMin = null;
+                    if (typeof globalMasterTipeAbsen !== 'undefined' && globalMasterTipeAbsen) {
+                        const mObj = globalMasterTipeAbsen.find(m => m.nama_tipe === tipe) || globalMasterTipeAbsen.find(m => m.is_checkout);
+                        if (mObj && (mObj.is_checkout || tipeStr.includes('pulang') || tipeStr.includes('checkout'))) {
+                            const endStr = mObj.batas_terlambat || (mObj.jam_tutup && mObj.jam_tutup !== '23:59:59' ? mObj.jam_tutup : null);
+                            if (endStr) limitMin = parseT(endStr);
+                        }
+                    }
+                    const wMin = parseT(a.waktu);
+                    const isExceedingEnd = (limitMin !== null && wMin !== null && wMin > limitMin);
+
+                    const isLemburRecord = a.status === "Lembur" || 
+                                           (a.menit_lembur && parseInt(a.menit_lembur, 10) > 0) || 
+                                           tipeStr.includes('lembur') || 
+                                           statusStr.includes('lembur') || 
+                                           ketStr.includes('lembur') || 
+                                           isExceedingEnd;
+
+                    let displayStatus = a.status || 'Hadir';
+                    if (isLemburRecord && displayStatus === 'Hadir') displayStatus = 'Lembur';
+
                     let badgeClass = "bg-secondary";
-                    if (a.status === "Hadir" || a.status === "Tepat Waktu") badgeClass = "bg-success";
+                    if (isLemburRecord) badgeClass = "bg-success";
+                    else if (a.status === "Hadir" || a.status === "Tepat Waktu") badgeClass = "bg-success";
                     else if (a.status === "Terlambat") badgeClass = "bg-warning text-dark";
                     else if (a.status === "Alpha") badgeClass = "bg-danger";
                     else if (a.status === "Cuti") badgeClass = "bg-info text-dark";
@@ -1781,7 +1914,7 @@ function showDetailAbsensi(tanggal, dateStrParam) {
                     else if (faceStatus.includes("Sesuai") || faceStatus.includes("Sama")) faceBadgeClass = "bg-success";
 
                     statusHtml += `<div class="mb-1 text-center">
-                        <span class="badge ${badgeClass} mb-1 w-100">${a.status || 'Hadir'}</span><br>
+                        <span class="badge ${badgeClass} mb-1 w-100">${displayStatus}</span><br>
                         <span class="badge ${faceBadgeClass} w-100" title="Status Wajah"><i class="fas fa-user-check"></i> ${faceStatus}</span>
                     </div>`;
                 });
@@ -1890,10 +2023,27 @@ function showDetailAbsensi(tanggal, dateStrParam) {
         });
 
         // 4. Kalkulasi Jam Lembur & Jam Kerja
+        let totalDbMenitLembur = 0;
+        (g.allRows || []).forEach(a => {
+            let mL = parseInt(a.menit_lembur, 10) || 0;
+            if (!mL && a.keterangan_waktu && a.keterangan_waktu.toLowerCase().includes('lembur')) {
+                const matchJ = a.keterangan_waktu.match(/(\d+)\s*j(?:am)?/i);
+                const matchM = a.keterangan_waktu.match(/(\d+)\s*m(?:enit)?/i);
+                if (matchJ || matchM) {
+                    const j = matchJ ? parseInt(matchJ[1], 10) : 0;
+                    const m = matchM ? parseInt(matchM[1], 10) : 0;
+                    mL = j * 60 + m;
+                }
+            }
+            if (mL > 0) totalDbMenitLembur = Math.max(totalDbMenitLembur, mL);
+        });
+
         if (waktuPulangMin && jamPulangResmiMin && waktuPulangMin > jamPulangResmiMin) {
             const lemburKotor = waktuPulangMin - jamPulangResmiMin;
             const lemburBersih = Math.max(0, lemburKotor - istirahatLemburMins);
-            jamLemburStr = formatM(lemburBersih);
+            jamLemburStr = formatM(Math.max(lemburBersih, totalDbMenitLembur));
+        } else if (totalDbMenitLembur > 0) {
+            jamLemburStr = formatM(totalDbMenitLembur);
         } else if (waktuPulangMin) {
             jamLemburStr = '0j 0m';
         }
@@ -2151,11 +2301,27 @@ async function exportCsvHarian(tanggal) {
             };
             
             let lemburMins = 0;
+            tipeAbsenList.forEach(tipe => {
+                const a = g.absensi[tipe];
+                if (a) {
+                    if (a.menit_lembur > 0) lemburMins = Math.max(lemburMins, a.menit_lembur);
+                    else if (a.keterangan_waktu && a.keterangan_waktu.toLowerCase().includes('lembur')) {
+                        const matchJ = a.keterangan_waktu.match(/(\d+)\s*j(?:am)?/i);
+                        const matchM = a.keterangan_waktu.match(/(\d+)\s*m(?:enit)?/i);
+                        if (matchJ || matchM) {
+                            const j = matchJ ? parseInt(matchJ[1], 10) : 0;
+                            const m = matchM ? parseInt(matchM[1], 10) : 0;
+                            lemburMins = Math.max(lemburMins, j * 60 + m);
+                        }
+                    }
+                }
+            });
+
             if (waktuPulang && batasPulang) {
                 const pMins = parseT(waktuPulang);
                 const bMins = parseT(batasPulang);
                 if (pMins && bMins && pMins > bMins) {
-                    lemburMins = pMins - bMins;
+                    lemburMins = Math.max(lemburMins, pMins - bMins);
                 }
             }
             
@@ -3102,112 +3268,690 @@ async function prosesExport(event) {
         const folderName = `${tglMulai.split('-').reverse().join('-')}_sd_${tglSelesai.split('-').reverse().join('-')}`;
         const rootFolder = zip.folder(folderName);
         
-        // 1. Group Data & Get Unique Tipe Absen
-        const grouped = {};
+        // 1. Hitung Rentang Tanggal
+        const datesList = [];
+        const [sY, sM, sD] = tglMulai.split('-').map(Number);
+        const [eY, eM, eD] = tglSelesai.split('-').map(Number);
+        let currDate = new Date(Date.UTC(sY, sM - 1, sD));
+        const endDate = new Date(Date.UTC(eY, eM - 1, eD));
+
+        while (currDate <= endDate) {
+            const yyyy = currDate.getUTCFullYear();
+            const mm = String(currDate.getUTCMonth() + 1).padStart(2, '0');
+            const dd = String(currDate.getUTCDate()).padStart(2, '0');
+            datesList.push(`${yyyy}-${mm}-${dd}`);
+            currDate.setUTCDate(currDate.getUTCDate() + 1);
+        }
+
+        // 2. Group Data (Cabang -> Nama Karyawan -> Tanggal -> Tipe Absen)
+        const branchMap = {};
         let tipeAbsenList = [];
         if (typeof globalMasterTipeAbsen !== 'undefined' && globalMasterTipeAbsen.length > 0) {
             tipeAbsenList = globalMasterTipeAbsen.filter(t => t.is_aktif).map(t => t.nama_tipe);
         }
 
-        data.forEach(row => {
-            const namaUser = row.users ? row.users.nama : 'Unknown';
-            const cabangUser = row.users ? row.users.cabang : '-';
-            const key = `${row.tanggal}_${namaUser}`;
-            
-            if (!grouped[key]) {
-                grouped[key] = {
-                    tanggal: row.tanggal,
+        // Ensure currentFormatWaktu is loaded
+        if (!window.currentFormatWaktu) {
+            try {
+                const { data: setRes } = await supabaseClient.from('settings').select('format_waktu').single();
+                if (setRes && setRes.format_waktu) {
+                    window.currentFormatWaktu = setRes.format_waktu;
+                }
+            } catch(e) {}
+        }
+
+        // Ambil seluruh karyawan agar karyawan yang 0 absen tetap muncul di sheet cabang
+        let qAllUsers = supabaseClient.from('users').select('id, nama, cabang').order('nama', { ascending: true });
+        if (!isSuperAdmin) {
+            qAllUsers = qAllUsers.eq('cabang', myCabang);
+        }
+        const { data: allUsersData } = await qAllUsers;
+
+        if (allUsersData && allUsersData.length > 0) {
+            allUsersData.forEach(u => {
+                const namaUser = u.nama || 'Unknown';
+                const cabangUser = u.cabang || 'Tanpa Cabang';
+                if (!branchMap[cabangUser]) {
+                    branchMap[cabangUser] = {};
+                }
+                branchMap[cabangUser][namaUser] = {
                     nama: namaUser,
                     cabang: cabangUser,
-                    absensi: {}
+                    absensi: {},
+                    hasAbsen: false
+                };
+            });
+        }
+
+        data.forEach(row => {
+            const namaUser = row.users ? row.users.nama : 'Unknown';
+            const cabangUser = row.users ? row.users.cabang || 'Tanpa Cabang' : 'Tanpa Cabang';
+            
+            if (!branchMap[cabangUser]) {
+                branchMap[cabangUser] = {};
+            }
+            if (!branchMap[cabangUser][namaUser]) {
+                branchMap[cabangUser][namaUser] = {
+                    nama: namaUser,
+                    cabang: cabangUser,
+                    absensi: {},
+                    hasAbsen: false
                 };
             }
+            
+            branchMap[cabangUser][namaUser].hasAbsen = true;
             
             const tipe = row.tipe_absen || 'Unknown';
             if (!tipeAbsenList.includes(tipe)) {
                 tipeAbsenList.push(tipe);
             }
             
-            grouped[key].absensi[tipe] = {
-                waktu: row.waktu || '-',
-                status: row.status || '-',
-                jarak: row.lokasi || '-',
-                foto: row.foto || ''
-            };
+            if (!branchMap[cabangUser][namaUser].absensi[row.tanggal]) {
+                branchMap[cabangUser][namaUser].absensi[row.tanggal] = {};
+            }
+            
+            const existing = branchMap[cabangUser][namaUser].absensi[row.tanggal][tipe];
+            const formattedTime = row.waktu ? formatWaktuGlobal(row.waktu) : '-';
+
+            if (!existing) {
+                branchMap[cabangUser][namaUser].absensi[row.tanggal][tipe] = {
+                    waktu: formattedTime,
+                    status: row.status || '-',
+                    jarak: row.lokasi || '-',
+                    foto: row.foto || '',
+                    menit_lembur: row.menit_lembur || 0,
+                    keterangan_waktu: row.keterangan_waktu || ''
+                };
+            } else {
+                // Jika ada 2x absen tipe sama di tanggal yang sama (misal 2x istirahat)
+                if (existing.waktu === '-' || !existing.waktu) {
+                    existing.waktu = formattedTime;
+                } else if (formattedTime !== '-' && !existing.waktu.includes(formattedTime)) {
+                    existing.waktu += `, ${formattedTime}`;
+                }
+                if (row.status && !existing.status.includes(row.status)) {
+                    existing.status += ` | ${row.status}`;
+                }
+                if (row.menit_lembur) {
+                    existing.menit_lembur = Math.max(existing.menit_lembur || 0, row.menit_lembur);
+                }
+                if (row.keterangan_waktu) {
+                    existing.keterangan_waktu = (existing.keterangan_waktu ? existing.keterangan_waktu + ' ' : '') + row.keterangan_waktu;
+                }
+            }
         });
 
-        // 2. Build 2-Tier Header
-        const nTypes = tipeAbsenList.length;
-        const emptyCols = nTypes > 1 ? ','.repeat(nTypes - 1) : '';
-        
-        let headerRow1 = "Tanggal,Nama,Cabang";
-        headerRow1 += `,"Waktu"${emptyCols}`;
-        headerRow1 += `,"Status Kehadiran"${emptyCols}`;
-        headerRow1 += `,"Lokasi / Jarak"${emptyCols}`;
-        
-        let headerRow2 = ",,";
-        tipeAbsenList.forEach(t => headerRow2 += `,"${t}"`); // Waktu
-        tipeAbsenList.forEach(t => headerRow2 += `,"${t}"`); // Status
-        tipeAbsenList.forEach(t => headerRow2 += `,"${t}"`); // Jarak
-        
-        let csvContent = headerRow1 + "\n" + headerRow2 + "\n";
+        // 3. Generate Excel File (Per Sheet = Nama Cabang)
+        if (typeof XLSX !== 'undefined') {
+            const wb = XLSX.utils.book_new();
+            const sortedCabangs = Object.keys(branchMap).sort();
+            const usedSheetNames = new Set();
 
-        // 2. Siapkan Folder Media jika dicentang
-        let mediaFolder;
-        if (isMedia) {
-            mediaFolder = rootFolder.folder("media");
-        }
+            if (sortedCabangs.length === 0) {
+                const headerRow = [''];
+                datesList.forEach(d => headerRow.push(parseInt(d.split('-')[2], 10)));
+                const ws = XLSX.utils.aoa_to_sheet([headerRow]);
+                XLSX.utils.book_append_sheet(wb, ws, "Rekap Absen");
+            } else {
+                sortedCabangs.forEach(cabangName => {
+                    const userGroupMap = branchMap[cabangName];
+                    const matrixData = [];
+                    const cellStylesMap = {}; // key: "r_c"
 
-        // 3. Process Export Rows
-        for (const key in grouped) {
-            const g = grouped[key];
-            const safeName = `"${g.nama}"`;
-            const safeCabang = `"${g.cabang}"`;
-            let rowCsv = `${g.tanggal},${safeName},${safeCabang}`;
-            
-            tipeAbsenList.forEach(tipe => {
-                const a = g.absensi[tipe];
-                rowCsv += a ? `,${a.waktu}` : ',-';
-            });
-            tipeAbsenList.forEach(tipe => {
-                const a = g.absensi[tipe];
-                rowCsv += a ? `,${a.status}` : ',-';
-            });
-            tipeAbsenList.forEach(tipe => {
-                const a = g.absensi[tipe];
-                rowCsv += a ? `,"${a.jarak}"` : ',-';
-            });
-            
-            csvContent += rowCsv + "\n";
+                    // Baris Header 1: Kolom A kosong, diikuti angka tanggal (1, 2, 3...)
+                    const headerRow = [''];
+                    datesList.forEach(d => {
+                        headerRow.push(parseInt(d.split('-')[2], 10));
+                    });
+                    matrixData.push(headerRow);
 
-            // Proses Foto jika diceklis
-            if (isMedia) {
-                const userFolder = mediaFolder.folder(g.nama);
-                const simpanFoto = async (url, namaFile) => {
-                    if (url && url.startsWith('http')) {
-                        try {
-                            const response = await fetch(url);
-                            const blob = await response.blob();
-                            userFolder.file(namaFile, blob);
-                        } catch (err) {
-                            console.error("Gagal mendownload foto:", url, err);
+                    // Style Baris Header Tanggal
+                    for (let c = 0; c <= datesList.length; c++) {
+                        cellStylesMap[`0_${c}`] = {
+                            font: { bold: true },
+                            fill: { fgColor: { rgb: "E9ECEF" } },
+                            alignment: { horizontal: "center", vertical: "center" }
+                        };
+                    }
+
+                    let currentRowIdx = 1;
+                    const userNames = Object.keys(userGroupMap).sort();
+
+                    userNames.forEach(namaUser => {
+                        const userObj = userGroupMap[namaUser];
+                        
+                        // Baris Nama Karyawan
+                        const nameRow = new Array(datesList.length + 1).fill('');
+                        nameRow[0] = userObj.nama;
+                        matrixData.push(nameRow);
+                        
+                        // Warna nama: #FFFF00 (Kuning) jika ada absen, #808080 (Abu-abu) jika 0 absen
+                        const nameBgColor = userObj.hasAbsen ? "FFFF00" : "808080";
+                        const nameFontColor = userObj.hasAbsen ? "000000" : "FFFFFF";
+                        
+                        // Style Baris Nama Karyawan
+                        for (let c = 0; c <= datesList.length; c++) {
+                            cellStylesMap[`${currentRowIdx}_${c}`] = {
+                                font: { bold: true, color: { rgb: nameFontColor } },
+                                fill: { fgColor: { rgb: nameBgColor } },
+                                alignment: { horizontal: "center", vertical: "center" }
+                            };
+                        }
+                        currentRowIdx++;
+                        
+                        // Baris Tipe Absen
+                        tipeAbsenList.forEach(tipe => {
+                            const typeRow = new Array(datesList.length + 1).fill('');
+                            typeRow[0] = tipe;
+                            
+                            // Style Kolom A untuk Judul Tipe Absen
+                            cellStylesMap[`${currentRowIdx}_0`] = {
+                                font: { bold: true },
+                                alignment: { horizontal: "left", vertical: "center" }
+                            };
+                            
+                            datesList.forEach((d, dIdx) => {
+                                const c = dIdx + 1;
+                                const dayAbsen = userObj.absensi[d];
+                                const a = dayAbsen ? dayAbsen[tipe] : null;
+                                
+                                if (a && a.waktu && a.waktu !== '-') {
+                                    typeRow[c] = a.waktu;
+                                    
+                                    const statusStr = (a.status || '').toLowerCase();
+                                    const tipeStr = tipe.toLowerCase();
+                                    const ketStr = (a.keterangan_waktu || '').toLowerCase();
+
+                                    let limitMin = null;
+                                    if (typeof globalMasterTipeAbsen !== 'undefined' && globalMasterTipeAbsen) {
+                                        const mObj = globalMasterTipeAbsen.find(m => m.nama_tipe === tipe) || globalMasterTipeAbsen.find(m => m.is_checkout);
+                                        if (mObj && (mObj.is_checkout || tipeStr.includes('pulang') || tipeStr.includes('checkout'))) {
+                                            const endStr = mObj.batas_terlambat || (mObj.jam_tutup && mObj.jam_tutup !== '23:59:59' ? mObj.jam_tutup : null);
+                                            if (endStr) limitMin = parseT(endStr);
+                                        }
+                                    }
+                                    const wMin = parseT(a.waktu);
+                                    const isExceedingEnd = (limitMin !== null && wMin !== null && wMin > limitMin);
+
+                                    const isTerlambat = statusStr.includes('terlambat');
+                                    const isLembur = tipeStr.includes('lembur') || statusStr.includes('lembur') || (a.menit_lembur && a.menit_lembur > 0) || ketStr.includes('lembur') || isExceedingEnd;
+                                    
+                                    let bgColor = null;
+                                    if (isTerlambat) {
+                                        bgColor = "FFA6A6"; // Terlambat: #FFA6A6
+                                    } else if (isLembur) {
+                                        bgColor = "AFD095"; // Lembur: #AFD095
+                                    }
+                                    
+                                    cellStylesMap[`${currentRowIdx}_${c}`] = {
+                                        alignment: { horizontal: "center", vertical: "center" },
+                                        ...(bgColor ? { fill: { fgColor: { rgb: bgColor } } } : {})
+                                    };
+                                } else {
+                                    cellStylesMap[`${currentRowIdx}_${c}`] = {
+                                        alignment: { horizontal: "center", vertical: "center" }
+                                    };
+                                }
+                            });
+                            
+                            matrixData.push(typeRow);
+                            currentRowIdx++;
+                        });
+                        
+                        // Baris Total Jam (Bold & Rata Tengah)
+                        const workHoursRow = new Array(datesList.length + 1).fill('');
+                        workHoursRow[0] = 'Total Jam';
+
+                        cellStylesMap[`${currentRowIdx}_0`] = {
+                            font: { bold: true },
+                            fill: { fgColor: { rgb: "F8F9FA" } },
+                            alignment: { horizontal: "center", vertical: "center" }
+                        };
+
+                        datesList.forEach((d, dIdx) => {
+                            const c = dIdx + 1;
+                            const dayAbsen = userObj.absensi[d];
+                            
+                            let jamKerjaStr = '-';
+                            if (dayAbsen) {
+                                let minMasukMins = null;
+                                let maxPulangMins = null;
+                                let waktuIzinKeluar = null;
+                                let waktuIzinMasuk = null;
+                                let waktuIstirahatKeluarList = [];
+                                let waktuIstirahatMasukList = [];
+
+                                const parseT = (tStr) => {
+                                    if (!tStr) return null;
+                                    const firstTime = String(tStr).split(',')[0].trim();
+                                    const p = firstTime.split(':');
+                                    if (p.length < 2) return null;
+                                    return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+                                };
+
+                                const parseTLast = (tStr) => {
+                                    if (!tStr) return null;
+                                    const parts = String(tStr).split(',');
+                                    const lastTime = parts[parts.length - 1].trim();
+                                    const p = lastTime.split(':');
+                                    if (p.length < 2) return null;
+                                    return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+                                };
+
+                                const formatM = (m) => {
+                                    if (m <= 0) return '0j 0m';
+                                    return `${Math.floor(m / 60)}j ${m % 60}m`;
+                                };
+
+                                tipeAbsenList.forEach(tipe => {
+                                    const a = dayAbsen[tipe];
+                                    if (a && a.waktu && a.waktu !== '-') {
+                                        const tipeLower = tipe.toLowerCase();
+                                        if (tipeLower.includes('izin keluar')) {
+                                            waktuIzinKeluar = a.waktu;
+                                        } else if (tipeLower.includes('izin masuk') || tipeLower.includes('izin kembali')) {
+                                            waktuIzinMasuk = a.waktu;
+                                        } else if (tipeLower.includes('istirahat')) {
+                                            const times = String(a.waktu).split(',').map(t => t.trim());
+                                            if (tipeLower.includes('keluar')) {
+                                                times.forEach(t => {
+                                                    const parsed = parseT(t);
+                                                    if (parsed !== null) waktuIstirahatKeluarList.push(parsed);
+                                                });
+                                            } else if (tipeLower.includes('masuk') || tipeLower.includes('kembali')) {
+                                                times.forEach(t => {
+                                                    const parsed = parseT(t);
+                                                    if (parsed !== null) waktuIstirahatMasukList.push(parsed);
+                                                });
+                                            }
+                                        } else {
+                                            let masterMatch = null;
+                                            if (typeof globalMasterTipeAbsen !== 'undefined') {
+                                                masterMatch = globalMasterTipeAbsen.find(t => t.nama_tipe === tipe);
+                                            }
+                                            const isCheckout = (masterMatch && masterMatch.is_checkout) || 
+                                                              tipeLower.includes('pulang') || 
+                                                              tipeLower.includes('checkout') || 
+                                                              (tipeLower.includes('lembur') && (tipeLower.includes('keluar') || tipeLower.includes('selesai')));
+                                            
+                                            if (isCheckout) {
+                                                const pMins = parseTLast(a.waktu);
+                                                if (pMins !== null) {
+                                                    if (maxPulangMins === null || pMins > maxPulangMins) {
+                                                        maxPulangMins = pMins;
+                                                    }
+                                                }
+                                            } else {
+                                                const mMins = parseT(a.waktu);
+                                                if (mMins !== null) {
+                                                    if (minMasukMins === null || mMins < minMasukMins) {
+                                                        minMasukMins = mMins;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                });
+
+                                if (minMasukMins !== null && maxPulangMins !== null) {
+                                    let diffMins = maxPulangMins - minMasukMins;
+                                    if (diffMins < 0) diffMins += 1440; // Lintas tengah malam
+                                    
+                                    // Hitung total menit izin
+                                    let izinMins = 0;
+                                    if (waktuIzinKeluar && waktuIzinMasuk) {
+                                        const kMins = parseT(waktuIzinKeluar);
+                                        const mMinsIzin = parseT(waktuIzinMasuk);
+                                        if (kMins && mMinsIzin && mMinsIzin > kMins) {
+                                            izinMins = mMinsIzin - kMins;
+                                        }
+                                    }
+                                    
+                                    let totalKerjaMins = diffMins - izinMins;
+                                    if (totalKerjaMins < 0) totalKerjaMins = 0;
+                                    jamKerjaStr = formatM(totalKerjaMins);
+                                }
+                            }
+
+                            workHoursRow[c] = jamKerjaStr;
+
+                            cellStylesMap[`${currentRowIdx}_${c}`] = {
+                                font: { bold: true },
+                                fill: { fgColor: { rgb: "F8F9FA" } },
+                                alignment: { horizontal: "center", vertical: "center" }
+                            };
+                        });
+
+                        matrixData.push(workHoursRow);
+                        currentRowIdx++;
+
+                        // Baris Total Lembur (Bold & Rata Tengah)
+                        const lemburRow = new Array(datesList.length + 1).fill('');
+                        lemburRow[0] = 'Total Lembur';
+
+                        cellStylesMap[`${currentRowIdx}_0`] = {
+                            font: { bold: true },
+                            fill: { fgColor: { rgb: "F8F9FA" } },
+                            alignment: { horizontal: "center", vertical: "center" }
+                        };
+
+                        datesList.forEach((d, dIdx) => {
+                            const c = dIdx + 1;
+                            const dayAbsen = userObj.absensi[d];
+                            
+                            let totalLemburMin = 0;
+                            if (dayAbsen) {
+                                Object.keys(dayAbsen).forEach(tKey => {
+                                    const aObj = dayAbsen[tKey];
+                                    if (aObj && aObj.waktu && aObj.waktu !== '-') {
+                                        if (aObj.menit_lembur > 0) {
+                                            totalLemburMin = Math.max(totalLemburMin, aObj.menit_lembur);
+                                        }
+                                        if (aObj.keterangan_waktu && aObj.keterangan_waktu.toLowerCase().includes('lembur')) {
+                                            const matchJ = aObj.keterangan_waktu.match(/(\d+)\s*j(?:am)?/i);
+                                            const matchM = aObj.keterangan_waktu.match(/(\d+)\s*m(?:enit)?/i);
+                                            if (matchJ || matchM) {
+                                                const j = matchJ ? parseInt(matchJ[1], 10) : 0;
+                                                const m = matchM ? parseInt(matchM[1], 10) : 0;
+                                                totalLemburMin = Math.max(totalLemburMin, j * 60 + m);
+                                            }
+                                        }
+
+                                        let limitMin = null;
+                                        if (typeof globalMasterTipeAbsen !== 'undefined' && globalMasterTipeAbsen) {
+                                            const mObj = globalMasterTipeAbsen.find(m => m.nama_tipe === tKey) || globalMasterTipeAbsen.find(m => m.is_checkout);
+                                            if (mObj && (mObj.is_checkout || tKey.toLowerCase().includes('pulang') || tKey.toLowerCase().includes('checkout'))) {
+                                                const endStr = mObj.batas_terlambat || (mObj.jam_tutup && mObj.jam_tutup !== '23:59:59' ? mObj.jam_tutup : null);
+                                                if (endStr) limitMin = parseT(endStr);
+                                            }
+                                        }
+                                        const wMin = parseT(aObj.waktu);
+                                        if (limitMin !== null && wMin !== null && wMin > limitMin) {
+                                            totalLemburMin = Math.max(totalLemburMin, wMin - limitMin);
+                                        }
+                                    }
+                                });
+                            }
+
+                            lemburRow[c] = totalLemburMin > 0 ? `${Math.floor(totalLemburMin / 60)}j ${totalLemburMin % 60}m` : '-';
+
+                            cellStylesMap[`${currentRowIdx}_${c}`] = {
+                                font: { bold: true, color: { rgb: totalLemburMin > 0 ? "28A745" : "000000" } },
+                                fill: { fgColor: { rgb: "F8F9FA" } },
+                                alignment: { horizontal: "center", vertical: "center" }
+                            };
+                        });
+
+                        matrixData.push(lemburRow);
+                        currentRowIdx++;
+
+                        // Baris Kosong Pemisah Karyawan
+                        matrixData.push(new Array(datesList.length + 1).fill(''));
+                        currentRowIdx++;
+                    });
+
+                    const ws = XLSX.utils.aoa_to_sheet(matrixData);
+
+                    // Terapkan style ke sel worksheet & buatkan sel objek jika belum ada
+                    for (let r = 0; r < matrixData.length; r++) {
+                        for (let c = 0; c < matrixData[r].length; c++) {
+                            const cellRef = XLSX.utils.encode_cell({ r, c });
+                            if (!ws[cellRef]) {
+                                ws[cellRef] = { t: 's', v: matrixData[r][c] || '' };
+                            }
+                            if (cellStylesMap[`${r}_${c}`]) {
+                                ws[cellRef].s = cellStylesMap[`${r}_${c}`];
+                            }
                         }
                     }
-                };
-                
-                // Sequential download to prevent overload
-                for (const tipe of tipeAbsenList) {
-                    const a = g.absensi[tipe];
-                    if (a && a.foto) {
-                        const cleanTipe = tipe.replace(/ /g, '_');
-                        await simpanFoto(a.foto, `${g.tanggal}_${cleanTipe}.png`);
+
+                    // Auto-fit Ukuran Kolom (A1:An menyesuaikan isi teks agar tidak terpotong)
+                    const colWidths = new Array(datesList.length + 1).fill(0);
+                    matrixData.forEach(row => {
+                        row.forEach((val, colIdx) => {
+                            const strVal = val !== null && val !== undefined ? String(val) : '';
+                            if (strVal.length > colWidths[colIdx]) {
+                                colWidths[colIdx] = strVal.length;
+                            }
+                        });
+                    });
+
+                    ws['!cols'] = colWidths.map((len, colIdx) => {
+                        if (colIdx === 0) {
+                            return { wch: Math.max(len + 4, 20) };
+                        }
+                        return { wch: Math.max(len + 3, 8) };
+                    });
+
+                    // Freeze Header Tanggal (Baris 1) & Freeze Kolom A (Tipe Absen / Nama) saat di-scroll
+                    ws['!freeze'] = { xSplit: 1, ySplit: 1, topLeftCell: 'B2', activePane: 'bottomRight', state: 'frozen' };
+                    ws['!views'] = [{ state: 'frozen', xSplit: 1, ySplit: 1, topLeftCell: 'B2', activePane: 'bottomRight' }];
+
+                    // Nama Sheet yang aman untuk Excel
+                    let safeSheetName = (cabangName || 'Tanpa Cabang')
+                        .replace(/[:\\/?*\[\]]/g, '')
+                        .trim()
+                        .substring(0, 31) || 'Sheet1';
+                    
+                    let sheetName = safeSheetName;
+                    let counter = 1;
+                    while (usedSheetNames.has(sheetName)) {
+                        sheetName = `${safeSheetName.substring(0, 28)}_${counter++}`;
+                    }
+                    usedSheetNames.add(sheetName);
+
+                    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                });
+            }
+
+            // Tambahkan Sheet: Info Tipe Absen
+            try {
+                const { data: listTipe } = await supabaseClient.from('master_tipe_absen').select('*').order('id', { ascending: true });
+                if (listTipe && listTipe.length > 0) {
+                    const tipeData = [];
+                    tipeData.push(['No', 'Nama Tipe Absen', 'Jam Mulai', 'Jam Tutup', 'Batas Terlambat', 'Jenis / Keterangan']);
+                    
+                    const tipeStyles = {};
+                    for (let c = 0; c < 6; c++) {
+                        tipeStyles[`0_${c}`] = {
+                            font: { bold: true },
+                            fill: { fgColor: { rgb: "E9ECEF" } },
+                            alignment: { horizontal: "center", vertical: "center" }
+                        };
+                    }
+                    
+                    listTipe.forEach((t, idx) => {
+                        const r = idx + 1;
+                        const no = idx + 1;
+                        const nama = t.nama_tipe || '-';
+                        const jMulai = t.jam_mulai ? formatWaktuGlobal(t.jam_mulai) : '-';
+                        const jTutup = t.jam_tutup ? formatWaktuGlobal(t.jam_tutup) : '-';
+                        const jTerlambat = t.batas_terlambat ? formatWaktuGlobal(t.batas_terlambat) : '-';
+                        const ket = t.is_checkout ? 'Pulang / Checkout' : 'Masuk / Checkin';
+                        
+                        tipeData.push([no, nama, jMulai, jTutup, jTerlambat, ket]);
+                        
+                        tipeStyles[`${r}_0`] = { alignment: { horizontal: "center", vertical: "center" } };
+                        tipeStyles[`${r}_1`] = { alignment: { horizontal: "left", vertical: "center" } };
+                        tipeStyles[`${r}_2`] = { alignment: { horizontal: "center", vertical: "center" } };
+                        tipeStyles[`${r}_3`] = { alignment: { horizontal: "center", vertical: "center" } };
+                        tipeStyles[`${r}_4`] = { alignment: { horizontal: "center", vertical: "center" } };
+                        tipeStyles[`${r}_5`] = { alignment: { horizontal: "center", vertical: "center" } };
+                    });
+                    
+                    const wsTipe = XLSX.utils.aoa_to_sheet(tipeData);
+                    for (let r = 0; r < tipeData.length; r++) {
+                        for (let c = 0; c < tipeData[r].length; c++) {
+                            const cellRef = XLSX.utils.encode_cell({ r, c });
+                            if (!wsTipe[cellRef]) wsTipe[cellRef] = { t: 's', v: tipeData[r][c] || '' };
+                            if (tipeStyles[`${r}_${c}`]) wsTipe[cellRef].s = tipeStyles[`${r}_${c}`];
+                        }
+                    }
+                    
+                    const colWidthsTipe = new Array(6).fill(0);
+                    tipeData.forEach(row => {
+                        row.forEach((val, cIdx) => {
+                            const len = val !== null && val !== undefined ? String(val).length : 0;
+                            if (len > colWidthsTipe[cIdx]) colWidthsTipe[cIdx] = len;
+                        });
+                    });
+                    wsTipe['!cols'] = colWidthsTipe.map((len, cIdx) => ({ wch: Math.max(len + 4, 14) }));
+                    
+                    XLSX.utils.book_append_sheet(wb, wsTipe, "Info Tipe Absen");
+                }
+            } catch(e) {
+                console.error("Gagal menambahkan Sheet Info Tipe Absen:", e);
+            }
+
+            // Tambahkan Sheet: Data Karyawan
+            try {
+                let qUserExport = supabaseClient.from('users').select('*').order('cabang', { ascending: true }).order('nama', { ascending: true });
+                if (!isSuperAdmin) {
+                    qUserExport = qUserExport.eq('cabang', myCabang);
+                }
+                const { data: listUserExport } = await qUserExport;
+                if (listUserExport && listUserExport.length > 0) {
+                    const userDataExport = [];
+                    userDataExport.push(['No', 'Nama Karyawan', 'Kantor / Cabang', 'Unit', 'Role / Akses']);
+                    
+                    const userStyles = {};
+                    for (let c = 0; c < 5; c++) {
+                        userStyles[`0_${c}`] = {
+                            font: { bold: true },
+                            fill: { fgColor: { rgb: "E9ECEF" } },
+                            alignment: { horizontal: "center", vertical: "center" }
+                        };
+                    }
+                    
+                    listUserExport.forEach((u, idx) => {
+                        const r = idx + 1;
+                        const no = idx + 1;
+                        const nama = u.nama || '-';
+                        const cabang = u.cabang || '-';
+                        const unitVal = u.unit || '-';
+                        const role = u.role || 'Karyawan';
+                        
+                        userDataExport.push([no, nama, cabang, unitVal, role]);
+                        
+                        userStyles[`${r}_0`] = { alignment: { horizontal: "center", vertical: "center" } };
+                        userStyles[`${r}_1`] = { alignment: { horizontal: "left", vertical: "center" } };
+                        userStyles[`${r}_2`] = { alignment: { horizontal: "center", vertical: "center" } };
+                        userStyles[`${r}_3`] = { alignment: { horizontal: "center", vertical: "center" } };
+                        userStyles[`${r}_4`] = { alignment: { horizontal: "center", vertical: "center" } };
+                    });
+                    
+                    const wsUser = XLSX.utils.aoa_to_sheet(userDataExport);
+                    for (let r = 0; r < userDataExport.length; r++) {
+                        for (let c = 0; c < userDataExport[r].length; c++) {
+                            const cellRef = XLSX.utils.encode_cell({ r, c });
+                            if (!wsUser[cellRef]) wsUser[cellRef] = { t: 's', v: userDataExport[r][c] || '' };
+                            if (userStyles[`${r}_${c}`]) wsUser[cellRef].s = userStyles[`${r}_${c}`];
+                        }
+                    }
+                    
+                    const colWidthsUser = new Array(5).fill(0);
+                    userDataExport.forEach(row => {
+                        row.forEach((val, cIdx) => {
+                            const len = val !== null && val !== undefined ? String(val).length : 0;
+                            if (len > colWidthsUser[cIdx]) colWidthsUser[cIdx] = len;
+                        });
+                    });
+                    wsUser['!cols'] = colWidthsUser.map((len, cIdx) => ({ wch: Math.max(len + 4, 16) }));
+                    
+                    XLSX.utils.book_append_sheet(wb, wsUser, "Data Karyawan");
+                }
+            } catch(e) {
+                console.error("Gagal menambahkan Sheet Data Karyawan:", e);
+            }
+
+            const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            const excelBlob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+            rootFolder.file("rekap_absen.xlsx", excelBlob);
+        } else {
+            // Fallback CSV jika SheetJS tidak tersedia
+            const sortedCabangs = Object.keys(branchMap).sort();
+            let allCsv = "";
+            sortedCabangs.forEach(cabangName => {
+                allCsv += `--- CABANG: ${cabangName} ---\n`;
+                const userGroupMap = branchMap[cabangName];
+                const matrixData = [];
+                const headerRow = [''];
+                datesList.forEach(d => headerRow.push(parseInt(d.split('-')[2], 10)));
+                matrixData.push(headerRow);
+
+                const userNames = Object.keys(userGroupMap).sort();
+                userNames.forEach(namaUser => {
+                    const userObj = userGroupMap[namaUser];
+                    const nameRow = new Array(datesList.length + 1).fill('');
+                    nameRow[0] = userObj.nama;
+                    matrixData.push(nameRow);
+                    tipeAbsenList.forEach(tipe => {
+                        const typeRow = new Array(datesList.length + 1).fill('');
+                        typeRow[0] = tipe;
+                        datesList.forEach((d, dIdx) => {
+                            const dayAbsen = userObj.absensi[d];
+                            if (dayAbsen && dayAbsen[tipe] && dayAbsen[tipe].waktu) {
+                                typeRow[dIdx + 1] = dayAbsen[tipe].waktu;
+                            }
+                        });
+                        matrixData.push(typeRow);
+                    });
+                    matrixData.push(new Array(datesList.length + 1).fill(''));
+                });
+
+                let csvMatrix = matrixData.map(row => row.map(cell => {
+                    if (cell === null || cell === undefined) return '""';
+                    const str = String(cell);
+                    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                        return `"${str.replace(/"/g, '""')}"`;
+                    }
+                    return str;
+                }).join(',')).join('\n');
+                allCsv += csvMatrix + "\n\n";
+            });
+            rootFolder.file("rekap_absen.csv", allCsv);
+        }
+
+        // 4. Proses Foto jika dicentang
+        if (isMedia) {
+            const mediaFolder = rootFolder.folder("media");
+            const simpanFoto = async (url, folder, namaFile) => {
+                if (url && url.startsWith('http')) {
+                    try {
+                        const response = await fetch(url);
+                        if (response.ok) {
+                            const blob = await response.blob();
+                            folder.file(namaFile, blob);
+                        }
+                    } catch (err) {
+                        console.error("Gagal mendownload foto:", url, err);
+                    }
+                }
+            };
+
+            const sortedCabangs = Object.keys(branchMap).sort();
+            for (const cabangName of sortedCabangs) {
+                const userGroupMap = branchMap[cabangName];
+                const userNames = Object.keys(userGroupMap).sort();
+                for (const namaUser of userNames) {
+                    const userObj = userGroupMap[namaUser];
+                    const userFolder = mediaFolder.folder(userObj.nama);
+                    
+                    for (const d of datesList) {
+                        const dayAbsen = userObj.absensi[d];
+                        if (dayAbsen) {
+                            for (const tipe of tipeAbsenList) {
+                                const a = dayAbsen[tipe];
+                                if (a && a.foto) {
+                                    const cleanTipe = tipe.replace(/ /g, '_');
+                                    await simpanFoto(a.foto, userFolder, `${d}_${cleanTipe}.png`);
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
-
-        // Simpan CSV ke root folder zip
-        rootFolder.file("rekap_absen.csv", csvContent);
 
         // 4. AMBIL DATA CUTI / IZIN
         let queryCuti = supabaseClient.from('cuti').select('*, users!inner(nama, cabang)')
@@ -4109,12 +4853,12 @@ async function restoreDatabase(event) {
         for (const table of restoreSequence) {
             const records = rawDb[table];
             if (records && Array.isArray(records) && records.length > 0) {
-                const { error } = await supabaseClient.from(table).upsert(records);
+                const { error } = await supabaseClient.from(table).upsert(records, { onConflict: 'id' });
                 if (error) {
                     console.warn(`Upsert massal gagal untuk tabel ${table}, mencoba per-baris:`, error);
                     let tableRestored = 0;
                     for (const row of records) {
-                        const { error: singleErr } = await supabaseClient.from(table).upsert(row);
+                        const { error: singleErr } = await supabaseClient.from(table).upsert(row, { onConflict: 'id' });
                         if (!singleErr) tableRestored++;
                         else console.warn(`Gagal upsert row tabel ${table}:`, singleErr, row);
                     }
@@ -4750,11 +5494,12 @@ async function jalankanMigrasiDataShift() {
                 const masterTarget = masterTipeAbsen.find(m => m.nama_tipe === newTipeAbsen) || 
                                      masterTipeAbsen.find(m => m.is_checkout);
 
-                if (masterTarget && masterTarget.jam_tutup) {
-                    const jamTutupMin = timeToMinutes(masterTarget.jam_tutup);
-                    if (currMin > jamTutupMin) {
+                if (masterTarget) {
+                    const normalEndStr = masterTarget.batas_terlambat || (masterTarget.jam_tutup && masterTarget.jam_tutup !== '23:59:59' ? masterTarget.jam_tutup : null);
+                    const limitMin = timeToMinutes(normalEndStr);
+                    if (limitMin && currMin > limitMin) {
                         status = "Lembur";
-                        const totalLemburKotor = currMin - jamTutupMin;
+                        const totalLemburKotor = currMin - limitMin;
                         const potonganIstirahat = masterTarget.potongan_lembur_menit !== undefined && masterTarget.potongan_lembur_menit !== null 
                             ? parseInt(masterTarget.potongan_lembur_menit, 10) : 0;
 
@@ -4772,15 +5517,17 @@ async function jalankanMigrasiDataShift() {
                 // Tipe yang sudah bernama spesifik tapi belum punya keterangan waktu
                 const masterTarget = masterTipeAbsen.find(m => m.nama_tipe === row.tipe_absen);
                 if (masterTarget) {
-                    if (masterTarget.batas_terlambat && currMin > timeToMinutes(masterTarget.batas_terlambat)) {
+                    const normalEndStr = masterTarget.batas_terlambat || (masterTarget.jam_tutup && masterTarget.jam_tutup !== '23:59:59' ? masterTarget.jam_tutup : null);
+                    const limitEndMin = timeToMinutes(normalEndStr);
+                    if (masterTarget.batas_terlambat && !masterTarget.is_checkout && currMin > timeToMinutes(masterTarget.batas_terlambat)) {
                         status = "Terlambat";
                         menitTerlambat = currMin - timeToMinutes(masterTarget.batas_terlambat);
                         const jam = Math.floor(menitTerlambat / 60);
                         const m = menitTerlambat % 60;
                         keteranganWaktu = `Terlambat ${jam > 0 ? jam + "j " : ""}${m}m`;
-                    } else if (masterTarget.is_checkout && masterTarget.jam_tutup && currMin > timeToMinutes(masterTarget.jam_tutup)) {
+                    } else if (masterTarget.is_checkout && limitEndMin && currMin > limitEndMin) {
                         status = "Lembur";
-                        const totalKotor = currMin - timeToMinutes(masterTarget.jam_tutup);
+                        const totalKotor = currMin - limitEndMin;
                         const pot = masterTarget.potongan_lembur_menit !== undefined && masterTarget.potongan_lembur_menit !== null 
                             ? parseInt(masterTarget.potongan_lembur_menit, 10) : 0;
                         menitLembur = Math.max(0, totalKotor - pot);
@@ -4903,12 +5650,15 @@ async function simpanEditAbsensi() {
             const bMins = parseT(targetMaster.batas_terlambat);
 
             if (targetMaster.is_checkout) {
+                const normalEndStr = targetMaster.batas_terlambat || (targetMaster.jam_tutup && targetMaster.jam_tutup !== '23:59:59' ? targetMaster.jam_tutup : null);
+                const bMins = parseT(normalEndStr);
                 if (bMins && wMins > bMins) {
                     status = "Lembur";
                     menit_lembur = wMins - bMins;
                     keterangan_waktu = ket_alasan || `Lembur ${Math.floor(menit_lembur/60)}j ${menit_lembur%60}m`;
                 } else {
                     status = "Hadir";
+                    menit_lembur = 0;
                     keterangan_waktu = ket_alasan || "Pulang Normal";
                 }
             } else if (targetMaster.nama_tipe.toLowerCase().includes("istirahat") || targetMaster.nama_tipe.toLowerCase().includes("izin")) {
@@ -5268,3 +6018,122 @@ function initRealtimeAutoSync() {
     }, 5000);
 }
 window.initRealtimeAutoSync = initRealtimeAutoSync;
+
+// FORM GAJI MINGGUAN (TIMESHEET PRINT/PDF)
+// ==========================================
+async function bukaModalFormGaji() {
+    setPresetTanggalGaji('7hari');
+    
+    // Populate Cabang Dropdown
+    const selectCabang = document.getElementById('gaji_cabang');
+    if (selectCabang) {
+        selectCabang.innerHTML = '<option value="">Semua Cabang</option>';
+        let kantorList = (typeof globalKantorList !== 'undefined' && globalKantorList) ? globalKantorList : [];
+        
+        if (kantorList.length === 0 && typeof supabaseClient !== 'undefined') {
+            try {
+                const { data } = await supabaseClient.from('kantor').select('nama').order('nama');
+                if (data) kantorList = data;
+            } catch(e) {}
+        }
+
+        kantorList.forEach(k => {
+            const namaKantor = k.nama || k.nama_kantor || '';
+            if (namaKantor) {
+                const opt = document.createElement('option');
+                opt.value = namaKantor;
+                opt.textContent = namaKantor;
+                selectCabang.appendChild(opt);
+            }
+        });
+        
+        // Jika admin cabang, kunci pilihan cabang
+        const currentUserData = localStorage.getItem('userLogin');
+        if (currentUserData) {
+            try {
+                const u = JSON.parse(currentUserData);
+                if (u.role !== 'Super Admin' && u.cabang) {
+                    selectCabang.value = u.cabang;
+                    selectCabang.disabled = true;
+                }
+            } catch(e) {}
+        }
+    }
+
+    const modalEl = document.getElementById('modalFormGaji');
+    if (modalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        try {
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        } catch(e) {
+            console.error('Modal error:', e);
+        }
+    }
+}
+
+function setPresetTanggalGaji(presetType) {
+    const today = new Date();
+    let dStart = new Date();
+    let dEnd = new Date();
+
+    if (presetType === '7hari') {
+        dStart.setDate(today.getDate() - 6);
+        dEnd = today;
+    } else if (presetType === 'mingguini') {
+        const day = today.getDay(); // 0: Sun, 1: Mon...
+        const diffToMon = (day === 0 ? -6 : 1 - day);
+        dStart.setDate(today.getDate() + diffToMon);
+        dEnd = new Date(dStart);
+        dEnd.setDate(dStart.getDate() + 6);
+    }
+
+    const formatYMD = (d) => d.toISOString().split('T')[0];
+    
+    const inpMulai = document.getElementById('gaji_mulai');
+    const inpSelesai = document.getElementById('gaji_selesai');
+    if (inpMulai) inpMulai.value = formatYMD(dStart);
+    if (inpSelesai) inpSelesai.value = formatYMD(dEnd);
+}
+
+function prosesCetakFormGaji(event) {
+    if (event) event.preventDefault();
+
+    const tglMulai = document.getElementById('gaji_mulai').value;
+    const tglSelesai = document.getElementById('gaji_selesai').value;
+    const cabang = document.getElementById('gaji_cabang').value;
+
+    if (!tglMulai || !tglSelesai) {
+        Swal.fire('Perhatian', 'Silakan pilih tanggal mulai dan tanggal selesai.', 'warning');
+        return;
+    }
+
+    const dStart = new Date(tglMulai);
+    const dEnd = new Date(tglSelesai);
+    const diffTime = dEnd - dStart;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+    if (diffDays <= 0) {
+        Swal.fire('Perhatian', 'Tanggal selesai harus sama atau setelah tanggal mulai.', 'warning');
+        return;
+    }
+
+    if (diffDays > 7) {
+        Swal.fire('Rentang Melebihi Limit', `Form Gaji Mingguan khusus untuk 1 minggu (maksimal 7 hari). Rentang yang Anda pilih adalah ${diffDays} hari.`, 'warning');
+        return;
+    }
+
+    // Close Modal
+    const modalEl = document.getElementById('modalFormGaji');
+    if (modalEl) {
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+    }
+
+    // Open print-gaji.html in new tab
+    const url = `print-gaji.html?mulai=${encodeURIComponent(tglMulai)}&selesai=${encodeURIComponent(tglSelesai)}&cabang=${encodeURIComponent(cabang)}`;
+    window.open(url, '_blank');
+}
+
+window.bukaModalFormGaji = bukaModalFormGaji;
+window.setPresetTanggalGaji = setPresetTanggalGaji;
+window.prosesCetakFormGaji = prosesCetakFormGaji;

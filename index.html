@@ -13,6 +13,41 @@
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     />
+    <link href="https://fonts.cdnfonts.com/css/google-sans" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: "var(--primary)",
+              "on-primary": "var(--on-primary)",
+              "primary-container": "var(--primary-container)",
+              "on-primary-container": "var(--on-primary-container)",
+              secondary: "var(--secondary)",
+              "on-secondary": "var(--on-secondary)",
+              "secondary-container": "var(--secondary-container)",
+              "on-secondary-container": "var(--on-secondary-container)",
+              tertiary: "var(--tertiary)",
+              "on-tertiary": "var(--on-tertiary)",
+              "tertiary-container": "var(--tertiary-container)",
+              "on-tertiary-container": "var(--on-tertiary-container)",
+              error: "var(--error)",
+              "on-error": "var(--on-error)",
+              "error-container": "var(--error-container)",
+              "on-error-container": "var(--on-error-container)",
+              background: "var(--background)",
+              "on-background": "var(--on-background)",
+              surface: "var(--surface)",
+              "on-surface": "var(--on-surface)",
+              "surface-variant": "var(--surface-variant)",
+              "on-surface-variant": "var(--on-surface-variant)",
+              outline: "var(--outline)",
+            },
+          },
+        },
+      };
+    </script>
 
     <script>
       // Cek apakah pengguna sudah login
@@ -24,58 +59,99 @@
 
     <style>
       :root {
-        --bs-primary: #e5b82a;
-        --bs-warning: #ff7f27;
-        --bs-body-bg: #fdfbf7;
-        --bs-body-color: #3e2723;
-        --bs-link-color: #e5b82a;
-        --bs-info: #e5b82a;
+        --primary: #af8c22;
+        --on-primary: #ffffff;
+        --primary-container: #e6d7ab;
+        --on-primary-container: #33290a;
+        --secondary: #45519e;
+        --on-secondary: #ffffff;
+        --secondary-container: #bdc2e6;
+        --on-secondary-container: #161a33;
+        --tertiary: #7d5260;
+        --on-tertiary: #ffffff;
+        --tertiary-container: #e6cdd5;
+        --on-tertiary-container: #332227;
+        --error: #b3261e;
+        --on-error: #ffffff;
+        --error-container: #e6aca9;
+        --on-error-container: #330b09;
+        --background: #fcfcfb;
+        --on-background: #333231;
+        --surface: #fcfcfb;
+        --on-surface: #333231;
+        --surface-variant: #e6e3da;
+        --on-surface-variant: #666255;
+        --outline: #999380;
+        --primary-dark: #e6d192;
+        --on-primary-dark: #4c3d0f;
+        --primary-container-dark: #665213;
+        --on-primary-container-dark: #e6d7ab;
+        --secondary-dark: #acb3e6;
+        --on-secondary-dark: #22274c;
+        --secondary-container-dark: #2d3466;
+        --on-secondary-container-dark: #bdc2e6;
+        --tertiary-dark: #e6c3ce;
+        --on-tertiary-dark: #4c323b;
+        --tertiary-container-dark: #66434f;
+        --on-tertiary-container-dark: #e6cdd5;
+        --error-dark: #e69490;
+        --on-error-dark: #4c100d;
+        --error-container-dark: #661511;
+        --on-error-container-dark: #e6aca9;
+        --background-dark: #333231;
+        --on-background-dark: #e6e5e3;
+        --surface-dark: #333231;
+        --on-surface-dark: #e6e5e3;
+        --surface-variant-dark: #666255;
+        --on-surface-variant-dark: #e6e1d5;
+        --outline-dark: #b3aea0;
+
+        /* Map Bootstrap variables to M3 */
+        --bs-primary: var(--primary);
+        --bs-warning: var(--error);
+        --bs-body-bg: var(--background);
+        --bs-body-color: var(--on-background);
+        --bs-link-color: var(--primary);
+        --bs-info: var(--secondary);
       }
       body {
-        background-color: var(--bs-body-bg) !important;
-        color: var(--bs-body-color) !important;
+        font-family: "Google Sans", sans-serif !important;
+        background-color: var(--background) !important;
+        color: var(--on-background) !important;
       }
       .bg-primary {
-        background-color: #e5b82a !important;
+        background-color: var(--primary) !important;
+      }
+      .border-primary {
+        border-color: var(--primary) !important;
       }
       .text-primary,
       .nav-tabs .nav-link.active {
-        color: #e5b82a !important;
+        color: var(--primary) !important;
       }
       .nav-tabs .nav-link.active {
-        border-bottom: 3px solid #e5b82a !important;
+        border-bottom: 3px solid var(--primary) !important;
       }
       .btn-primary {
-        background-color: #e5b82a !important;
-        border-color: #e5b82a !important;
-        color: #3e2723 !important;
+        background-color: var(--primary) !important;
+        border-color: var(--primary) !important;
+        color: var(--on-primary) !important;
       }
       .btn-primary:hover,
       .btn-primary:focus {
-        background-color: #d4af37 !important;
-        border-color: #d4af37 !important;
+        background-color: var(--primary-container) !important;
+        border-color: var(--primary-container) !important;
+        color: var(--on-primary-container) !important;
       }
       .btn-warning {
-        background-color: #ff7f27 !important;
-        border-color: #ff7f27 !important;
-        color: #fdfbf7 !important;
+        background-color: var(--error) !important;
+        border-color: var(--error) !important;
+        color: var(--on-error) !important;
       }
       .btn-warning:hover {
-        background-color: #e66b1a !important;
-        border-color: #e66b1a !important;
-      }
-      .navbar-dark .navbar-brand,
-      .navbar-dark .navbar-text,
-      .navbar-dark .nav-link {
-        color: #3e2723 !important;
-      }
-      .navbar-dark .btn-outline-light {
-        color: #3e2723 !important;
-        border-color: #3e2723 !important;
-      }
-      .navbar-dark .btn-outline-light:hover {
-        background-color: #3e2723 !important;
-        color: #fdfbf7 !important;
+        background-color: var(--error-container) !important;
+        border-color: var(--error-container) !important;
+        color: var(--on-error-container) !important;
       }
       h1,
       h2,
@@ -85,7 +161,7 @@
       h6,
       .card-title,
       .fw-bold {
-        color: #3e2723 !important;
+        color: var(--on-background) !important;
       }
 
       /* Styling Spesifik Kamera & Peta */
@@ -153,29 +229,65 @@
     </style>
   </head>
   <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
-      <div class="container">
-        <a class="navbar-brand fw-bold" href="#"></a>
-        <div class="d-flex align-items-center">
+    <div class="p-4 flex flex-col gap-6">
+      <!-- User Details -->
+      <div class="flex justify-between items-center">
+        <div
+          class="navbar-brand text-on-surface text-xl font-semibold font-sans"
+        >
+          ZIEDA ABSEN
+        </div>
+        <div class="flex gap-2">
           <a
             id="btn-admin-panel"
-            class="btn btn-sm btn-warning text-dark fw-bold me-2 d-none"
+            class="px-4 py-2 bg-primary text-on-primary rounded-full text-sm font-medium hidden"
             href="admin.html"
-            >⚙️ Panel Admin</a
+            >Admin</a
           >
-          <span
-            class="navbar-text text-white me-3 d-none d-md-inline"
-            id="nama-user-navbar"
-            >Selamat datang, Karyawan</span
+          <button
+            class="px-4 py-2 bg-primary text-on-primary rounded-full text-sm font-medium"
+            onclick="logout()"
           >
-          <button class="btn btn-sm btn-outline-light" onclick="logout()">
             Logout
           </button>
         </div>
       </div>
-    </nav>
 
-    <div class="container-fluid py-4">
+      <!-- Greeting -->
+      <div class="flex justify-between items-center">
+        <div
+          class="text-on-surface text-xl font-normal font-sans"
+          id="nama-user-navbar"
+        >
+          Selamat Datang, Karyawan
+        </div>
+        <!-- Weather Icon -->
+        <div class="w-[22px] h-[22px]">
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 22 22"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              fill-rule="evenodd"
+              clip-rule="evenodd"
+              d="M11 19.9375C15.936 19.9375 19.9375 15.936 19.9375 11C19.9375 6.06396 15.936 2.0625 11 2.0625C6.06396 2.0625 2.0625 6.06396 2.0625 11C2.0625 15.936 6.06396 19.9375 11 19.9375Z"
+              fill="#FBBC04"
+            />
+            <path
+              fill-rule="evenodd"
+              clip-rule="evenodd"
+              d="M11.6875 22C14.7251 22 17.1875 19.5376 17.1875 16.5C17.1875 13.4624 14.7251 11 11.6875 11C8.64993 11 6.1875 13.4624 6.1875 16.5C6.1875 19.5376 8.64993 22 11.6875 22Z"
+              fill="#DEDFDF"
+            />
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="container-fluid">
       <!-- PENGUMUMAN APLIKASI -->
       <div
         id="pengumuman-container"
@@ -186,127 +298,178 @@
       </div>
 
       <!-- MENU NAVBAR KARYAWAN -->
-      <div class="card shadow-sm mb-4 border-0 user-bottom-nav">
-        <div class="card-body p-1">
-          <ul
-            class="nav nav-pills nav-justified gap-1 pb-0"
-            id="hrisTabs"
-            role="tablist"
-          >
-            <li class="nav-item" role="presentation">
-              <button
-                class="nav-link active fw-bold px-1"
-                id="tab-absensi-btn"
-                data-bs-toggle="pill"
-                data-bs-target="#tab-absensi"
-                type="button"
-                role="tab"
-                style="font-size: 0.8rem"
+      <div
+        class="fixed bottom-0 left-0 w-full z-[1030] pb-6 pointer-events-none flex justify-center"
+      >
+        <ul
+          class="nav flex justify-center items-center gap-6 py-3 m-0 pointer-events-auto"
+          id="hrisTabs"
+          role="tablist"
+        >
+          <!-- Icon 1 -->
+          <li class="nav-item" role="presentation">
+            <button
+              id="tab-absensi-btn"
+              data-bs-toggle="pill"
+              data-bs-target="#tab-absensi"
+              type="button"
+              role="tab"
+              aria-selected="true"
+              class="nav-link active w-14 h-14 p-0 relative rounded-full bg-primary-container flex items-center justify-center shadow-md border-0 transition-all"
+            >
+              <svg
+                width="68"
+                height="68"
+                viewBox="0 0 60 60"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
               >
-                📍 Absen
-              </button>
-            </li>
-            <li class="nav-item" role="presentation">
-              <button
-                class="nav-link fw-bold px-1"
-                id="tab-cuti-btn"
-                data-bs-toggle="pill"
-                data-bs-target="#tab-cuti"
-                type="button"
-                role="tab"
-                style="font-size: 0.8rem"
+                <circle
+                  cx="29.6493"
+                  cy="29.625"
+                  r="15.25"
+                  stroke="var(--on-primary-container)"
+                  stroke-width="4.75"
+                ></circle>
+                <circle
+                  cx="29.7743"
+                  cy="29.5"
+                  r="8.875"
+                  stroke="var(--on-primary-container)"
+                  stroke-width="4.75"
+                ></circle>
+              </svg>
+            </button>
+          </li>
+          <!-- Icon 2 -->
+          <li class="nav-item" role="presentation">
+            <button
+              id="tab-cuti-btn"
+              data-bs-toggle="pill"
+              data-bs-target="#tab-cuti"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              class="nav-link w-14 h-14 p-0 relative rounded-full bg-primary-container flex items-center justify-center shadow-md border-0 transition-all"
+            >
+              <svg
+                width="36"
+                height="36"
+                viewBox="0 0 36 36"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
               >
-                📝 Cuti
-              </button>
-            </li>
-            <li class="nav-item" role="presentation">
-              <button
-                class="nav-link fw-bold px-1"
-                id="tab-riwayat-btn"
-                data-bs-toggle="pill"
-                data-bs-target="#tab-riwayat"
-                type="button"
-                role="tab"
-                style="font-size: 0.8rem"
+                <mask id="path-1-inside-1_2130_3506" fill="white">
+                  <path
+                    d="M36 18C36 27.9411 27.9411 36 18 36C8.05887 36 0 27.9411 0 18C0 8.05887 8.05887 0 18 0C27.9411 0 36 8.05887 36 18ZM9.63095 18C9.63095 22.6221 13.3779 26.3691 18 26.3691C22.6221 26.3691 26.3691 22.6221 26.3691 18C26.3691 13.3779 22.6221 9.63095 18 9.63095C13.3779 9.63095 9.63095 13.3779 9.63095 18Z"
+                  />
+                </mask>
+                <path
+                  d="M36 18C36 27.9411 27.9411 36 18 36C8.05887 36 0 27.9411 0 18C0 8.05887 8.05887 0 18 0C27.9411 0 36 8.05887 36 18ZM9.63095 18C9.63095 22.6221 13.3779 26.3691 18 26.3691C22.6221 26.3691 26.3691 22.6221 26.3691 18C26.3691 13.3779 22.6221 9.63095 18 9.63095C13.3779 9.63095 9.63095 13.3779 9.63095 18Z"
+                  fill="white"
+                  stroke="var(--on-primary-container)"
+                  stroke-width="6"
+                  mask="url(#path-1-inside-1_2130_3506)"
+                />
+              </svg>
+            </button>
+          </li>
+          <!-- Icon 3 -->
+          <li class="nav-item" role="presentation">
+            <button
+              id="tab-riwayat-btn"
+              data-bs-toggle="pill"
+              data-bs-target="#tab-riwayat"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              class="nav-link w-14 h-14 p-0 relative rounded-full bg-primary-container flex items-center justify-center shadow-md border-0 transition-all"
+            >
+              <div
+                class="relative flex items-center justify-center w-9 h-9 bg-on-primary-container rounded-full"
               >
-                📅 Riwayat
-              </button>
-            </li>
-            <li class="nav-item" role="presentation">
-              <button
-                class="nav-link fw-bold px-1"
-                id="tab-profil-btn"
-                data-bs-toggle="pill"
-                data-bs-target="#tab-profil"
-                type="button"
-                role="tab"
-                style="font-size: 0.8rem"
+                <span
+                  id="nav-date-text"
+                  class="text-primary-container text-lg font-medium font-sans"
+                  >30</span
+                >
+              </div>
+            </button>
+          </li>
+          <!-- Icon 4 -->
+          <li class="nav-item" role="presentation">
+            <button
+              id="tab-profil-btn"
+              data-bs-toggle="pill"
+              data-bs-target="#tab-profil"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              class="nav-link w-14 h-14 p-0 relative rounded-full bg-primary-container flex items-center justify-center shadow-md border-0 transition-all"
+            >
+              <svg
+                width="40"
+                height="40"
+                viewBox="0 0 49 49"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
               >
-                👤 Profil
-              </button>
-            </li>
-          </ul>
-        </div>
+                <path
+                  d="M4.07407 24.4445C4.07407 35.6889 13.2 44.8148 24.4444 44.8148C35.6889 44.8148 44.8148 35.6889 44.8148 24.4445C44.8148 13.2 35.6889 4.0741 24.4444 4.0741C13.2 4.0741 4.07407 13.2 4.07407 24.4445ZM30.5555 16.2963C30.5555 19.6778 27.8259 22.4074 24.4444 22.4074C21.063 22.4074 18.3333 19.6778 18.3333 16.2963C18.3333 12.9148 21.063 10.1852 24.4444 10.1852C27.8259 10.1852 30.5555 12.9148 30.5555 16.2963ZM24.3018 24.4445C30.2092 24.4445 36.6667 27.3574 36.6667 31.3093V33.1019C36.6667 35.1389 35.0167 36.6871 32.9796 36.6871H15.9093C13.8722 36.6667 12.2222 35.1185 12.2222 33.0815V31.2889C12.2222 27.3574 18.3944 24.4445 24.3018 24.4445Z"
+                  fill="var(--on-primary-container)"
+                ></path>
+              </svg>
+            </button>
+          </li>
+        </ul>
       </div>
 
       <div class="tab-content" id="hrisTabsContent">
         <div class="tab-pane fade show active" id="tab-absensi" role="tabpanel">
-          <div class="card shadow-sm">
-            <div class="card-body">
-              <h5 id="form-judul-absen" class="card-title fw-bold mb-4">
-                Form Kehadiran Harian
-              </h5>
-              <div class="row g-4">
-                <div class="col-md-12" id="lokasi-section">
-                  <label class="form-label fw-bold small text-muted"
-                    >Verifikasi Lokasi</label
-                  >
-                  <div id="map"></div>
-                  <p id="info-radius" class="mt-2 text-muted small">
-                    Jarak maksimal: <strong>100 meter</strong> dari kantor.
-                  </p>
-                </div>
-              </div>
+          <div class="p-6 flex flex-col gap-8">
+            <!-- Map and Action Button -->
+            <div class="flex flex-col gap-4">
+              <div
+                id="map"
+                class="w-full h-80 bg-surface rounded-xl border-4 border-primary z-0"
+              ></div>
 
-              <hr class="my-4" />
-              <button
-                class="btn btn-outline-info w-100 py-2 fw-bold mb-3 shadow-sm"
-                onclick="showJadwalAbsen()"
-              >
-                ℹ️ Informasi Jadwal Absen Hari Ini
-              </button>
               <button
                 id="btn-cek-lokasi"
-                class="btn btn-primary w-100 py-3 fw-bold fs-5 shadow-sm"
                 onclick="pilihTipeAbsenPopup()"
+                class="w-full h-16 bg-primary hover:opacity-90 transition-opacity rounded-xl flex justify-center items-center gap-0 cursor-pointer border-0 shadow-sm text-on-primary text-2xl font-semibold font-sans leading-8"
               >
-                📍 Absen Sekarang
+                Meyiapkan
               </button>
             </div>
-          </div>
 
-          <div class="card shadow-sm mt-4">
-            <div class="card-header bg-white fw-bold">
-              Riwayat Absen Hari Ini
-            </div>
-            <div class="card-body p-0 overflow-auto">
-              <table
-                class="table table-striped table-hover mb-0 text-center small"
+            <!-- Table Riwayat Absen Hari Ini (Preserved) -->
+            <div class="card shadow-sm border-0 mt-2">
+              <div
+                class="card-header bg-white fw-bold rounded-t-xl border-b text-center"
               >
-                <thead class="table-light">
-                  <tr>
-                    <th>Tanggal</th>
-                    <th>Tipe Absen</th>
-                    <th>Waktu</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody id="tabel-riwayat-hari-ini">
-                  <tr>
-                    <td colspan="4" class="text-muted">Memuat data...</td>
-                  </tr>
-                </tbody>
-              </table>
+                Riwayat Absen Hari Ini
+              </div>
+              <div class="card-body p-0 overflow-auto rounded-b-xl bg-white">
+                <table
+                  class="table table-striped table-hover mb-0 text-center small w-full"
+                >
+                  <thead class="table-light">
+                    <tr>
+                      <th>Tipe Absen</th>
+                      <th>Waktu</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tabel-riwayat-hari-ini">
+                    <tr>
+                      <td colspan="3" class="text-muted py-4">
+                        Belum ada riwayat absensi hari ini
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
@@ -575,7 +738,9 @@
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header bg-primary text-white">
-            <h5 class="modal-title fw-bold" id="kameraModalLabel"><i class="fas fa-camera me-2"></i>Ambil Foto Wajah</h5>
+            <h5 class="modal-title fw-bold" id="kameraModalLabel">
+              <i class="fas fa-camera me-2"></i>Ambil Foto Wajah
+            </h5>
             <button
               type="button"
               class="btn-close btn-close-white"
@@ -585,9 +750,15 @@
             ></button>
           </div>
           <div class="modal-body text-center">
-            <div class="alert alert-primary py-2 px-3 mb-3 text-center fw-bold shadow-sm d-flex align-items-center justify-content-center border-0 bg-primary-subtle text-primary-emphasis">
-              <i class="fas fa-tag me-2"></i> Kategori Absen: 
-              <span id="text-tipe-absen-kamera" class="badge bg-primary text-white fs-6 ms-2 px-3 py-1">Absen Masuk</span>
+            <div
+              class="alert alert-primary py-2 px-3 mb-3 text-center fw-bold shadow-sm d-flex align-items-center justify-content-center border-0 bg-primary-subtle text-primary-emphasis"
+            >
+              <i class="fas fa-tag me-2"></i> Kategori Absen:
+              <span
+                id="text-tipe-absen-kamera"
+                class="badge bg-primary text-white fs-6 ms-2 px-3 py-1"
+                >Absen Masuk</span
+              >
             </div>
             <div
               id="kamera-container"
@@ -748,7 +919,11 @@
           `Selamat datang, ${userObj.nama} (${userCabang !== "-" ? userCabang : "Pusat"})`;
 
         if (userObj.role === "HR" || userObj.role === "Super Admin") {
-          document.getElementById("btn-admin-panel").classList.remove("d-none");
+          document
+            .getElementById("btn-admin-panel")
+            .classList.remove("hidden", "d-none");
+        } else {
+          document.getElementById("btn-admin-panel").classList.add("hidden");
         }
 
         isiDataProfil();
@@ -781,10 +956,12 @@
 
           if (listKantor.length > 0) {
             listKantor.forEach((k) => {
-              const isAssigned = (k.nama === namaKantor);
+              const isAssigned = k.nama === namaKantor;
               L.marker([k.lat, k.lng])
                 .addTo(map)
-                .bindPopup(`<b>${k.nama}</b>${isAssigned ? " (Cabang Utama)" : " (Cabang Lain)"}`);
+                .bindPopup(
+                  `<b>${k.nama}</b>${isAssigned ? " (Cabang Utama)" : " (Cabang Lain)"}`,
+                );
 
               L.circle([k.lat, k.lng], {
                 color: isAssigned ? "green" : "#007bff",
@@ -831,7 +1008,10 @@
         const btnAmbilFoto = document.getElementById("btn-ambil-foto");
 
         btnCekLokasi.disabled = false;
-        btnCekLokasi.innerHTML = "📍 Absen Sekarang";
+        btnCekLokasi.innerHTML = `<svg width="50" height="50" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="29.6493" cy="29.625" r="15.25" stroke="var(--on-primary)" stroke-width="4.75"></circle>
+          <circle cx="29.7743" cy="29.5" r="8.875" stroke="var(--on-primary)" stroke-width="4.75"></circle>
+        </svg><span>Absen</span>`;
 
         // CEK HARI LIBUR
         const currentDay = new Date().getDay();
@@ -910,7 +1090,10 @@
 
         let rawData = [];
         if (error || !data || data.length === 0) {
-          rawData = [{ id: 1, nama_tipe: "Masuk" }, { id: 2, nama_tipe: "Pulang", is_checkout: true }];
+          rawData = [
+            { id: 1, nama_tipe: "Masuk" },
+            { id: 2, nama_tipe: "Pulang", is_checkout: true },
+          ];
         } else {
           rawData = data;
         }
@@ -928,7 +1111,9 @@
           assignedKantor.tipe_absen_ids.length > 0
         ) {
           const allowedIds = assignedKantor.tipe_absen_ids.map(Number);
-          const filtered = rawData.filter((t) => allowedIds.includes(Number(t.id)));
+          const filtered = rawData.filter((t) =>
+            allowedIds.includes(Number(t.id)),
+          );
           masterTipeAbsen = filtered.length > 0 ? filtered : rawData;
         } else {
           masterTipeAbsen = rawData;
@@ -985,11 +1170,16 @@
           } else {
             keteranganWaktu = "Tepat Waktu";
           }
-        } else if (isPulang && tData.jam_tutup) {
-          const jamTutupMin = timeToMinutes(tData.jam_tutup);
-          if (currMin > jamTutupMin) {
+        } else if (isPulang) {
+          const normalEndStr =
+            tData.batas_terlambat ||
+            (tData.jam_tutup && tData.jam_tutup !== "23:59:59"
+              ? tData.jam_tutup
+              : null);
+          const limitMin = timeToMinutes(normalEndStr);
+          if (limitMin && currMin > limitMin) {
             status = "Lembur";
-            const totalLemburKotor = currMin - jamTutupMin;
+            const totalLemburKotor = currMin - limitMin;
 
             const potonganIstirahat =
               tData.potongan_lembur_menit !== undefined &&
@@ -1068,9 +1258,15 @@
           );
         });
 
-        const hasMasukPagi = absenNames.some((n) => n.includes("masuk pagi") || n.includes("pagi"));
-        const hasMasukSiang = absenNames.some((n) => n.includes("masuk siang") || n.includes("siang"));
-        const hasMasukMalam = absenNames.some((n) => n.includes("masuk malam") || n.includes("malam"));
+        const hasMasukPagi = absenNames.some(
+          (n) => n.includes("masuk pagi") || n.includes("pagi"),
+        );
+        const hasMasukSiang = absenNames.some(
+          (n) => n.includes("masuk siang") || n.includes("siang"),
+        );
+        const hasMasukMalam = absenNames.some(
+          (n) => n.includes("masuk malam") || n.includes("malam"),
+        );
 
         const pulangSubItems = masterTipeAbsen.filter((item) => {
           const name = item.nama_tipe.toLowerCase();
@@ -1080,9 +1276,12 @@
             item.is_checkout;
           if (!isPulang) return false;
 
-          if (hasMasukPagi && !hasMasukSiang && !hasMasukMalam) return name.includes("pagi");
-          if (hasMasukSiang && !hasMasukPagi && !hasMasukMalam) return name.includes("siang");
-          if (hasMasukMalam && !hasMasukPagi && !hasMasukSiang) return name.includes("malam");
+          if (hasMasukPagi && !hasMasukSiang && !hasMasukMalam)
+            return name.includes("pagi");
+          if (hasMasukSiang && !hasMasukPagi && !hasMasukMalam)
+            return name.includes("siang");
+          if (hasMasukMalam && !hasMasukPagi && !hasMasukSiang)
+            return name.includes("malam");
           return true;
         });
 
@@ -1156,7 +1355,12 @@
         }
 
         // 4. Kategori ABSEN PULANG (Hanya jika cabang memiliki/mengizinkan tipe absen pulang)
-        if (sudahMasuk && !sedangIzin && !sedangIstirahat && pulangSubItems.length > 0) {
+        if (
+          sudahMasuk &&
+          !sedangIzin &&
+          !sedangIstirahat &&
+          pulangSubItems.length > 0
+        ) {
           if (pulangSubItems.length === 1) {
             const singlePulang = pulangSubItems[0];
             optionsHtml += `
@@ -1269,7 +1473,11 @@
         }
 
         if (subItems.length === 0) {
-          Swal.fire("Informasi", "Tidak ada pilihan tipe absen yang aktif untuk kategori ini di cabang Anda.", "info");
+          Swal.fire(
+            "Informasi",
+            "Tidak ada pilihan tipe absen yang aktif untuk kategori ini di cabang Anda.",
+            "info",
+          );
           return;
         }
 
@@ -1288,7 +1496,9 @@
 
           const belumBuka = item.jam_mulai && waktu_sekarang < item.jam_mulai;
           const waktuHabis =
-            !isCheckoutType && item.jam_tutup && waktu_sekarang > item.jam_tutup;
+            !isCheckoutType &&
+            item.jam_tutup &&
+            waktu_sekarang > item.jam_tutup;
 
           const countThisType = absenHariIni.filter(
             (a) => a.tipe_absen === item.nama_tipe,
@@ -1382,8 +1592,10 @@
               document.title = data.nama_aplikasi;
             }
             if (data.form_judul) {
-              document.getElementById("form-judul-absen").innerText =
-                data.form_judul;
+              const formJudul = document.getElementById("form-judul-absen");
+              if (formJudul) {
+                formJudul.innerText = data.form_judul;
+              }
               // If form_judul exists, maybe append it to title or override
               document.title = data.nama_aplikasi
                 ? `${data.nama_aplikasi} - ${data.form_judul}`
@@ -1434,6 +1646,12 @@
       window.formatWaktuGlobal = formatWaktuGlobal;
 
       loadAppSettings().then(() => {
+        // Set dynamic date on the third nav icon
+        const dateSpan = document.getElementById("nav-date-text");
+        if (dateSpan) {
+          dateSpan.innerText = new Date().getDate();
+        }
+
         loadKantorUser();
         cekStatusAbsenHariIni();
 
@@ -1465,13 +1683,13 @@
 
       // Initialize face api models
       let modelsLoaded = false;
-      Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri("./models"),
-      ]).then(() => {
-        modelsLoaded = true;
-      }).catch(err => {
-        console.warn("Local model load warning:", err);
-      });
+      Promise.all([faceapi.nets.tinyFaceDetector.loadFromUri("./models")])
+        .then(() => {
+          modelsLoaded = true;
+        })
+        .catch((err) => {
+          console.warn("Local model load warning:", err);
+        });
 
       function mulaiKamera() {
         const video = document.getElementById("kamera");
@@ -1559,7 +1777,8 @@
               faceCountdownValue = 3;
 
               if (!isCapturing) {
-                faceStatus.innerHTML = "❌ Wajah hilang/bergerak! Paskan wajah kembali";
+                faceStatus.innerHTML =
+                  "❌ Wajah hilang/bergerak! Paskan wajah kembali";
                 faceStatus.className =
                   "badge bg-warning-subtle text-warning-emphasis fs-6 border border-warning-subtle rounded-pill px-3 py-2 mt-2 mb-0 fw-bold";
                 btnAmbilFoto.disabled = true;
@@ -1725,7 +1944,10 @@
           isAbsenCabangLain = true;
           cabangAbsenSekarang = cabangLainFound.nama;
 
-          const titikCabangLain = L.latLng(cabangLainFound.lat, cabangLainFound.lng);
+          const titikCabangLain = L.latLng(
+            cabangLainFound.lat,
+            cabangLainFound.lng,
+          );
           map.fitBounds(L.latLngBounds([titikCabangLain, titikKaryawan]), {
             padding: [20, 20],
           });
@@ -1768,7 +1990,9 @@
             icon: "warning",
             confirmButtonText: "Daftar Wajah Sekarang",
           }).then(() => {
-            const modal = new bootstrap.Modal(document.getElementById('modalRegisterFace'));
+            const modal = new bootstrap.Modal(
+              document.getElementById("modalRegisterFace"),
+            );
             modal.show();
           });
           return;
@@ -1797,7 +2021,9 @@
             icon: "warning",
             confirmButtonText: "Daftar Wajah Sekarang",
           }).then(() => {
-            const modal = new bootstrap.Modal(document.getElementById('modalRegisterFace'));
+            const modal = new bootstrap.Modal(
+              document.getElementById("modalRegisterFace"),
+            );
             modal.show();
           });
           return;
@@ -1835,7 +2061,11 @@
         const tanggalHariIni = localDate.toISOString().split("T")[0];
 
         const tipeData = getTipeAbsenData();
-        const calcWaktu = hitungDetailWaktuAbsensi(localTime, tipeData, tipeAbsenSekarang);
+        const calcWaktu = hitungDetailWaktuAbsensi(
+          localTime,
+          tipeData,
+          tipeAbsenSekarang,
+        );
 
         const lokasiTeks = isAbsenCabangLain
           ? `Jarak: ${Math.round(jarakAbsen)}m dari ${cabangAbsenSekarang} (Luar Cabang)`
@@ -1858,7 +2088,7 @@
         if (response.error) {
           Swal.fire("Gagal", response.error.message, "error");
         } else {
-          const textMsg = `<b>Laporan Absen (Lokasi)</b>\nNama: ${currentUser.nama}\nCabang Utama: ${currentUser.cabang || '-'}\nCabang Absen: ${isAbsenCabangLain ? cabangAbsenSekarang + ' (Luar Cabang)' : (currentUser.cabang || '-')}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${localTime}\nStatus Waktu: ${calcWaktu.keteranganWaktu}\nLokasi: ${lokasiTeks}`;
+          const textMsg = `<b>Laporan Absen (Lokasi)</b>\nNama: ${currentUser.nama}\nCabang Utama: ${currentUser.cabang || "-"}\nCabang Absen: ${isAbsenCabangLain ? cabangAbsenSekarang + " (Luar Cabang)" : currentUser.cabang || "-"}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${localTime}\nStatus Waktu: ${calcWaktu.keteranganWaktu}\nLokasi: ${lokasiTeks}`;
           await sendTelegramNotification(textMsg);
 
           Swal.fire("Berhasil!", "Absensi berhasil disimpan.", "success").then(
@@ -1892,7 +2122,9 @@
             icon: "warning",
             confirmButtonText: "Daftar Wajah Sekarang",
           }).then(() => {
-            const modal = new bootstrap.Modal(document.getElementById('modalRegisterFace'));
+            const modal = new bootstrap.Modal(
+              document.getElementById("modalRegisterFace"),
+            );
             modal.show();
           });
           return;
@@ -2000,7 +2232,11 @@
             masterTipeAbsen.find((m) => m.nama_tipe === tipeAbsenSekarang) ||
             {};
 
-          const calcWaktu = hitungDetailWaktuAbsensi(waktu_sekarang, tipeData, tipeAbsenSekarang);
+          const calcWaktu = hitungDetailWaktuAbsensi(
+            waktu_sekarang,
+            tipeData,
+            tipeAbsenSekarang,
+          );
 
           const res = await supabaseClient.from("absensi").insert([
             {
@@ -2019,7 +2255,7 @@
           ]);
           let dbError = res.error;
 
-          const textMsg = `<b>Laporan Absen (Wajah/Selfie)</b>\nNama: ${userObj.nama}\nCabang Utama: ${userObj.cabang || '-'}\nCabang Absen: ${isAbsenCabangLain ? cabangAbsenSekarang + ' (Luar Cabang)' : (userObj.cabang || '-')}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${waktu_sekarang}\nStatus Waktu: ${calcWaktu.keteranganWaktu}\nLokasi: ${lokasiTeks}\nFoto: <a href="${publicUrlData.publicUrl}">Lihat Foto</a>`;
+          const textMsg = `<b>Laporan Absen (Wajah/Selfie)</b>\nNama: ${userObj.nama}\nCabang Utama: ${userObj.cabang || "-"}\nCabang Absen: ${isAbsenCabangLain ? cabangAbsenSekarang + " (Luar Cabang)" : userObj.cabang || "-"}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${waktu_sekarang}\nStatus Waktu: ${calcWaktu.keteranganWaktu}\nLokasi: ${lokasiTeks}\nFoto: <a href="${publicUrlData.publicUrl}">Lihat Foto</a>`;
           await sendTelegramNotification(textMsg);
 
           await cekStatusAbsenHariIni();
@@ -2622,7 +2858,7 @@
             tanggal_mulai || new Date().toISOString().split("T")[0];
           const tglSelesai =
             tanggal_selesai || new Date().toISOString().split("T")[0];
-          const textMsg = `<b>Pengajuan Cuti/Izin/Sakit</b>\nNama: ${userObj.nama}\nCabang: ${userObj.cabang || '-'}\nJenis: ${namaCutiTerpilih || tipe_cuti_izin}\nDurasi: ${diffDays} Hari (${tglMulai} s/d ${tglSelesai})\nAlasan: ${alasan}`;
+          const textMsg = `<b>Pengajuan Cuti/Izin/Sakit</b>\nNama: ${userObj.nama}\nCabang: ${userObj.cabang || "-"}\nJenis: ${namaCutiTerpilih || tipe_cuti_izin}\nDurasi: ${diffDays} Hari (${tglMulai} s/d ${tglSelesai})\nAlasan: ${alasan}`;
           await sendTelegramNotification(textMsg);
 
           Swal.fire({
@@ -2788,7 +3024,7 @@
 
         const tbodyHariIni = document.getElementById("tabel-riwayat-hari-ini");
         if (tbodyHariIni)
-          tbodyHariIni.innerHTML = `<tr><td colspan="4" class="text-center py-4"><div class="placeholder-glow"><span class="placeholder col-8 mb-2"></span></div></td></tr>`;
+          tbodyHariIni.innerHTML = `<tr><td colspan="3" class="text-center py-4"><div class="placeholder-glow"><span class="placeholder col-8 mb-2"></span></div></td></tr>`;
 
         const { data, error } = await supabaseClient
           .from("absensi")
@@ -2808,14 +3044,14 @@
         if (error) {
           if (tbodyHariIni)
             tbodyHariIni.innerHTML =
-              '<tr><td colspan="4" class="text-danger">Gagal memuat data</td></tr>';
+              '<tr><td colspan="3" class="text-danger">Gagal memuat data</td></tr>';
           return;
         }
 
         if (!allData || allData.length === 0) {
           if (tbodyHariIni)
             tbodyHariIni.innerHTML =
-              '<tr><td colspan="4" class="text-muted">Belum ada riwayat absensi hari ini</td></tr>';
+              '<tr><td colspan="3" class="text-muted">Belum ada riwayat absensi hari ini</td></tr>';
           buatKalender([]);
           return;
         }
@@ -2828,19 +3064,25 @@
         const tanggalHariIni = localDate.toISOString().split("T")[0];
 
         allData.forEach((absen) => {
-          let badgeClass =
-            absen.status === "Terlambat"
-              ? "warning text-dark"
-              : "success text-white";
-          if (absen.status === "Alpha") badgeClass = "danger text-white";
-          if (absen.status === "Lembur") badgeClass = "info text-dark";
+          let bgClass = "bg-primary-container";
+          let textClass = "text-on-primary-container";
+
+          if (absen.status === "Terlambat") {
+            bgClass = "bg-secondary-container";
+            textClass = "text-on-secondary-container";
+          } else if (absen.status === "Alpha") {
+            bgClass = "bg-error";
+            textClass = "text-on-error";
+          } else if (absen.status === "Lembur") {
+            bgClass = "bg-tertiary-container";
+            textClass = "text-on-tertiary-container";
+          }
 
           const trHtml = `
             <tr>
-              <td>${absen.tanggal}</td>
               <td>${absen.tipe_absen || "-"}</td>
               <td>${formatWaktuGlobal(absen.waktu || "-")}</td>
-              <td><span class="badge bg-${badgeClass}">${absen.status}</span></td>
+              <td><span class="badge ${bgClass} ${textClass}">${absen.status}</span></td>
             </tr>
           `;
 
@@ -2906,7 +3148,10 @@
                 .maybeSingle();
 
               if (userById) {
-                await supabaseClient.from("users").update({ auth_id: session.user.id }).eq("id", userById.id);
+                await supabaseClient
+                  .from("users")
+                  .update({ auth_id: session.user.id })
+                  .eq("id", userById.id);
                 userById.auth_id = session.user.id;
                 data = userById;
               }
@@ -3082,17 +3327,21 @@
       async function sendTelegramNotification(message) {
         const targetChatId =
           (typeof window !== "undefined" && window.TELEGRAM_CHAT_ID) ||
-          (typeof TELEGRAM_CHAT_ID !== "undefined" ? TELEGRAM_CHAT_ID : "-5585540383");
+          (typeof TELEGRAM_CHAT_ID !== "undefined"
+            ? TELEGRAM_CHAT_ID
+            : "-5585540383");
 
         const botToken =
           (typeof window !== "undefined" && window.TELEGRAM_BOT_TOKEN) ||
-          (typeof TELEGRAM_BOT_TOKEN !== "undefined" ? TELEGRAM_BOT_TOKEN : "") ||
-          (typeof window !== "undefined" && window.ENV && window.ENV.TELEGRAM_BOT_TOKEN) || "";
+          (typeof TELEGRAM_BOT_TOKEN !== "undefined"
+            ? TELEGRAM_BOT_TOKEN
+            : "") ||
+          (typeof window !== "undefined" &&
+            window.ENV &&
+            window.ENV.TELEGRAM_BOT_TOKEN) ||
+          "";
 
-        if (
-          !targetChatId ||
-          targetChatId === "ISI_DENGAN_CHAT_ID_GRUP_ANDA"
-        ) {
+        if (!targetChatId || targetChatId === "ISI_DENGAN_CHAT_ID_GRUP_ANDA") {
           console.log("Telegram Chat ID tidak dikonfigurasi");
           return;
         }
@@ -3100,38 +3349,48 @@
         // 1. Jika TELEGRAM_BOT_TOKEN diisi di .env lokal / Docker / window.ENV, kirim langsung via Direct Telegram Bot API
         if (botToken && !botToken.includes("YOUR_BOT_TOKEN")) {
           try {
-            const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: targetChatId,
-                text: message,
-                parse_mode: 'HTML'
-              })
-            });
+            const resp = await fetch(
+              `https://api.telegram.org/bot${botToken}/sendMessage`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  chat_id: targetChatId,
+                  text: message,
+                  parse_mode: "HTML",
+                }),
+              },
+            );
             const resData = await resp.json();
             if (resData.ok) {
-              console.log("Notifikasi Telegram berhasil dikirim via Direct Bot API.");
+              console.log(
+                "Notifikasi Telegram berhasil dikirim via Direct Bot API.",
+              );
               return;
             } else {
               console.warn("Direct Telegram API response warning:", resData);
             }
-          } catch(err) {
-            console.warn("Gagal mengirim via Direct Telegram API, mencoba fallback...", err);
+          } catch (err) {
+            console.warn(
+              "Gagal mengirim via Direct Telegram API, mencoba fallback...",
+              err,
+            );
           }
         }
 
         // 2. Fallback Vercel Serverless Function (/api/telegram-notif) - Digunakan saat di-deploy ke Vercel (tanpa expose Token di frontend)
         try {
-          const vercelResp = await fetch('/api/telegram-notif', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: message, chat_id: targetChatId })
+          const vercelResp = await fetch("/api/telegram-notif", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: message, chat_id: targetChatId }),
           });
           if (vercelResp.ok) {
             const vData = await vercelResp.json();
             if (vData.ok) {
-              console.log("Notifikasi Telegram berhasil dikirim via Vercel Serverless Function.");
+              console.log(
+                "Notifikasi Telegram berhasil dikirim via Vercel Serverless Function.",
+              );
               return;
             }
           }
@@ -3151,11 +3410,14 @@
           if (error) throw error;
 
           if (data && !data.ok) {
-            console.error("Gagal kirim notifikasi Telegram via Edge Function:", data);
+            console.error(
+              "Gagal kirim notifikasi Telegram via Edge Function:",
+              data,
+            );
           }
         } catch (error) {
           console.info(
-            "Edge Function (telegram-notif) tidak dipasang pada server ini."
+            "Edge Function (telegram-notif) tidak dipasang pada server ini.",
           );
         }
       }

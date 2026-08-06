@@ -15,6 +15,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
       :root {
         --bs-primary: #E5B82A;
@@ -233,7 +234,7 @@
             
             <!-- Modal Detail Dashboard -->
             <div class="modal fade" id="modalDetailDashboard" tabindex="-1" aria-hidden="true">
-              <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+              <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content border-0 shadow">
                   <div class="modal-header text-white" id="modalDetailDashboardHeader">
                     <h5 class="modal-title fw-bold" id="modalDetailDashboardTitle">Daftar Karyawan</h5>
@@ -675,6 +676,9 @@
                     <button class="btn btn-sm btn-success fw-bold shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#collapseExportAbsensi" aria-expanded="false" aria-controls="collapseExportAbsensi">
                       <i class="fas fa-file-export me-1"></i> Export Data Absensi
                     </button>
+                    <button class="btn btn-sm btn-primary fw-bold shadow-sm" type="button" data-bs-toggle="modal" data-bs-target="#modalFormGaji" onclick="bukaModalFormGaji()">
+                      <i class="fas fa-print me-1"></i> Form Gaji Mingguan
+                    </button>
                   </div>
                 </div>
 
@@ -881,6 +885,19 @@
                       </div>
                     </div>
                   </form>
+                </div>
+              </div>
+
+              <!-- CARD FORM GAJI MINGGUAN -->
+              <div class="card shadow-sm border-0 mt-4 border-start border-4 border-primary">
+                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                  <span><i class="fas fa-print text-primary me-2"></i>Cetak Form Gaji Mingguan (Timesheet PDF/Print)</span>
+                </div>
+                <div class="card-body">
+                  <p class="text-muted small mb-3">Membuat & mencetak lembar Scan Log / Timesheet Mingguan per karyawan untuk kebutuhan payroll (maksimal 7 hari).</p>
+                  <button type="button" class="btn btn-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalFormGaji" onclick="bukaModalFormGaji()">
+                    <i class="fas fa-print me-2"></i>Buka Cetak Form Gaji Mingguan
+                  </button>
                 </div>
               </div>
             </div>
@@ -1268,13 +1285,63 @@ Besok **17 Agustus** kita libur ya!"></textarea>
       </div>
     </div>
 
+    <!-- MODAL FORM GAJI MINGGUAN -->
+    <div class="modal fade" id="modalFormGaji" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title fw-bold text-white"><i class="fas fa-print me-2"></i>Cetak Form Gaji Mingguan</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <form id="form-cetak-gaji" onsubmit="prosesCetakFormGaji(event)">
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label small fw-bold text-secondary">Preset Rentang Waktu (1 Minggu)</label>
+                  <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-primary w-50" onclick="setPresetTanggalGaji('7hari')">7 Hari Terakhir</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary w-50" onclick="setPresetTanggalGaji('mingguini')">Minggu Ini (Senin - Minggu)</button>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small fw-bold text-secondary">Tanggal Mulai</label>
+                  <input type="date" class="form-control" id="gaji_mulai" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small fw-bold text-secondary">Tanggal Selesai</label>
+                  <input type="date" class="form-control" id="gaji_selesai" required>
+                </div>
+                <div class="col-12">
+                  <label class="form-label small fw-bold text-secondary">Cabang / Unit</label>
+                  <select class="form-select" id="gaji_cabang">
+                    <option value="">Semua Cabang</option>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <div class="alert alert-info py-2 px-3 small mb-0">
+                    <i class="fas fa-info-circle me-1"></i> Form Gaji Mingguan menampilkan log 4 waktu (Masuk, Istirahat Keluar, Istirahat Masuk, Pulang) selama 7 hari dalam layout siap cetak.
+                  </div>
+                </div>
+              </div>
+              <div class="modal-footer border-top-0 px-0 pb-0 mt-3">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                <button type="submit" class="btn btn-primary fw-bold shadow-sm">
+                  <i class="fas fa-external-link-alt me-1"></i> Buka Halaman Cetak
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="env.js"></script>
     <script src="config.js"></script>
-    <script src="admin.js?v=36"></script>
+    <script src="admin.js?v=38"></script>
     
     <script>
       if (typeof userData !== 'undefined' && userData) {
