@@ -733,7 +733,7 @@
             }
 
             if (maxPulang !== null && jamPulangResmiMin && maxPulang > jamPulangResmiMin) {
-              const calcLembur = Math.max(0, (maxPulang - jamPulangResmiMin) - breakM);
+              const calcLembur = Math.max(0, maxPulang - jamPulangResmiMin);
               if (calcLembur > dayObj.lemburMins) {
                 dayObj.lemburMins = calcLembur;
               }

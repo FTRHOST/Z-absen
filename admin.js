@@ -2294,11 +2294,27 @@ async function exportCsvHarian(tanggal) {
             };
             
             let lemburMins = 0;
+            tipeAbsenList.forEach(tipe => {
+                const a = g.absensi[tipe];
+                if (a) {
+                    if (a.menit_lembur > 0) lemburMins = Math.max(lemburMins, a.menit_lembur);
+                    else if (a.keterangan_waktu && a.keterangan_waktu.toLowerCase().includes('lembur')) {
+                        const matchJ = a.keterangan_waktu.match(/(\d+)\s*j(?:am)?/i);
+                        const matchM = a.keterangan_waktu.match(/(\d+)\s*m(?:enit)?/i);
+                        if (matchJ || matchM) {
+                            const j = matchJ ? parseInt(matchJ[1], 10) : 0;
+                            const m = matchM ? parseInt(matchM[1], 10) : 0;
+                            lemburMins = Math.max(lemburMins, j * 60 + m);
+                        }
+                    }
+                }
+            });
+
             if (waktuPulang && batasPulang) {
                 const pMins = parseT(waktuPulang);
                 const bMins = parseT(batasPulang);
                 if (pMins && bMins && pMins > bMins) {
-                    lemburMins = pMins - bMins;
+                    lemburMins = Math.max(lemburMins, pMins - bMins);
                 }
             }
             
@@ -3620,10 +3636,11 @@ async function prosesExport(event) {
                             if (dayAbsen) {
                                 Object.keys(dayAbsen).forEach(tKey => {
                                     const aObj = dayAbsen[tKey];
-                                    if (aObj) {
+                                    if (aObj && aObj.waktu && aObj.waktu !== '-') {
                                         if (aObj.menit_lembur > 0) {
                                             totalLemburMin = Math.max(totalLemburMin, aObj.menit_lembur);
-                                        } else if (aObj.keterangan_waktu && aObj.keterangan_waktu.toLowerCase().includes('lembur')) {
+                                        }
+                                        if (aObj.keterangan_waktu && aObj.keterangan_waktu.toLowerCase().includes('lembur')) {
                                             const matchJ = aObj.keterangan_waktu.match(/(\d+)\s*j(?:am)?/i);
                                             const matchM = aObj.keterangan_waktu.match(/(\d+)\s*m(?:enit)?/i);
                                             if (matchJ || matchM) {
@@ -3631,6 +3648,19 @@ async function prosesExport(event) {
                                                 const m = matchM ? parseInt(matchM[1], 10) : 0;
                                                 totalLemburMin = Math.max(totalLemburMin, j * 60 + m);
                                             }
+                                        }
+
+                                        let limitMin = null;
+                                        if (typeof globalMasterTipeAbsen !== 'undefined' && globalMasterTipeAbsen) {
+                                            const mObj = globalMasterTipeAbsen.find(m => m.nama_tipe === tKey) || globalMasterTipeAbsen.find(m => m.is_checkout);
+                                            if (mObj && (mObj.is_checkout || tKey.toLowerCase().includes('pulang') || tKey.toLowerCase().includes('checkout'))) {
+                                                const endStr = mObj.batas_terlambat || (mObj.jam_tutup && mObj.jam_tutup !== '23:59:59' ? mObj.jam_tutup : null);
+                                                if (endStr) limitMin = parseT(endStr);
+                                            }
+                                        }
+                                        const wMin = parseT(aObj.waktu);
+                                        if (limitMin !== null && wMin !== null && wMin > limitMin) {
+                                            totalLemburMin = Math.max(totalLemburMin, wMin - limitMin);
                                         }
                                     }
                                 });
