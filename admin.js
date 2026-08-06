@@ -877,6 +877,15 @@ function batalEditKantor() {
 window.editKantor = editKantor;
 window.batalEditKantor = batalEditKantor;
 
+function parseT(tStr) {
+    if (!tStr) return null;
+    const parts = tStr.split(':');
+    if (parts.length >= 2) {
+        return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+    }
+    return null;
+}
+
 // Ensure map is correctly rendered when modal is opened for 'Tambah Baru'
 document.addEventListener('DOMContentLoaded', () => {
     const modalEl = document.getElementById('modalKantor');
@@ -1565,7 +1574,8 @@ async function loadDataAbsensi() {
 
     const [year, month] = filterBulan.value.split('-');
     const startDate = `${year}-${month}-01`;
-    const endDate = new Date(year, month, 0).toISOString().split('T')[0];
+    const lastDay = new Date(year, parseInt(month, 10), 0).getDate();
+    const endDate = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
 
     const expMulai = document.getElementById("export_mulai");
     const expSelesai = document.getElementById("export_selesai");
