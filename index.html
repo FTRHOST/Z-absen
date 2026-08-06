@@ -985,11 +985,12 @@
           } else {
             keteranganWaktu = "Tepat Waktu";
           }
-        } else if (isPulang && tData.jam_tutup) {
-          const jamTutupMin = timeToMinutes(tData.jam_tutup);
-          if (currMin > jamTutupMin) {
+        } else if (isPulang) {
+          const normalEndStr = tData.batas_terlambat || (tData.jam_tutup && tData.jam_tutup !== '23:59:59' ? tData.jam_tutup : null);
+          const limitMin = timeToMinutes(normalEndStr);
+          if (limitMin && currMin > limitMin) {
             status = "Lembur";
-            const totalLemburKotor = currMin - jamTutupMin;
+            const totalLemburKotor = currMin - limitMin;
 
             const potonganIstirahat =
               tData.potongan_lembur_menit !== undefined &&

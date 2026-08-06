@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=1100, initial-scale=0.35">
   <title>Form Gaji Mingguan (Timesheet) - Zieda Absen</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -14,12 +14,10 @@
       --border-color: #334155;
     }
     
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background-color: #f8fafc;
-      color: #0f172a;
-      padding: 0;
-      margin: 0;
+    html, body {
+      min-width: 1100px !important;
+      width: 100% !important;
+      overflow-x: auto !important;
     }
 
     /* BAR KONTROL DI ATAS (HANYA DITAMPILKAN DI SCREEN) */
@@ -31,11 +29,14 @@
       top: 0;
       z-index: 1000;
       box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      min-width: 1100px !important;
     }
 
     /* CONTAINER PRINTABLE */
     .print-container {
-      max-width: 1100px;
+      width: 1100px !important;
+      min-width: 1100px !important;
+      max-width: 1100px !important;
       margin: 20px auto;
       padding: 0 15px;
     }
@@ -260,6 +261,10 @@
         background-color: #ffffff !important;
       }
 
+      thead {
+        display: table-header-group !important;
+      }
+
       @page {
         size: A4 portrait;
         margin: 10mm 8mm;
@@ -312,29 +317,41 @@
 
   <!-- PRINT CONTAINER -->
   <div class="print-container">
-    
-    <!-- DOKUMEN HEADER -->
-    <div class="d-flex align-items-center mb-3 pb-2 border-bottom border-2 border-dark">
-      <div style="width: 80px;">
-        <img id="app-logo-header" src="" alt="" style="max-width: 100%; max-height: 60px; display: none;">
-      </div>
-      <div class="flex-grow-1 text-center">
-        <h4 class="fw-bold mb-1 tracking-wide text-uppercase" style="letter-spacing: 1px;">ZIEDA ABSEN - SCAN LOG (GAJI MINGGUAN)</h4>
-        <p class="mb-0 small text-secondary fw-semibold" id="doc-subtitle">
-          Periode: - | Cabang: Semua Cabang
-        </p>
-      </div>
-      <div style="width: 80px;"></div>
-    </div>
+    <table style="width: 100%; border-collapse: collapse; border: none; background: transparent;">
+      <thead>
+        <tr style="border: none;">
+          <th style="border: none; padding: 0; background: transparent; font-weight: normal; text-align: left;">
+            <!-- DOKUMEN HEADER -->
+            <div class="d-flex align-items-center mb-3 pb-2 border-bottom border-2 border-dark">
+              <div style="width: 80px;">
+                <img id="app-logo-header" src="" alt="" style="max-width: 100%; max-height: 60px; display: none;">
+              </div>
+              <div class="flex-grow-1 text-center">
+                <h4 class="fw-bold mb-1 tracking-wide text-uppercase" style="letter-spacing: 1px;">ZIEDA ABSEN - SCAN LOG (GAJI MINGGUAN)</h4>
+                <p class="mb-0 small text-secondary fw-semibold" id="doc-subtitle">
+                  Periode: - | Cabang: Semua Cabang
+                </p>
+              </div>
+              <div style="width: 80px;"></div>
+            </div>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border: none;">
+          <td style="border: none; padding: 0; background: transparent;">
+            <!-- SPINNER LOADING -->
+            <div id="loading-spinner" class="text-center py-5">
+              <div class="spinner-border text-primary me-2" role="status"></div>
+              <span class="fw-semibold text-secondary">Mengambil data absensi & kalkulasi timesheet mingguan...</span>
+            </div>
 
-    <!-- SPINNER LOADING -->
-    <div id="loading-spinner" class="text-center py-5">
-      <div class="spinner-border text-primary me-2" role="status"></div>
-      <span class="fw-semibold text-secondary">Mengambil data absensi & kalkulasi timesheet mingguan...</span>
-    </div>
-
-    <!-- CONTAINER KARTU KARYAWAN -->
-    <div id="employee-cards-container"></div>
+            <!-- CONTAINER KARTU KARYAWAN -->
+            <div id="employee-cards-container"></div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 
   <!-- SCRIPTS -->
@@ -497,7 +514,7 @@
         // Query Absensi pada rentang tanggal
         let qAbsen = supabaseClient
           .from('absensi')
-          .select('id, user_id, tanggal, waktu, tipe_absen, status, menit_terlambat, menit_lembur')
+          .select('id, user_id, tanggal, waktu, tipe_absen, status, menit_terlambat, menit_lembur, keterangan_waktu')
           .gte('tanggal', tglMulai)
           .lte('tanggal', tglSelesai);
 
@@ -559,9 +576,10 @@
                 const waktuFormatted = a.waktu ? formatTimeHM(a.waktu) : null;
                 const statusStr = (a.status || '').toLowerCase();
                 const tipeStr = (tipe || '').toLowerCase();
+                const ketStr = (a.keterangan_waktu || '').toLowerCase();
 
-                const isTerlambat = statusStr.includes('terlambat');
-                const isLembur = tipeStr.includes('lembur') || statusStr.includes('lembur');
+                const isTerlambat = statusStr.includes('terlambat') || (a.menit_terlambat && a.menit_terlambat > 0);
+                const isLembur = tipeStr.includes('lembur') || statusStr.includes('lembur') || (a.menit_lembur && a.menit_lembur > 0) || ketStr.includes('lembur');
 
                 let bgColor = '';
                 if (isTerlambat) {
@@ -570,8 +588,19 @@
                   bgColor = '#AFD095'; // Lembur: #AFD095
                 }
 
+                let mLembur = a.menit_lembur || 0;
+                if (!mLembur && ketStr.includes('lembur')) {
+                  const matchJ = ketStr.match(/(\d+)\s*j(?:am)?/i);
+                  const matchM = ketStr.match(/(\d+)\s*m(?:enit)?/i);
+                  if (matchJ || matchM) {
+                    const j = matchJ ? parseInt(matchJ[1], 10) : 0;
+                    const m = matchM ? parseInt(matchM[1], 10) : 0;
+                    mLembur = j * 60 + m;
+                  }
+                }
+
                 if (a.menit_terlambat) userAbsenMap[a.tanggal].terlambatMins += (a.menit_terlambat || 0);
-                if (a.menit_lembur) userAbsenMap[a.tanggal].lemburMins += (a.menit_lembur || 0);
+                if (mLembur > 0) userAbsenMap[a.tanggal].lemburMins = Math.max(userAbsenMap[a.tanggal].lemburMins || 0, mLembur);
                 if (a.status) userAbsenMap[a.tanggal].statusList.push(a.status);
 
                 if (waktuFormatted) {
@@ -678,6 +707,22 @@
             if (maxPulang !== null && minMasuk !== null && maxPulang >= minMasuk) {
               netDailyMins = (maxPulang - minMasuk) - breakM;
               if (netDailyMins < 0) netDailyMins = 0;
+            }
+
+            let jamPulangResmiMin = 960; // Default 16:00
+            if (empTipeList && empTipeList.length > 0 && masterTipeAbsenList && masterTipeAbsenList.length > 0) {
+              const checkoutObj = masterTipeAbsenList.find(t => t.is_checkout && empTipeList.includes(t.nama_tipe));
+              if (checkoutObj && checkoutObj.batas_terlambat) {
+                const parts = checkoutObj.batas_terlambat.split(':');
+                if (parts.length >= 2) jamPulangResmiMin = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+              }
+            }
+
+            if (maxPulang !== null && jamPulangResmiMin && maxPulang > jamPulangResmiMin) {
+              const calcLembur = Math.max(0, (maxPulang - jamPulangResmiMin) - breakM);
+              if (calcLembur > dayObj.lemburMins) {
+                dayObj.lemburMins = calcLembur;
+              }
             }
 
             dailyNetMinsMap[d] = netDailyMins;

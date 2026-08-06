@@ -1833,7 +1833,9 @@ function showDetailAbsensi(tanggal, dateStrParam) {
                 let statusHtml = '';
                 list.forEach(a => {
                     let badgeClass = "bg-secondary";
-                    if (a.status === "Hadir" || a.status === "Tepat Waktu") badgeClass = "bg-success";
+                    const isLemburRecord = a.status === "Lembur" || (a.menit_lembur && parseInt(a.menit_lembur, 10) > 0) || (a.tipe_absen && a.tipe_absen.toLowerCase().includes('lembur')) || (a.keterangan_waktu && a.keterangan_waktu.toLowerCase().includes('lembur'));
+                    if (isLemburRecord) badgeClass = "bg-success";
+                    else if (a.status === "Hadir" || a.status === "Tepat Waktu") badgeClass = "bg-success";
                     else if (a.status === "Terlambat") badgeClass = "bg-warning text-dark";
                     else if (a.status === "Alpha") badgeClass = "bg-danger";
                     else if (a.status === "Cuti") badgeClass = "bg-info text-dark";
@@ -1954,10 +1956,27 @@ function showDetailAbsensi(tanggal, dateStrParam) {
         });
 
         // 4. Kalkulasi Jam Lembur & Jam Kerja
+        let totalDbMenitLembur = 0;
+        (g.allRows || []).forEach(a => {
+            let mL = parseInt(a.menit_lembur, 10) || 0;
+            if (!mL && a.keterangan_waktu && a.keterangan_waktu.toLowerCase().includes('lembur')) {
+                const matchJ = a.keterangan_waktu.match(/(\d+)\s*j(?:am)?/i);
+                const matchM = a.keterangan_waktu.match(/(\d+)\s*m(?:enit)?/i);
+                if (matchJ || matchM) {
+                    const j = matchJ ? parseInt(matchJ[1], 10) : 0;
+                    const m = matchM ? parseInt(matchM[1], 10) : 0;
+                    mL = j * 60 + m;
+                }
+            }
+            if (mL > 0) totalDbMenitLembur = Math.max(totalDbMenitLembur, mL);
+        });
+
         if (waktuPulangMin && jamPulangResmiMin && waktuPulangMin > jamPulangResmiMin) {
             const lemburKotor = waktuPulangMin - jamPulangResmiMin;
             const lemburBersih = Math.max(0, lemburKotor - istirahatLemburMins);
-            jamLemburStr = formatM(lemburBersih);
+            jamLemburStr = formatM(Math.max(lemburBersih, totalDbMenitLembur));
+        } else if (totalDbMenitLembur > 0) {
+            jamLemburStr = formatM(totalDbMenitLembur);
         } else if (waktuPulangMin) {
             jamLemburStr = '0j 0m';
         }
@@ -3256,7 +3275,9 @@ async function prosesExport(event) {
                     waktu: formattedTime,
                     status: row.status || '-',
                     jarak: row.lokasi || '-',
-                    foto: row.foto || ''
+                    foto: row.foto || '',
+                    menit_lembur: row.menit_lembur || 0,
+                    keterangan_waktu: row.keterangan_waktu || ''
                 };
             } else {
                 // Jika ada 2x absen tipe sama di tanggal yang sama (misal 2x istirahat)
@@ -3267,6 +3288,12 @@ async function prosesExport(event) {
                 }
                 if (row.status && !existing.status.includes(row.status)) {
                     existing.status += ` | ${row.status}`;
+                }
+                if (row.menit_lembur) {
+                    existing.menit_lembur = Math.max(existing.menit_lembur || 0, row.menit_lembur);
+                }
+                if (row.keterangan_waktu) {
+                    existing.keterangan_waktu = (existing.keterangan_waktu ? existing.keterangan_waktu + ' ' : '') + row.keterangan_waktu;
                 }
             }
         });
@@ -3350,8 +3377,9 @@ async function prosesExport(event) {
                                     
                                     const statusStr = (a.status || '').toLowerCase();
                                     const tipeStr = tipe.toLowerCase();
+                                    const ketStr = (a.keterangan_waktu || '').toLowerCase();
                                     const isTerlambat = statusStr.includes('terlambat');
-                                    const isLembur = tipeStr.includes('lembur') || statusStr.includes('lembur');
+                                    const isLembur = tipeStr.includes('lembur') || statusStr.includes('lembur') || (a.menit_lembur && a.menit_lembur > 0) || ketStr.includes('lembur');
                                     
                                     let bgColor = null;
                                     if (isTerlambat) {
@@ -3500,6 +3528,52 @@ async function prosesExport(event) {
                         });
 
                         matrixData.push(workHoursRow);
+                        currentRowIdx++;
+
+                        // Baris Total Lembur (Bold & Rata Tengah)
+                        const lemburRow = new Array(datesList.length + 1).fill('');
+                        lemburRow[0] = 'Total Lembur';
+
+                        cellStylesMap[`${currentRowIdx}_0`] = {
+                            font: { bold: true },
+                            fill: { fgColor: { rgb: "F8F9FA" } },
+                            alignment: { horizontal: "center", vertical: "center" }
+                        };
+
+                        datesList.forEach((d, dIdx) => {
+                            const c = dIdx + 1;
+                            const dayAbsen = userObj.absensi[d];
+                            
+                            let totalLemburMin = 0;
+                            if (dayAbsen) {
+                                Object.keys(dayAbsen).forEach(tKey => {
+                                    const aObj = dayAbsen[tKey];
+                                    if (aObj) {
+                                        if (aObj.menit_lembur > 0) {
+                                            totalLemburMin = Math.max(totalLemburMin, aObj.menit_lembur);
+                                        } else if (aObj.keterangan_waktu && aObj.keterangan_waktu.toLowerCase().includes('lembur')) {
+                                            const matchJ = aObj.keterangan_waktu.match(/(\d+)\s*j(?:am)?/i);
+                                            const matchM = aObj.keterangan_waktu.match(/(\d+)\s*m(?:enit)?/i);
+                                            if (matchJ || matchM) {
+                                                const j = matchJ ? parseInt(matchJ[1], 10) : 0;
+                                                const m = matchM ? parseInt(matchM[1], 10) : 0;
+                                                totalLemburMin = Math.max(totalLemburMin, j * 60 + m);
+                                            }
+                                        }
+                                    }
+                                });
+                            }
+
+                            lemburRow[c] = totalLemburMin > 0 ? `${Math.floor(totalLemburMin / 60)}j ${totalLemburMin % 60}m` : '-';
+
+                            cellStylesMap[`${currentRowIdx}_${c}`] = {
+                                font: { bold: true, color: { rgb: totalLemburMin > 0 ? "28A745" : "000000" } },
+                                fill: { fgColor: { rgb: "F8F9FA" } },
+                                alignment: { horizontal: "center", vertical: "center" }
+                            };
+                        });
+
+                        matrixData.push(lemburRow);
                         currentRowIdx++;
 
                         // Baris Kosong Pemisah Karyawan
@@ -5286,11 +5360,12 @@ async function jalankanMigrasiDataShift() {
                 const masterTarget = masterTipeAbsen.find(m => m.nama_tipe === newTipeAbsen) || 
                                      masterTipeAbsen.find(m => m.is_checkout);
 
-                if (masterTarget && masterTarget.jam_tutup) {
-                    const jamTutupMin = timeToMinutes(masterTarget.jam_tutup);
-                    if (currMin > jamTutupMin) {
+                if (masterTarget) {
+                    const normalEndStr = masterTarget.batas_terlambat || (masterTarget.jam_tutup && masterTarget.jam_tutup !== '23:59:59' ? masterTarget.jam_tutup : null);
+                    const limitMin = timeToMinutes(normalEndStr);
+                    if (limitMin && currMin > limitMin) {
                         status = "Lembur";
-                        const totalLemburKotor = currMin - jamTutupMin;
+                        const totalLemburKotor = currMin - limitMin;
                         const potonganIstirahat = masterTarget.potongan_lembur_menit !== undefined && masterTarget.potongan_lembur_menit !== null 
                             ? parseInt(masterTarget.potongan_lembur_menit, 10) : 0;
 
@@ -5308,15 +5383,17 @@ async function jalankanMigrasiDataShift() {
                 // Tipe yang sudah bernama spesifik tapi belum punya keterangan waktu
                 const masterTarget = masterTipeAbsen.find(m => m.nama_tipe === row.tipe_absen);
                 if (masterTarget) {
-                    if (masterTarget.batas_terlambat && currMin > timeToMinutes(masterTarget.batas_terlambat)) {
+                    const normalEndStr = masterTarget.batas_terlambat || (masterTarget.jam_tutup && masterTarget.jam_tutup !== '23:59:59' ? masterTarget.jam_tutup : null);
+                    const limitEndMin = timeToMinutes(normalEndStr);
+                    if (masterTarget.batas_terlambat && !masterTarget.is_checkout && currMin > timeToMinutes(masterTarget.batas_terlambat)) {
                         status = "Terlambat";
                         menitTerlambat = currMin - timeToMinutes(masterTarget.batas_terlambat);
                         const jam = Math.floor(menitTerlambat / 60);
                         const m = menitTerlambat % 60;
                         keteranganWaktu = `Terlambat ${jam > 0 ? jam + "j " : ""}${m}m`;
-                    } else if (masterTarget.is_checkout && masterTarget.jam_tutup && currMin > timeToMinutes(masterTarget.jam_tutup)) {
+                    } else if (masterTarget.is_checkout && limitEndMin && currMin > limitEndMin) {
                         status = "Lembur";
-                        const totalKotor = currMin - timeToMinutes(masterTarget.jam_tutup);
+                        const totalKotor = currMin - limitEndMin;
                         const pot = masterTarget.potongan_lembur_menit !== undefined && masterTarget.potongan_lembur_menit !== null 
                             ? parseInt(masterTarget.potongan_lembur_menit, 10) : 0;
                         menitLembur = Math.max(0, totalKotor - pot);
@@ -5439,12 +5516,15 @@ async function simpanEditAbsensi() {
             const bMins = parseT(targetMaster.batas_terlambat);
 
             if (targetMaster.is_checkout) {
+                const normalEndStr = targetMaster.batas_terlambat || (targetMaster.jam_tutup && targetMaster.jam_tutup !== '23:59:59' ? targetMaster.jam_tutup : null);
+                const bMins = parseT(normalEndStr);
                 if (bMins && wMins > bMins) {
                     status = "Lembur";
                     menit_lembur = wMins - bMins;
                     keterangan_waktu = ket_alasan || `Lembur ${Math.floor(menit_lembur/60)}j ${menit_lembur%60}m`;
                 } else {
                     status = "Hadir";
+                    menit_lembur = 0;
                     keterangan_waktu = ket_alasan || "Pulang Normal";
                 }
             } else if (targetMaster.nama_tipe.toLowerCase().includes("istirahat") || targetMaster.nama_tipe.toLowerCase().includes("izin")) {
