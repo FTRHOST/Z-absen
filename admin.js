@@ -1953,12 +1953,7 @@ function showDetailAbsensi(tanggal, dateStrParam) {
         let jamKerjaStr = '-';
         let jamLemburStr = '-';
 
-        const parseT = (tStr) => {
-            if (!tStr) return null;
-            const p = tStr.split(':');
-            if (p.length < 2) return null;
-            return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
-        };
+
         const formatM = (m) => {
             if (m <= 0) return '0j 0m';
             return `${Math.floor(m / 60)}j ${m % 60}m`;
@@ -2292,12 +2287,6 @@ async function exportCsvHarian(tanggal) {
                 });
             }
             
-            const parseT = (tStr) => {
-                if (!tStr) return null;
-                const p = tStr.split(':');
-                if (p.length < 2) return null;
-                return parseInt(p[0]) * 60 + parseInt(p[1]);
-            };
             const formatM = (m) => {
                 if (m <= 0) return '0j 0m';
                 return `${Math.floor(m/60)}j ${m%60}m`;
@@ -3523,14 +3512,6 @@ async function prosesExport(event) {
                                 let waktuIzinMasuk = null;
                                 let waktuIstirahatKeluarList = [];
                                 let waktuIstirahatMasukList = [];
-
-                                const parseT = (tStr) => {
-                                    if (!tStr) return null;
-                                    const firstTime = String(tStr).split(',')[0].trim();
-                                    const p = firstTime.split(':');
-                                    if (p.length < 2) return null;
-                                    return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
-                                };
 
                                 const parseTLast = (tStr) => {
                                     if (!tStr) return null;
@@ -5610,13 +5591,6 @@ async function simpanEditAbsensi() {
         // Hitung ulang status, menit_terlambat, dan menit_lembur berdasarkan master_tipe_absen
         const { data: masterList } = await supabaseClient.from("master_tipe_absen").select("*");
         const targetMaster = (masterList || []).find(m => m.nama_tipe === tipe_absen);
-
-        const parseT = (tStr) => {
-            if (!tStr) return null;
-            const p = tStr.split(':');
-            if (p.length < 2) return null;
-            return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
-        };
 
         let status = "Hadir";
         let menit_terlambat = 0;
