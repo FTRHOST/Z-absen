@@ -1819,7 +1819,43 @@ function showDetailAbsensi(tanggal, dateStrParam) {
         tipeAbsenList.forEach(tipe => {
             const list = g.absensi[tipe] || [];
             if (list.length > 0) {
-                const timeBadges = list.map(a => `<span class="badge bg-light text-dark border d-block mb-1">${formatWaktuGlobal(a.waktu)}</span>`).join('');
+                const timeBadges = list.map(a => {
+                    const statusStr = (a.status || '').toLowerCase();
+                    const tipeStr = (tipe || '').toLowerCase();
+                    const ketStr = (a.keterangan_waktu || '').toLowerCase();
+
+                    let limitMin = null;
+                    if (typeof globalMasterTipeAbsen !== 'undefined' && globalMasterTipeAbsen) {
+                        const mObj = globalMasterTipeAbsen.find(m => m.nama_tipe === tipe) || globalMasterTipeAbsen.find(m => m.is_checkout);
+                        if (mObj && (mObj.is_checkout || tipeStr.includes('pulang') || tipeStr.includes('checkout'))) {
+                            const endStr = mObj.batas_terlambat || (mObj.jam_tutup && mObj.jam_tutup !== '23:59:59' ? mObj.jam_tutup : null);
+                            if (endStr) limitMin = parseT(endStr);
+                        }
+                    }
+                    const wMin = parseT(a.waktu);
+                    const isExceedingEnd = (limitMin !== null && wMin !== null && wMin > limitMin);
+
+                    const isLemburRecord = a.status === "Lembur" || 
+                                           (a.menit_lembur && parseInt(a.menit_lembur, 10) > 0) || 
+                                           tipeStr.includes('lembur') || 
+                                           statusStr.includes('lembur') || 
+                                           ketStr.includes('lembur') || 
+                                           isExceedingEnd;
+
+                    const isTerlambatRecord = a.status === "Terlambat" || 
+                                              (a.menit_terlambat && parseInt(a.menit_terlambat, 10) > 0) || 
+                                              statusStr.includes('terlambat') || 
+                                              ketStr.includes('terlambat');
+
+                    let badgeClass = "bg-light text-dark border";
+                    if (isLemburRecord) {
+                        badgeClass = "bg-success text-white";
+                    } else if (isTerlambatRecord) {
+                        badgeClass = "bg-warning text-dark";
+                    }
+
+                    return `<span class="badge ${badgeClass} d-block mb-1" title="${a.keterangan_waktu || a.status}">${formatWaktuGlobal(a.waktu)}</span>`;
+                }).join('');
                 trHtml += `<td class="align-middle">${timeBadges}</td>`;
             } else {
                 trHtml += `<td class="align-middle text-muted">-</td>`;
@@ -1832,8 +1868,32 @@ function showDetailAbsensi(tanggal, dateStrParam) {
             if (list.length > 0) {
                 let statusHtml = '';
                 list.forEach(a => {
+                    const statusStr = (a.status || '').toLowerCase();
+                    const tipeStr = (tipe || '').toLowerCase();
+                    const ketStr = (a.keterangan_waktu || '').toLowerCase();
+
+                    let limitMin = null;
+                    if (typeof globalMasterTipeAbsen !== 'undefined' && globalMasterTipeAbsen) {
+                        const mObj = globalMasterTipeAbsen.find(m => m.nama_tipe === tipe) || globalMasterTipeAbsen.find(m => m.is_checkout);
+                        if (mObj && (mObj.is_checkout || tipeStr.includes('pulang') || tipeStr.includes('checkout'))) {
+                            const endStr = mObj.batas_terlambat || (mObj.jam_tutup && mObj.jam_tutup !== '23:59:59' ? mObj.jam_tutup : null);
+                            if (endStr) limitMin = parseT(endStr);
+                        }
+                    }
+                    const wMin = parseT(a.waktu);
+                    const isExceedingEnd = (limitMin !== null && wMin !== null && wMin > limitMin);
+
+                    const isLemburRecord = a.status === "Lembur" || 
+                                           (a.menit_lembur && parseInt(a.menit_lembur, 10) > 0) || 
+                                           tipeStr.includes('lembur') || 
+                                           statusStr.includes('lembur') || 
+                                           ketStr.includes('lembur') || 
+                                           isExceedingEnd;
+
+                    let displayStatus = a.status || 'Hadir';
+                    if (isLemburRecord && displayStatus === 'Hadir') displayStatus = 'Lembur';
+
                     let badgeClass = "bg-secondary";
-                    const isLemburRecord = a.status === "Lembur" || (a.menit_lembur && parseInt(a.menit_lembur, 10) > 0) || (a.tipe_absen && a.tipe_absen.toLowerCase().includes('lembur')) || (a.keterangan_waktu && a.keterangan_waktu.toLowerCase().includes('lembur'));
                     if (isLemburRecord) badgeClass = "bg-success";
                     else if (a.status === "Hadir" || a.status === "Tepat Waktu") badgeClass = "bg-success";
                     else if (a.status === "Terlambat") badgeClass = "bg-warning text-dark";
@@ -1847,7 +1907,7 @@ function showDetailAbsensi(tanggal, dateStrParam) {
                     else if (faceStatus.includes("Sesuai") || faceStatus.includes("Sama")) faceBadgeClass = "bg-success";
 
                     statusHtml += `<div class="mb-1 text-center">
-                        <span class="badge ${badgeClass} mb-1 w-100">${a.status || 'Hadir'}</span><br>
+                        <span class="badge ${badgeClass} mb-1 w-100">${displayStatus}</span><br>
                         <span class="badge ${faceBadgeClass} w-100" title="Status Wajah"><i class="fas fa-user-check"></i> ${faceStatus}</span>
                     </div>`;
                 });
@@ -3378,8 +3438,20 @@ async function prosesExport(event) {
                                     const statusStr = (a.status || '').toLowerCase();
                                     const tipeStr = tipe.toLowerCase();
                                     const ketStr = (a.keterangan_waktu || '').toLowerCase();
+
+                                    let limitMin = null;
+                                    if (typeof globalMasterTipeAbsen !== 'undefined' && globalMasterTipeAbsen) {
+                                        const mObj = globalMasterTipeAbsen.find(m => m.nama_tipe === tipe) || globalMasterTipeAbsen.find(m => m.is_checkout);
+                                        if (mObj && (mObj.is_checkout || tipeStr.includes('pulang') || tipeStr.includes('checkout'))) {
+                                            const endStr = mObj.batas_terlambat || (mObj.jam_tutup && mObj.jam_tutup !== '23:59:59' ? mObj.jam_tutup : null);
+                                            if (endStr) limitMin = parseT(endStr);
+                                        }
+                                    }
+                                    const wMin = parseT(a.waktu);
+                                    const isExceedingEnd = (limitMin !== null && wMin !== null && wMin > limitMin);
+
                                     const isTerlambat = statusStr.includes('terlambat');
-                                    const isLembur = tipeStr.includes('lembur') || statusStr.includes('lembur') || (a.menit_lembur && a.menit_lembur > 0) || ketStr.includes('lembur');
+                                    const isLembur = tipeStr.includes('lembur') || statusStr.includes('lembur') || (a.menit_lembur && a.menit_lembur > 0) || ketStr.includes('lembur') || isExceedingEnd;
                                     
                                     let bgColor = null;
                                     if (isTerlambat) {
