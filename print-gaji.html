@@ -723,20 +723,27 @@
               if (netDailyMins < 0) netDailyMins = 0;
             }
 
-            let jamPulangResmiMin = 960; // Default 16:00
-            if (empTipeList && empTipeList.length > 0 && masterTipeAbsenList && masterTipeAbsenList.length > 0) {
-              const checkoutObj = masterTipeAbsenList.find(t => t.is_checkout && empTipeList.includes(t.nama_tipe));
-              if (checkoutObj && checkoutObj.batas_terlambat) {
-                const parts = checkoutObj.batas_terlambat.split(':');
-                if (parts.length >= 2) jamPulangResmiMin = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+            let dailyCalcLembur = 0;
+            Object.keys(dayObj.byTipe).forEach(tipeKey => {
+              const cellObj = dayObj.byTipe[tipeKey];
+              if (cellObj && cellObj.time && cellObj.time !== '-') {
+                const tLower = tipeKey.toLowerCase();
+                const mObj = masterTipeAbsenList ? masterTipeAbsenList.find(m => m.nama_tipe === tipeKey) : null;
+                if (mObj && (mObj.is_checkout || tLower.includes('pulang') || tLower.includes('checkout'))) {
+                  const endStr = mObj.batas_terlambat || (mObj.jam_tutup && mObj.jam_tutup !== '23:59:59' ? mObj.jam_tutup : null);
+                  if (endStr) {
+                    const limitMin = parseMins(endStr);
+                    const pMins = parseMins(cellObj.time);
+                    if (limitMin && pMins && pMins > limitMin) {
+                      dailyCalcLembur += (pMins - limitMin);
+                    }
+                  }
+                }
               }
-            }
+            });
 
-            if (maxPulang !== null && jamPulangResmiMin && maxPulang > jamPulangResmiMin) {
-              const calcLembur = Math.max(0, maxPulang - jamPulangResmiMin);
-              if (calcLembur > dayObj.lemburMins) {
-                dayObj.lemburMins = calcLembur;
-              }
+            if (dailyCalcLembur > dayObj.lemburMins) {
+              dayObj.lemburMins = dailyCalcLembur;
             }
 
             dailyNetMinsMap[d] = netDailyMins;
