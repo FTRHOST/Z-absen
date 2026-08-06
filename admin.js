@@ -4653,12 +4653,12 @@ async function restoreDatabase(event) {
         for (const table of restoreSequence) {
             const records = rawDb[table];
             if (records && Array.isArray(records) && records.length > 0) {
-                const { error } = await supabaseClient.from(table).upsert(records);
+                const { error } = await supabaseClient.from(table).upsert(records, { onConflict: 'id' });
                 if (error) {
                     console.warn(`Upsert massal gagal untuk tabel ${table}, mencoba per-baris:`, error);
                     let tableRestored = 0;
                     for (const row of records) {
-                        const { error: singleErr } = await supabaseClient.from(table).upsert(row);
+                        const { error: singleErr } = await supabaseClient.from(table).upsert(row, { onConflict: 'id' });
                         if (!singleErr) tableRestored++;
                         else console.warn(`Gagal upsert row tabel ${table}:`, singleErr, row);
                     }

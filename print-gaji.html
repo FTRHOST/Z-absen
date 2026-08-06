@@ -314,11 +314,17 @@
   <div class="print-container">
     
     <!-- DOKUMEN HEADER -->
-    <div class="text-center mb-3 pb-2 border-bottom border-2 border-dark">
-      <h4 class="fw-bold mb-1 tracking-wide text-uppercase" style="letter-spacing: 1px;">ZIEDA ABSEN - SCAN LOG (GAJI MINGGUAN)</h4>
-      <p class="mb-0 small text-secondary fw-semibold" id="doc-subtitle">
-        Periode: - | Cabang: Semua Cabang
-      </p>
+    <div class="d-flex align-items-center mb-3 pb-2 border-bottom border-2 border-dark">
+      <div style="width: 80px;">
+        <img id="app-logo-header" src="" alt="" style="max-width: 100%; max-height: 60px; display: none;">
+      </div>
+      <div class="flex-grow-1 text-center">
+        <h4 class="fw-bold mb-1 tracking-wide text-uppercase" style="letter-spacing: 1px;">ZIEDA ABSEN - SCAN LOG (GAJI MINGGUAN)</h4>
+        <p class="mb-0 small text-secondary fw-semibold" id="doc-subtitle">
+          Periode: - | Cabang: Semua Cabang
+        </p>
+      </div>
+      <div style="width: 80px;"></div>
     </div>
 
     <!-- SPINNER LOADING -->
@@ -411,6 +417,16 @@
         let { data: tData, error: tErr } = await supabaseClient.from('master_tipe_absen').select('*').order('id', { ascending: true });
         if (!tErr && tData) {
           masterTipeAbsenList = tData;
+        }
+
+        // Load App Settings for Logo
+        let { data: sData, error: sErr } = await supabaseClient.from('app_settings').select('logo_url').eq('id', 1).maybeSingle();
+        if (!sErr && sData && sData.logo_url) {
+          const logoEl = document.getElementById('app-logo-header');
+          if (logoEl) {
+            logoEl.src = sData.logo_url;
+            logoEl.style.display = 'block';
+          }
         }
       } catch (e) {
         console.error('Error loading master data:', e);
