@@ -226,6 +226,46 @@
           padding-bottom: 70px;
         }
       }
+      /* Custom bottom nav styling */
+      #hrisTabs .nav-link {
+        background-color: var(--surface-variant) !important;
+        transition: all 0.3s ease;
+      }
+      #hrisTabs .nav-link svg circle[stroke],
+      #hrisTabs .nav-link svg path[stroke] {
+        stroke: var(--on-surface-variant) !important;
+        transition: all 0.3s ease;
+      }
+      #hrisTabs .nav-link svg path[fill]:not([fill="white"]):not([fill="none"]) {
+        fill: var(--on-surface-variant) !important;
+        transition: all 0.3s ease;
+      }
+      #hrisTabs .nav-link .nav-icon-3-wrapper {
+        background-color: var(--on-surface-variant) !important;
+        transition: all 0.3s ease;
+      }
+      #hrisTabs .nav-link span {
+        color: var(--surface-variant) !important;
+        transition: all 0.3s ease;
+      }
+
+      /* Active state */
+      #hrisTabs .nav-link.active {
+        background-color: var(--primary-container) !important;
+      }
+      #hrisTabs .nav-link.active svg circle[stroke],
+      #hrisTabs .nav-link.active svg path[stroke] {
+        stroke: var(--on-primary-container) !important;
+      }
+      #hrisTabs .nav-link.active svg path[fill]:not([fill="white"]):not([fill="none"]) {
+        fill: var(--on-primary-container) !important;
+      }
+      #hrisTabs .nav-link.active .nav-icon-3-wrapper {
+        background-color: var(--on-primary-container) !important;
+      }
+      #hrisTabs .nav-link.active span {
+        color: var(--primary-container) !important;
+      }
     </style>
   </head>
   <body>
@@ -253,38 +293,7 @@
         </div>
       </div>
 
-      <!-- Greeting -->
-      <div class="flex justify-between items-center">
-        <div
-          class="text-on-surface text-xl font-normal font-sans"
-          id="nama-user-navbar"
-        >
-          Selamat Datang, Karyawan
-        </div>
-        <!-- Weather Icon -->
-        <div class="w-[22px] h-[22px]">
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 22 22"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              fill-rule="evenodd"
-              clip-rule="evenodd"
-              d="M11 19.9375C15.936 19.9375 19.9375 15.936 19.9375 11C19.9375 6.06396 15.936 2.0625 11 2.0625C6.06396 2.0625 2.0625 6.06396 2.0625 11C2.0625 15.936 6.06396 19.9375 11 19.9375Z"
-              fill="#FBBC04"
-            />
-            <path
-              fill-rule="evenodd"
-              clip-rule="evenodd"
-              d="M11.6875 22C14.7251 22 17.1875 19.5376 17.1875 16.5C17.1875 13.4624 14.7251 11 11.6875 11C8.64993 11 6.1875 13.4624 6.1875 16.5C6.1875 19.5376 8.64993 22 11.6875 22Z"
-              fill="#DEDFDF"
-            />
-          </svg>
-        </div>
-      </div>
+
     </div>
 
     <div class="container-fluid">
@@ -299,7 +308,8 @@
 
       <!-- MENU NAVBAR KARYAWAN -->
       <div
-        class="fixed bottom-0 left-0 w-full z-[1030] pb-6 pointer-events-none flex justify-center"
+        id="bottom-nav-container"
+        class="fixed bottom-0 left-0 w-full z-[1030] pb-6 pointer-events-none flex justify-center transition-transform duration-300 ease-in-out translate-y-0"
       >
         <ul
           class="nav flex justify-center items-center gap-6 py-3 m-0 pointer-events-auto"
@@ -315,7 +325,7 @@
               type="button"
               role="tab"
               aria-selected="true"
-              class="nav-link active w-14 h-14 p-0 relative rounded-full bg-primary-container flex items-center justify-center shadow-md border-0 transition-all"
+              class="nav-link active w-14 h-14 p-0 relative rounded-full bg-transparent flex items-center justify-center shadow-md border-0 transition-all"
             >
               <svg
                 width="68"
@@ -350,7 +360,7 @@
               type="button"
               role="tab"
               aria-selected="false"
-              class="nav-link w-14 h-14 p-0 relative rounded-full bg-primary-container flex items-center justify-center shadow-md border-0 transition-all"
+              class="nav-link w-14 h-14 p-0 relative rounded-full bg-transparent flex items-center justify-center shadow-md border-0 transition-all"
             >
               <svg
                 width="36"
@@ -366,7 +376,6 @@
                 </mask>
                 <path
                   d="M36 18C36 27.9411 27.9411 36 18 36C8.05887 36 0 27.9411 0 18C0 8.05887 8.05887 0 18 0C27.9411 0 36 8.05887 36 18ZM9.63095 18C9.63095 22.6221 13.3779 26.3691 18 26.3691C22.6221 26.3691 26.3691 22.6221 26.3691 18C26.3691 13.3779 22.6221 9.63095 18 9.63095C13.3779 9.63095 9.63095 13.3779 9.63095 18Z"
-                  fill="white"
                   stroke="var(--on-primary-container)"
                   stroke-width="6"
                   mask="url(#path-1-inside-1_2130_3506)"
@@ -383,14 +392,14 @@
               type="button"
               role="tab"
               aria-selected="false"
-              class="nav-link w-14 h-14 p-0 relative rounded-full bg-primary-container flex items-center justify-center shadow-md border-0 transition-all"
+              class="nav-link w-14 h-14 p-0 relative rounded-full bg-transparent flex items-center justify-center shadow-md border-0 transition-all"
             >
               <div
-                class="relative flex items-center justify-center w-9 h-9 bg-on-primary-container rounded-full"
+                class="relative flex items-center justify-center w-9 h-9 rounded-full nav-icon-3-wrapper"
               >
                 <span
                   id="nav-date-text"
-                  class="text-primary-container text-lg font-medium font-sans"
+                  class="text-lg font-medium font-sans"
                   >30</span
                 >
               </div>
@@ -405,7 +414,7 @@
               type="button"
               role="tab"
               aria-selected="false"
-              class="nav-link w-14 h-14 p-0 relative rounded-full bg-primary-container flex items-center justify-center shadow-md border-0 transition-all"
+              class="nav-link w-14 h-14 p-0 relative rounded-full bg-transparent flex items-center justify-center shadow-md border-0 transition-all"
             >
               <svg
                 width="40"
@@ -426,7 +435,40 @@
 
       <div class="tab-content" id="hrisTabsContent">
         <div class="tab-pane fade show active" id="tab-absensi" role="tabpanel">
-          <div class="p-6 flex flex-col gap-8">
+          <div class="px-6 pt-0 pb-6 flex flex-col gap-8">
+            <!-- Greeting -->
+            <div class="flex justify-between items-center">
+              <div
+                class="text-on-surface text-xl font-normal font-sans"
+                id="nama-user-navbar"
+              >
+                Selamat Datang, Karyawan
+              </div>
+              <!-- Weather Icon -->
+              <div class="w-[22px] h-[22px]">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 22 22"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M11 19.9375C15.936 19.9375 19.9375 15.936 19.9375 11C19.9375 6.06396 15.936 2.0625 11 2.0625C6.06396 2.0625 2.0625 6.06396 2.0625 11C2.0625 15.936 6.06396 19.9375 11 19.9375Z"
+                    fill="#FBBC04"
+                  />
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M11.6875 22C14.7251 22 17.1875 19.5376 17.1875 16.5C17.1875 13.4624 14.7251 11 11.6875 11C8.64993 11 6.1875 13.4624 6.1875 16.5C6.1875 19.5376 8.64993 22 11.6875 22Z"
+                    fill="#DEDFDF"
+                  />
+                </svg>
+              </div>
+            </div>
+
             <!-- Map and Action Button -->
             <div class="flex flex-col gap-4">
               <div
@@ -1623,6 +1665,21 @@
         return timeStr.length === 5 ? `${timeStr}:00` : timeStr;
       }
       window.formatWaktuGlobal = formatWaktuGlobal;
+
+      // Hide bottom nav on scroll down
+      let lastScrollY = window.scrollY;
+      window.addEventListener("scroll", () => {
+        const navContainer = document.getElementById("bottom-nav-container");
+        if (!navContainer) return;
+        if (window.scrollY > lastScrollY && window.scrollY > 50) {
+          // scroll down -> hide
+          navContainer.classList.add("translate-y-[150%]");
+        } else {
+          // scroll up -> show
+          navContainer.classList.remove("translate-y-[150%]");
+        }
+        lastScrollY = window.scrollY;
+      });
 
       loadAppSettings().then(() => {
         // Set dynamic date on the third nav icon
