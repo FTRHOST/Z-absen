@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Z-Absen | Pengaturan Jadwal Gajian</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-hover: #4338CA;
+            --secondary: #10B981;
+            --dark: #1E293B;
+            --light: #F8FAFC;
+            --glass-bg: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.4);
+            --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+            background-attachment: fixed;
+            color: var(--dark);
+            min-height: 100vh;
+        }
+
+        /* Navbar / Header */
+        .header {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 1.2rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+        }
+
+        .header h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header .btn-back {
+            text-decoration: none;
+            color: var(--dark);
+            font-weight: 500;
+            font-size: 0.9rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            background: #f1f5f9;
+            transition: all 0.3s ease;
+        }
+
+        .header .btn-back:hover {
+            background: #e2e8f0;
+            transform: translateX(-2px);
+        }
+
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 2.5rem auto;
+            padding: 0 1.5rem;
+        }
+
+        /* Top Controls */
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .search-box {
+            position: relative;
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 0.8rem 1rem 0.8rem 2.8rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .filter-select {
+            padding: 0.8rem 1rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            outline: none;
+            background: rgba(255, 255, 255, 0.9);
+            color: #475569;
+            cursor: pointer;
+            min-width: 180px;
+        }
+
+        .filter-select:focus, .search-box input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+        }
+
+        .search-box i {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+        }
+        
+        .bulk-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            background: var(--glass-bg);
+            padding: 0.5rem 1rem;
+            border-radius: 12px;
+            border: 1px solid var(--glass-border);
+        }
+
+        /* Users Grid */
+        .users-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .user-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: var(--glass-shadow);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .user-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.08);
+            border-color: #cbd5e1;
+        }
+
+        .user-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--primary);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .user-card:hover::before {
+            opacity: 1;
+        }
+
+        .card-checkbox {
+            margin-top: 0.25rem;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .user-info {
+            flex: 1;
+        }
+
+        .user-info h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: var(--dark);
+        }
+
+        .user-info p {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin-bottom: 1rem;
+        }
+
+        .badge-schedule {
+            display: inline-block;
+            padding: 0.4rem 0.8rem;
+            background: #e0e7ff;
+            color: #4338ca;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-none {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+
+        /* Modal / Form */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal-content {
+            background: white;
+            width: 90%;
+            max-width: 500px;
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            transform: translateY(20px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-header h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .btn-close {
+            background: none;
+            border: none;
+            font-size: 1.25rem;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .btn-close:hover {
+            color: #ef4444;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #475569;
+        }
+
+        .form-select, .form-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .form-select:focus, .form-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .date-inputs-container {
+            background: #f8fafc;
+            border: 1px dashed #cbd5e1;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-top: 0.5rem;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .date-note {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 0.5rem;
+        }
+
+        .modal-footer {
+            margin-top: 2rem;
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+        
+        .btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+        }
+
+        .btn-cancel {
+            background: #f1f5f9;
+            color: #475569;
+        }
+
+        .btn-cancel:hover {
+            background: #e2e8f0;
+        }
+
+        .btn-save {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 10px rgba(79, 70, 229, 0.3);
+        }
+        
+        .btn-bulk {
+            background: var(--secondary);
+            color: white;
+            box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-save:hover, .btn-bulk:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.1);
+        }
+
+        /* Loading Spinner */
+        .loader {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(79, 70, 229, 0.2);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s ease-in-out infinite;
+            margin: 3rem auto;
+        }
+
+        .loader-container {
+            text-align: center;
+            width: 100%;
+            padding: 3rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Checkbox Grid for Weekly */
+        .days-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+        }
+
+        .day-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+        
+        .day-checkbox:hover {
+            background: #e0e7ff;
+        }
+        
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: white;
+            color: var(--dark);
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            z-index: 2000;
+            border-left: 4px solid var(--secondary);
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="header">
+        <h1><i class="fa-solid fa-calendar-check"></i> Pengaturan Jadwal Gajian</h1>
+        <a href="admin.html" class="btn-back"><i class="fa-solid fa-arrow-left"></i> Kembali ke Admin</a>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container">
+        <div class="controls">
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap; flex: 1;">
+                <div class="search-box">
+                    <i class="fa-solid fa-search"></i>
+                    <input type="text" id="searchInput" placeholder="Cari nama karyawan..." onkeyup="filterUsers()">
+                </div>
+                <select id="filterCabang" class="filter-select" onchange="filterUsers()">
+                    <option value="ALL">Semua Cabang</option>
+                    <!-- Option cabang diisi via JS -->
+                </select>
+            </div>
+            
+            <div class="bulk-actions">
+                <label style="font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" style="width: 16px; height: 16px;">
+                    Pilih Semua
+                </label>
+                <button class="btn btn-bulk btn-small" onclick="openBulkModal()"><i class="fa-solid fa-layer-group"></i> Terapkan Massal</button>
+                <button class="btn btn-cancel btn-small" onclick="loadData()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+            </div>
+        </div>
+
+        <div id="loading" class="loader-container">
+            <div class="loader"></div>
+            <p style="margin-top: 1rem; color: #64748b;">Memuat data karyawan...</p>
+        </div>
+
+        <div class="users-grid" id="usersGrid">
+            <!-- Cards akan dirender di sini via JS -->
+        </div>
+    </main>
+
+    <!-- Modal Form -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Atur Jadwal</h2>
+                <button class="btn-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form id="scheduleForm" onsubmit="saveSchedule(event)">
+                <input type="hidden" id="userId"> <!-- Bisa berisi satu ID atau daftar ID dipisah koma -->
+                
+                <div class="form-group">
+                    <label>Tipe Gajian</label>
+                    <select id="tipeGajian" class="form-select" onchange="updateDateInputs()" required>
+                        <option value="" disabled selected>Pilih Tipe</option>
+                        <option value="mingguan">Mingguan (Weekly)</option>
+                        <option value="dwimingguan">Dwi-Mingguan (Bi-weekly)</option>
+                        <option value="bulanan">Bulanan (Monthly)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Pilih Hari / Tanggal</label>
+                    <div id="dynamicInputs" class="date-inputs-container">
+                        <p class="text-muted" style="font-size: 0.85rem; color: #94a3b8; text-align: center;">Pilih Tipe Gajian terlebih dahulu.</p>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-cancel" onclick="closeModal()">Batal</button>
+                    <button type="submit" class="btn btn-save" id="btnSaveSchedule">Simpan Jadwal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <i class="fa-solid fa-circle-check" style="color: var(--secondary); font-size: 1.25rem;"></i>
+        <span id="toastMsg">Berhasil disimpan!</span>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="env.js"></script>
+    <script src="config.js"></script>
+
+    <script>
+        let allUsers = [];
+        let schedules = {}; // Format: { user_id: { tipe_gajian: '...', hari_tanggal_gajian: [...] } }
+        let selectedUserIds = new Set(); // Menyimpan ID user yang dipilih secara global
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            if (typeof supabaseClient === 'undefined' && typeof supabase !== 'undefined' && typeof SUPABASE_URL !== 'undefined') {
+                window.supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            }
+            await loadData();
+        });
+
+        async function loadData() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('usersGrid').innerHTML = '';
+            document.getElementById('selectAllCheckbox').checked = false;
+
+            try {
+                const { data: usersData, error: errUsers } = await supabaseClient
+                    .from('users')
+                    .select('id, nama, cabang, role')
+                    .order('nama');
+                if (errUsers) throw errUsers;
+
+                const { data: jadwalData, error: errJadwal } = await supabaseClient
+                    .from('jadwal_gajian')
+                    .select('*');
+                if (errJadwal) throw errJadwal;
+
+                schedules = {};
+                if (jadwalData) {
+                    jadwalData.forEach(j => schedules[j.karyawan_id] = j);
+                }
+
+                // Populate cabang filter
+                const uniqueCabang = [...new Set(usersData.map(u => u.cabang).filter(Boolean))].sort();
+                const filterCabang = document.getElementById('filterCabang');
+                uniqueCabang.forEach(cab => {
+                    const option = document.createElement('option');
+                    option.value = cab;
+                    option.textContent = cab;
+                    filterCabang.appendChild(option);
+                });
+
+                allUsers = usersData || [];
+                renderUsers(allUsers);
+            } catch (error) {
+                console.error("Error loading data:", error);
+                alert("Gagal memuat data dari database.");
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function renderUsers(users) {
+            const grid = document.getElementById('usersGrid');
+            grid.innerHTML = '';
+
+            if (users.length === 0) {
+                grid.innerHTML = `<p style="grid-column: 1/-1; text-align:center; color: #64748b;">Tidak ada data karyawan ditemukan.</p>`;
+                return;
+            }
+
+            users.forEach(user => {
+                const schedule = schedules[user.id];
+                
+                let badgeClass = 'badge-none';
+                let badgeText = 'Belum Diatur';
+                let detailText = '';
+
+                if (schedule) {
+                    badgeClass = 'badge-schedule';
+                    badgeText = schedule.tipe_gajian;
+                    
+                    let arr = schedule.hari_tanggal_gajian;
+                    if (!Array.isArray(arr)) arr = [arr];
+                    
+                    if (schedule.tipe_gajian === 'mingguan') {
+                        detailText = `<br><span style="font-size:0.8rem; color:#475569;">Hari: <b>${arr.join(', ')}</b></span>`;
+                    } else {
+                        detailText = `<br><span style="font-size:0.8rem; color:#475569;">Tgl: <b>${arr.join(', ')}</b></span>`;
+                    }
+                }
+
+                const card = document.createElement('div');
+                card.className = 'user-card';
+                card.onclick = () => openModal(user.id, user.nama);
+                card.innerHTML = `
+                    <input type="checkbox" class="card-checkbox user-check" value="${user.id}" ${selectedUserIds.has(user.id) ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleUserSelection(this, ${user.id})">
+                    <div class="user-info">
+                        <h3>${user.nama}</h3>
+                        <p><i class="fa-solid fa-briefcase"></i> ${user.role || '-'} | <i class="fa-solid fa-building"></i> ${user.cabang || '-'}</p>
+                        <div>
+                            <span class="${badgeClass}">${badgeText}</span>
+                            ${detailText}
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function filterUsers() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const selectedCabang = document.getElementById('filterCabang').value;
+
+            const filtered = allUsers.filter(u => {
+                const matchName = u.nama.toLowerCase().includes(query) || (u.cabang && u.cabang.toLowerCase().includes(query));
+                const matchCabang = selectedCabang === "ALL" || u.cabang === selectedCabang;
+                return matchName && matchCabang;
+            });
+
+            renderUsers(filtered);
+            // Jangan hapus checkbox Select All secara membabi buta agar state konsisten
+            updateSelectAllState();
+        }
+
+        /* BULK ACTIONS */
+        function toggleUserSelection(checkbox, userId) {
+            if (checkbox.checked) {
+                selectedUserIds.add(userId);
+            } else {
+                selectedUserIds.delete(userId);
+            }
+            updateSelectAllState();
+        }
+
+        function updateSelectAllState() {
+            const displayedCheckboxes = document.querySelectorAll('.user-check');
+            const selectAllCb = document.getElementById('selectAllCheckbox');
+            if (displayedCheckboxes.length === 0) {
+                selectAllCb.checked = false;
+                return;
+            }
+            const allChecked = Array.from(displayedCheckboxes).every(cb => cb.checked);
+            selectAllCb.checked = allChecked;
+        }
+
+        function toggleSelectAll(checkbox) {
+            const displayedCheckboxes = document.querySelectorAll('.user-check');
+            displayedCheckboxes.forEach(cb => {
+                cb.checked = checkbox.checked;
+                const userId = parseInt(cb.value);
+                if (checkbox.checked) {
+                    selectedUserIds.add(userId);
+                } else {
+                    selectedUserIds.delete(userId);
+                }
+            });
+        }
+
+        function openBulkModal() {
+            const selected = Array.from(selectedUserIds);
+            if (selected.length === 0) {
+                alert("Pilih minimal satu karyawan untuk diterapkan massal!");
+                return;
+            }
+
+            document.getElementById('modalTitle').innerText = `Atur Massal (${selected.length} Karyawan)`;
+            document.getElementById('userId').value = selected.join(','); // Simpan sebagai string dipisah koma
+            
+            document.getElementById('tipeGajian').value = '';
+            document.getElementById('dynamicInputs').innerHTML = '<p class="text-muted" style="font-size: 0.85rem; color: #94a3b8; text-align: center;">Pilih Tipe Gajian terlebih dahulu.</p>';
+            
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        /* MODAL LOGIC */
+        function openModal(userId, userName) {
+            document.getElementById('modalTitle').innerText = `Jadwal: ${userName}`;
+            document.getElementById('userId').value = userId; // Single ID
+            
+            const schedule = schedules[userId];
+            const selectTipe = document.getElementById('tipeGajian');
+            
+            if (schedule) {
+                selectTipe.value = schedule.tipe_gajian;
+                updateDateInputs(schedule.hari_tanggal_gajian);
+            } else {
+                selectTipe.value = '';
+                document.getElementById('dynamicInputs').innerHTML = '<p class="text-muted" style="font-size: 0.85rem; color: #94a3b8; text-align: center;">Pilih Tipe Gajian terlebih dahulu.</p>';
+            }
+
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('active');
+        }
+
+        function updateDateInputs(existingData = []) {
+            const tipe = document.getElementById('tipeGajian').value;
+            const container = document.getElementById('dynamicInputs');
+            
+            if (!Array.isArray(existingData)) existingData = [existingData];
+
+            let html = '';
+            if (tipe === 'mingguan') {
+                const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+                html += `<div class="days-grid">`;
+                days.forEach(day => {
+                    const checked = existingData.includes(day) ? 'checked' : '';
+                    html += `<label class="day-checkbox"><input type="checkbox" name="hari_gaji" value="${day}" ${checked}> ${day}</label>`;
+                });
+                html += `</div><p class="date-note">* Pilih hari pencairan gaji (Bisa lebih dari 1).</p>`;
+            } 
+            else if (tipe === 'dwimingguan') {
+                const tgl1 = existingData[0] || 1;
+                const tgl2 = existingData[1] || 16;
+                html = `
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:1">
+                            <label style="font-size:0.75rem; color:#64748b;">Tanggal Pertama</label>
+                            <input type="number" id="tgl_1" class="form-input" min="1" max="31" value="${tgl1}" required>
+                        </div>
+                        <div style="flex:1">
+                            <label style="font-size:0.75rem; color:#64748b;">Tanggal Kedua</label>
+                            <input type="number" id="tgl_2" class="form-input" min="1" max="31" value="${tgl2}" required>
+                        </div>
+                    </div>
+                    <p class="date-note">* Gajian cair 2 kali dalam sebulan (contoh: 1 dan 16).</p>
+                `;
+            }
+            else if (tipe === 'bulanan') {
+                const tgl = existingData[0] || 28;
+                html = `
+                    <div>
+                        <label style="font-size:0.75rem; color:#64748b;">Tanggal Gajian</label>
+                        <input type="number" id="tgl_bulan" class="form-input" min="1" max="31" value="${tgl}" required>
+                    </div>
+                    <p class="date-note">* Gajian cair 1 kali setiap bulan.</p>
+                `;
+            }
+
+            container.innerHTML = html;
+        }
+
+        async function saveSchedule(e) {
+            e.preventDefault();
+            
+            const btn = document.getElementById('btnSaveSchedule');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...';
+            btn.disabled = true;
+
+            const userIdRaw = document.getElementById('userId').value;
+            const userIds = userIdRaw.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+            
+            const tipe = document.getElementById('tipeGajian').value;
+            let hariTanggal = [];
+
+            if (tipe === 'mingguan') {
+                const checkboxes = document.querySelectorAll('input[name="hari_gaji"]:checked');
+                checkboxes.forEach(cb => hariTanggal.push(cb.value));
+                if (hariTanggal.length === 0) {
+                    alert("Pilih minimal 1 hari!");
+                    resetBtn(btn);
+                    return;
+                }
+            } else if (tipe === 'dwimingguan') {
+                hariTanggal.push(parseInt(document.getElementById('tgl_1').value));
+                hariTanggal.push(parseInt(document.getElementById('tgl_2').value));
+            } else if (tipe === 'bulanan') {
+                hariTanggal.push(parseInt(document.getElementById('tgl_bulan').value));
+            }
+
+            try {
+                // Buat array payload untuk batch upsert
+                const payloads = userIds.map(id => ({
+                    karyawan_id: id,
+                    tipe_gajian: tipe,
+                    hari_tanggal_gajian: hariTanggal
+                }));
+
+                const { error } = await supabaseClient
+                    .from('jadwal_gajian')
+                    .upsert(payloads, { onConflict: 'karyawan_id' });
+
+                if (error) throw error;
+
+                // Update local state untuk dirender ulang
+                payloads.forEach(p => { schedules[p.karyawan_id] = p; });
+                
+                selectedUserIds.clear(); // Bersihkan memori pilihan
+                document.getElementById('selectAllCheckbox').checked = false;
+                
+                filterUsers(); 
+
+                closeModal();
+                showToast(`Berhasil menyimpan jadwal untuk ${payloads.length} karyawan!`);
+            } catch (err) {
+                console.error(err);
+                alert("Terjadi kesalahan saat menyimpan jadwal.");
+            } finally {
+                resetBtn(btn);
+            }
+        }
+
+        function resetBtn(btn) {
+            btn.innerHTML = 'Simpan Jadwal';
+            btn.disabled = false;
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+    </script>
+</body>
+</html>
