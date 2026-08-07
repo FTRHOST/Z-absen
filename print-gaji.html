@@ -328,7 +328,7 @@
                 <img id="app-logo-header" src="" alt="" style="max-width: 100%; max-height: 60px; display: none;">
               </div>
               <div class="flex-grow-1 text-center">
-                <h4 class="fw-bold mb-1 tracking-wide text-uppercase" style="letter-spacing: 1px;">ZIEDA ABSEN - SCAN LOG (GAJI MINGGUAN)</h4>
+                <h4 class="fw-bold mb-1 tracking-wide text-uppercase" style="letter-spacing: 1px;">ZIEDA ABSEN - LAPORAN</h4>
                 <p class="mb-0 small text-secondary fw-semibold" id="doc-subtitle">
                   Periode: - | Cabang: Semua Cabang
                 </p>
@@ -474,9 +474,9 @@
         return;
       }
 
-      if (diffDays > 7) {
+      if (diffDays > 31) {
         spinner.style.display = 'none';
-        container.innerHTML = `<div class="alert alert-warning text-center">Rentang tanggal Form Gaji Mingguan maksimal 7 hari (1 minggu). Anda memilih ${diffDays} hari. Silakan sesuaikan filter tanggal.</div>`;
+        container.innerHTML = `<div class="alert alert-warning text-center">Rentang tanggal maksimal adalah 31 hari (1 bulan). Anda memilih ${diffDays} hari. Silakan sesuaikan filter tanggal.</div>`;
         return;
       }
 
@@ -753,31 +753,57 @@
             totalTelatMins += dayObj.terlambatMins;
           });
 
-          // Build Dynamic Rows for empTipeList (Khusus Kantor Karyawan Ini)
-          let tableRowsHtml = '';
-          empTipeList.forEach(tipe => {
+          // Pecah tanggal menjadi blok-blok maksimal 7 hari agar tabel tidak melebar
+          const chunkedDates = [];
+          for (let i = 0; i < datesList.length; i += 7) {
+            chunkedDates.push(datesList.slice(i, i + 7));
+          }
+
+          let allTablesHtml = '';
+          
+          chunkedDates.forEach(chunk => {
+            let tableRowsHtml = '';
+            
+            // Baris untuk setiap tipe absen
+            empTipeList.forEach(tipe => {
+              tableRowsHtml += `
+                <tr>
+                  <td class="row-label ps-2">${tipe}</td>
+                  ${chunk.map(d => {
+                    const cellObj = userAbsenMap[d].byTipe[tipe];
+                    if (cellObj && cellObj.time) {
+                      const styleAttr = cellObj.bgColor ? `style="background-color: ${cellObj.bgColor}; font-weight: 600;"` : '';
+                      return `<td ${styleAttr}>${cellObj.time}</td>`;
+                    }
+                    return `<td>-</td>`;
+                  }).join('')}
+                </tr>
+              `;
+            });
+
+            // Summary Row (Total Jam)
             tableRowsHtml += `
               <tr>
-                <td class="row-label ps-2">${tipe}</td>
-                ${datesList.map(d => {
-                  const cellObj = userAbsenMap[d].byTipe[tipe];
-                  if (cellObj && cellObj.time) {
-                    const styleAttr = cellObj.bgColor ? `style="background-color: ${cellObj.bgColor}; font-weight: 600;"` : '';
-                    return `<td ${styleAttr}>${cellObj.time}</td>`;
-                  }
-                  return `<td>-</td>`;
-                }).join('')}
+                <td class="row-label text-center fw-bold text-dark">Total Jam</td>
+                ${chunk.map(d => `<td class="row-total-jam">${dailyNetMinsMap[d] > 0 ? formatHMM(dailyNetMinsMap[d]) : '-'}</td>`).join('')}
               </tr>
             `;
-          });
 
-          // Summary Row (Total Jam) - Title Rata Tengah
-          tableRowsHtml += `
-            <tr>
-              <td class="row-label text-center fw-bold text-dark">Total Jam</td>
-              ${datesList.map(d => `<td class="row-total-jam">${dailyNetMinsMap[d] > 0 ? formatHMM(dailyNetMinsMap[d]) : '-'}</td>`).join('')}
-            </tr>
-          `;
+            // Rangkai menjadi satu tabel untuk blok 7 hari ini
+            allTablesHtml += `
+              <table class="table-timesheet mb-3" style="margin-bottom: 15px;">
+                <thead>
+                  <tr>
+                    <th class="row-label text-center">Absen/Hari</th>
+                    ${chunk.map(d => `<th>${formatHariTanggalHeader(d)}</th>`).join('')}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${tableRowsHtml}
+                </tbody>
+              </table>
+            `;
+          });
 
           // Foto Pendaftaran / Wajah Karyawan
           const userFaceUrl = typeof fixStorageUrl === 'function' ? fixStorageUrl(u.foto_wajah || '') : (u.foto_wajah || '');
@@ -795,18 +821,8 @@
                 </div>
               </div>
 
-              <!-- TABEL DINAMIS SESUAI TIPE ABSEN -->
-              <table class="table-timesheet">
-                <thead>
-                  <tr>
-                    <th class="row-label text-center">Absen/Hari</th>
-                    ${datesList.map(d => `<th>${formatHariTanggalHeader(d)}</th>`).join('')}
-                  </tr>
-                </thead>
-                <tbody>
-                  ${tableRowsHtml}
-                </tbody>
-              </table>
+              <!-- TABEL DINAMIS (Dipech per 7 hari) -->
+              ${allTablesHtml}
 
               <!-- RINGKASAN REKAP & TANDA TANGAN -->
               <div class="summary-footer">

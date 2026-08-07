@@ -1,0 +1,21 @@
+{
+  "name": "z-absen",
+  "version": "1.0.0",
+  "description": "Zieda Absen adalah sebuah aplikasi web ringan berbasis Serverless (BaaS) yang dirancang khusus untuk mempermudah HRD (Human Resources Department) dalam melacak absensi, memonitor jam kerja, dan menyetujui pengajuan cuti karyawan secara efisien dan akurat.",
+  "main": "admin.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.2",
+    "axios": "^1.19.0",
+    "dotenv": "^17.4.2",
+    "form-data": "^4.0.6",
+    "pdf-lib": "^1.17.1",
+    "puppeteer": "^25.5.0",
+    "ws": "^8.21.2"
+  }
+}

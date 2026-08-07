@@ -1,0 +1,48 @@
+name: Generate Payroll
+
+on:
+  schedule:
+    # Berjalan setiap hari pada pukul 01:00 UTC (08:00 WIB)
+    - cron: '0 1 * * *'
+  # Memungkinkan workflow dijalankan secara manual (untuk keperluan testing/trigger)
+  workflow_dispatch:
+
+jobs:
+  generate_payroll:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: |
+          # Perhatian: Pastikan Anda sudah menjalankan perintah berikut di komputer lokal Anda:
+          # npm init -y
+          # npm install @supabase/supabase-js puppeteer axios form-data dotenv ws
+          # Lalu commit & push file package.json dan package-lock.json ke repository GitHub.
+          # 
+          # GitHub Actions akan mengeksekusi npm install untuk mengunduh semua dependency tersebut.
+          npm install
+
+      - name: Execute Payroll Script
+        env:
+          # Pastikan variabel-variabel ini sudah ditambahkan di:
+          # Repository > Settings > Secrets and variables > Actions > Repository secrets
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_KEY }} # Fallback (menggunakan variable yang sama)
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }} # Fallback
+          
+          # Konfigurasi Cabang yang Laporannya Ingin Dipisah (Pisahkan dengan koma)
+          # Jika Anda menambahkan cabang di sini, cabang tersebut akan mendapat PDF eksklusif.
+          # Sisanya akan dijadikan satu dalam file "Semua Cabang".
+          SEPARATED_BRANCHES: "Zieda Pusat" 
+        run: node scripts/generate-payroll.js
