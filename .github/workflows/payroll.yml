@@ -35,11 +35,9 @@ jobs:
           # Pastikan variabel-variabel ini sudah ditambahkan di:
           # Repository > Settings > Secrets and variables > Actions > Repository secrets
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_KEY }} # Fallback (menggunakan variable yang sama)
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }} # Fallback
           
           # Konfigurasi Cabang yang Laporannya Ingin Dipisah (Pisahkan dengan koma)
           # Jika Anda menambahkan cabang di sini, cabang tersebut akan mendapat PDF eksklusif.
