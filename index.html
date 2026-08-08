@@ -517,42 +517,40 @@
         </div>
 
         <div class="tab-pane fade" id="tab-cuti" role="tabpanel">
-          <div class="d-flex gap-2 mb-3">
-            <button
-              class="btn btn-info text-white fw-bold w-50"
-              data-bs-toggle="modal"
-              data-bs-target="#modalSisaCuti"
-            >
-              <i class="fas fa-ticket-alt"></i> Cek Sisa Cuti
-            </button>
-            <button
-              class="btn btn-secondary fw-bold w-50"
-              data-bs-toggle="modal"
-              data-bs-target="#modalRiwayatCuti"
-            >
-              <i class="fas fa-history"></i> Riwayat Cuti
-            </button>
-          </div>
+          <div class="px-6 pt-0 pb-6 flex flex-col gap-4">
+            <div class="d-flex gap-2 mb-2">
+              <button
+                class="w-1/2 h-12 bg-secondary text-on-secondary rounded-xl font-semibold shadow-sm flex items-center justify-center gap-2 border-0"
+                data-bs-toggle="modal"
+                data-bs-target="#modalSisaCuti"
+              >
+                <i class="fas fa-ticket-alt"></i> Sisa Cuti
+              </button>
+              <button
+                class="w-1/2 h-12 bg-surface-variant text-on-surface-variant rounded-xl font-semibold shadow-sm flex items-center justify-center gap-2 border-0"
+                data-bs-toggle="modal"
+                data-bs-target="#modalRiwayatCuti"
+              >
+                <i class="fas fa-history"></i> Riwayat
+              </button>
+            </div>
 
-          <div class="row g-4">
-            <div class="col-12">
-              <div class="card shadow-sm h-100">
-                <div class="card-header bg-white fw-bold">
-                  Formulir Pengajuan Cuti
-                </div>
-                <div class="card-body">
-                  <form id="form-pengajuan-cuti" onsubmit="ajukanCuti(event)">
-                    <div id="dynamic-form-container">
-                      <div class="text-center text-muted">Memuat form...</div>
-                    </div>
-                    <button
-                      type="submit"
-                      class="btn btn-success w-100 fw-bold mt-3"
-                    >
-                      Kirim Pengajuan Cuti
-                    </button>
-                  </form>
-                </div>
+            <div class="card shadow-sm border-0 rounded-xl">
+              <div class="card-header bg-white fw-bold rounded-t-xl border-b text-center text-on-surface">
+                Formulir Pengajuan Cuti
+              </div>
+              <div class="card-body bg-white rounded-b-xl">
+                <form id="form-pengajuan-cuti" onsubmit="ajukanCuti(event)">
+                  <div id="dynamic-form-container">
+                    <div class="text-center text-muted">Memuat form...</div>
+                  </div>
+                  <button
+                    type="submit"
+                    class="w-full h-12 bg-primary text-on-primary rounded-xl font-semibold shadow-sm mt-3 border-0"
+                  >
+                    Kirim Pengajuan Cuti
+                  </button>
+                </form>
               </div>
             </div>
           </div>
