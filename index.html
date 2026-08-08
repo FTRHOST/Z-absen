@@ -2291,8 +2291,8 @@
           ]);
           let dbError = res.error;
 
-          const textMsg = `<b>Laporan Absen (Wajah/Selfie)</b>\nNama: ${userObj.nama}\nCabang Utama: ${userObj.cabang || "-"}\nCabang Absen: ${isAbsenCabangLain ? cabangAbsenSekarang + " (Luar Cabang)" : userObj.cabang || "-"}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${waktu_sekarang}\nStatus Waktu: ${calcWaktu.keteranganWaktu}\nLokasi: ${lokasiTeks}\nFoto: <a href="${publicUrlData.publicUrl}">Lihat Foto</a>`;
-          await sendTelegramNotification(textMsg);
+          const textMsg = `<b>Laporan Absen (Wajah/Selfie)</b>\nNama: ${userObj.nama}\nCabang Utama: ${userObj.cabang || "-"}\nCabang Absen: ${isAbsenCabangLain ? cabangAbsenSekarang + " (Luar Cabang)" : userObj.cabang || "-"}\nTipe: ${tipeAbsenSekarang}\nWaktu: ${waktu_sekarang}\nStatus Waktu: ${calcWaktu.keteranganWaktu}\nLokasi: ${lokasiTeks}`;
+          await sendTelegramNotification(textMsg, publicUrlData.publicUrl);
 
           await cekStatusAbsenHariIni();
           await loadRiwayatAbsensi();
@@ -3343,12 +3343,12 @@
           }).then(() => logout());
         }
       }
-      async function sendTelegramNotification(message) {
+      async function sendTelegramNotification(message, photoUrl = null) {
         const targetChatId =
           (typeof window !== "undefined" && window.TELEGRAM_CHAT_ID) ||
           (typeof TELEGRAM_CHAT_ID !== "undefined"
             ? TELEGRAM_CHAT_ID
-            : "-5585540383");
+            : "-1004380194522");
 
         const botToken =
           (typeof window !== "undefined" && window.TELEGRAM_BOT_TOKEN) ||
@@ -3365,19 +3365,20 @@
           return;
         }
 
+        const payloadObj = photoUrl
+          ? { chat_id: targetChatId, photo: photoUrl, caption: message, parse_mode: "HTML" }
+          : { chat_id: targetChatId, text: message, parse_mode: "HTML" };
+        const apiEndpoint = photoUrl ? "sendPhoto" : "sendMessage";
+
         // 1. Jika TELEGRAM_BOT_TOKEN diisi di .env lokal / Docker / window.ENV, kirim langsung via Direct Telegram Bot API
         if (botToken && !botToken.includes("YOUR_BOT_TOKEN")) {
           try {
             const resp = await fetch(
-              `https://api.telegram.org/bot${botToken}/sendMessage`,
+              `https://api.telegram.org/bot${botToken}/${apiEndpoint}`,
               {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  chat_id: targetChatId,
-                  text: message,
-                  parse_mode: "HTML",
-                }),
+                body: JSON.stringify(payloadObj),
               },
             );
             const resData = await resp.json();
@@ -3402,7 +3403,7 @@
           const vercelResp = await fetch("/api/telegram-notif", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: message, chat_id: targetChatId }),
+            body: JSON.stringify({ message: message, chat_id: targetChatId, photo_url: photoUrl }),
           });
           if (vercelResp.ok) {
             const vData = await vercelResp.json();
@@ -3422,7 +3423,7 @@
           const { data, error } = await supabaseClient.functions.invoke(
             "telegram-notif",
             {
-              body: { message: message, chat_id: targetChatId },
+              body: { message: message, chat_id: targetChatId, photo_url: photoUrl },
             },
           );
 

@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, chat_id } = await req.json()
+    const { message, chat_id, photo_url } = await req.json()
     
     // Ambil Token Bot dari Supabase Secrets
     const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN')
@@ -25,17 +25,18 @@ serve(async (req) => {
       throw new Error('chat_id tidak disertakan dari frontend')
     }
 
+    const apiEndpoint = photo_url ? 'sendPhoto' : 'sendMessage';
+    const payloadObj = photo_url
+      ? { chat_id: chat_id, photo: photo_url, caption: message, parse_mode: 'HTML' }
+      : { chat_id: chat_id, text: message, parse_mode: 'HTML' };
+
     // Panggil API Telegram secara aman di backend
-    const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/${apiEndpoint}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        chat_id: chat_id,
-        text: message,
-        parse_mode: 'HTML',
-      }),
+      body: JSON.stringify(payloadObj),
     })
 
     const data = await telegramResponse.json()
