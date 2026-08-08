@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const { message, chat_id } = req.body || {};
+  const { message, chat_id, photo_url } = req.body || {};
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   const targetChatId = chat_id || process.env.TELEGRAM_CHAT_ID;
 
@@ -30,14 +30,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    const telegramResp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    const apiEndpoint = photo_url ? 'sendPhoto' : 'sendMessage';
+    const payloadObj = photo_url 
+      ? { chat_id: targetChatId, photo: photo_url, caption: message, parse_mode: 'HTML' }
+      : { chat_id: targetChatId, text: message, parse_mode: 'HTML' };
+
+    const telegramResp = await fetch(`https://api.telegram.org/bot${botToken}/${apiEndpoint}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: targetChatId,
-        text: message,
-        parse_mode: 'HTML'
-      })
+      body: JSON.stringify(payloadObj)
     });
 
     const data = await telegramResp.json();
